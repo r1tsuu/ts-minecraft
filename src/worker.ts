@@ -1,11 +1,14 @@
 import { getBlockIdByName, initBlocksWorker } from "./block.js";
-import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
+// @ts-expect-error
+import { SimplexNoise } from "three/examples/jsm/math/SimplexNoise";
+import type { SimplexNoise as SimplexNoiseType } from "three/examples/jsm/math/SimplexNoise.js";
+
 import type { Chunk } from "./types.js";
 import { CHUNK_SIZE, getBlockIndex, WORLD_HEIGHT } from "./util.js";
 
 initBlocksWorker();
 
-const simplex = new SimplexNoise();
+const simplex = new SimplexNoise() as SimplexNoiseType;
 
 const generateChunk = (chunkX: number, chunkZ: number): Chunk => {
   const chunk: Chunk = {
@@ -19,7 +22,7 @@ const generateChunk = (chunkX: number, chunkZ: number): Chunk => {
     for (let z = 0; z < CHUNK_SIZE; z++) {
       const worldX = chunkX + x;
       const worldZ = chunkZ + z;
-      const baseY = 30;
+      const baseY = 15;
       const heightVariation = 12;
       const amplitude = heightVariation / 2;
       const frequency = 0.005;

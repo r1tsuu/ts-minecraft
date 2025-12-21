@@ -84,6 +84,7 @@ export class FPSControls implements ControlsHandler {
   initMouse() {
     const onMouseMove = (e: MouseEvent) => {
       if (document.pointerLockElement !== this.domElement) return;
+      this.player.needsRaycastUpdate = true;
 
       const sensitivity = 0.002;
       this.yaw -= e.movementX * sensitivity;
@@ -104,20 +105,25 @@ export class FPSControls implements ControlsHandler {
       switch (e.code) {
         case "KeyW":
           this.moveForward = true;
+          this.player.needsRaycastUpdate = true;
           break;
         case "KeyS":
           this.moveBackward = true;
+          this.player.needsRaycastUpdate = true;
           break;
         case "KeyA":
           this.moveLeft = true;
+          this.player.needsRaycastUpdate = true;
           break;
         case "KeyD":
           this.moveRight = true;
+          this.player.needsRaycastUpdate = true;
           break;
         case "Space":
           if (this.canJump) {
             this.velocity.y = this.jumpStrength;
             this.canJump = false;
+            this.player.needsRaycastUpdate = true;
           }
           break;
       }

@@ -34,6 +34,7 @@ export type Controls = {
 export type PlayerConfig = {
   width: number;
   height: number;
+  needsRaycastUpdate: boolean;
 };
 
 export type MinecraftInstance = {
