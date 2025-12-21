@@ -1,5 +1,8 @@
 import * as THREE from "three";
 import type { PlayerConfig, World } from "./types.ts";
+import { getBlockInWorld } from "./world.ts";
+
+const FAR = 5;
 
 export const createRaycaster = ({
   camera,
@@ -13,7 +16,16 @@ export const createRaycaster = ({
   scene: THREE.Scene;
 }) => {
   const raycaster = new THREE.Raycaster();
-  raycaster.far = 5;
+  raycaster.far = FAR + 1;
+
+  const raycastingMesh = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshPhongMaterial({
+      wireframe: true, // debug
+      color: THREE.Color.NAMES.black,
+    }),
+    (FAR * 2 + 1) ** 3
+  );
 
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(1.01, 1.01, 1.01),
@@ -21,17 +33,39 @@ export const createRaycaster = ({
   );
 
   let lastUpdated: null | number = null;
+  scene.add(raycastingMesh);
 
   const update = () => {
-    if (lastUpdated !== null && Date.now() - lastUpdated < 50) return;
+    if (lastUpdated !== null && Date.now() - lastUpdated < 20) return;
 
     scene.remove(mesh);
+
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
 
-    const [intersects] = raycaster.intersectObjects(
-      Array.from(world.blockMeshes.values()),
-      false
-    );
+    let index = 0;
+    const matrix = new THREE.Matrix4();
+
+    for (let x = -FAR; x <= FAR; x++) {
+      for (let y = -FAR; y <= FAR; y++) {
+        for (let z = -FAR; z <= FAR; z++) {
+          const worldX = Math.floor(camera.position.x + x);
+          const worldY = Math.floor(camera.position.y + y);
+          const worldZ = Math.floor(camera.position.z + z);
+
+          if (!getBlockInWorld(worldX, worldY, worldZ, world)) continue;
+
+          matrix.setPosition(worldX, worldY, worldZ);
+          raycastingMesh.setMatrixAt(index, matrix);
+          index++;
+        }
+      }
+    }
+
+    raycastingMesh.instanceMatrix.needsUpdate = true;
+    raycastingMesh.computeBoundingSphere();
+    raycastingMesh.computeBoundingBox();
+
+    const [intersects] = raycaster.intersectObject(raycastingMesh, false);
 
     if (
       intersects &&
