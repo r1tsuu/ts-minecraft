@@ -1,0 +1,46 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: none;
+}
+
+
+.fps_display {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: white;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 5px;
+  font-family: monospace;
+}
+
+.position_display {
+  position: absolute;
+  top: 20px;
+  left: 0;
+  color: white;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 5px;
+  font-family: monospace;
+}
+
+.controls_toggle_button {
+  position: absolute;
+  top: 50px;
+  left: 0;
+  color: white;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 5px;
+  font-family: monospace;
+  cursor: pointer;
+}
