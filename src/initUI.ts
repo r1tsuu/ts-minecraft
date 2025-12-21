@@ -193,23 +193,49 @@ export const initUI = ({
   const controlsDisplay = customElement({
     tag: "div",
     className: "ui_element",
-    text: "Press C to Toggle Controls (FPS)",
     parent: wrapper,
   });
+
+  const updateControlText = () => {
+    let text: string;
+
+    if (controls.type === "fps") {
+      text = "Press C to Toggle Controls (FPS)";
+    } else {
+      text = "Press C to Toggle Controls (Free)";
+    }
+
+    controlsDisplay.setText(text);
+  };
+
+  updateControlText();
 
   const pauseDisplay = customElement({
     tag: "div",
     className: "ui_element",
-    text: "Press P to Pause",
     parent: wrapper,
   });
+
+  const updatePauseText = () => {
+    let text: string;
+
+    if (minecraft.paused) {
+      text = "Press P to Resume";
+    } else {
+      text = "Press P to Pause";
+    }
+
+    pauseDisplay.setText(text);
+  };
+
+  updatePauseText();
 
   const toggleControls = () => {
     controls.handler.dispose();
     if (controls.type === "fps") {
       controls.type = "free";
       controls.handler = new FreeControls(camera, renderer.domElement);
-      controlsDisplay.setText("Press C to Toggle Controls (Free)");
+      updateControlText();
     } else {
       controls.type = "fps";
       controls.handler = new FPSControls(
@@ -218,11 +244,9 @@ export const initUI = ({
         world,
         player
       );
-      controlsDisplay.setText("Press C to Toggle Controls (FPS)");
+      updateControlText();
     }
   };
-
-  controlsDisplay.element.onclick = toggleControls;
 
   let pauseOverlay: CustomElement | null = null;
 
@@ -232,7 +256,7 @@ export const initUI = ({
       pauseOverlay = null;
     }
     minecraft.paused = false;
-    pauseDisplay.setText("Press P to Pause");
+    updatePauseText();
     if (document.pointerLockElement !== renderer.domElement) {
       renderer.domElement.requestPointerLock();
     }
@@ -252,8 +276,7 @@ export const initUI = ({
       }
 
       minecraft.paused = true;
-
-      pauseDisplay.setText("Press P to Resume");
+      updatePauseText();
 
       pauseOverlay = initPauseMenu({
         onExitToMainMenu: () => {
