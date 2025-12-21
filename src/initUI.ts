@@ -14,20 +14,26 @@ export const initUI = ({
   controls: { handler: ControlsHandler; type: "free" | "fps" };
   renderer: THREE.WebGLRenderer;
 }) => {
+  const wrapper = document.createElement("div");
+  wrapper.classList.add("ui_wrapper");
+  document.body.appendChild(wrapper);
+
   // FPS Counter
   const fpsDisplay = document.createElement("div");
   fpsDisplay.classList.add("fps_display");
-  document.body.appendChild(fpsDisplay);
+  fpsDisplay.textContent = `FPS: Loading...`;
+
+  wrapper.appendChild(fpsDisplay);
 
   // Position display
   const positionDisplay = document.createElement("div");
   positionDisplay.classList.add("position_display");
-  document.body.appendChild(positionDisplay);
+  wrapper.appendChild(positionDisplay);
 
   const toggleControlsButton = document.createElement("button");
   toggleControlsButton.classList.add("controls_toggle_button");
   toggleControlsButton.textContent = "Switch to Free Controls";
-  document.body.appendChild(toggleControlsButton);
+  wrapper.appendChild(toggleControlsButton);
 
   const toggleControls = () => {
     controls.handler.dispose();

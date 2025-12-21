@@ -13,11 +13,21 @@ canvas {
   cursor: none;
 }
 
+.ui_wrapper {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-width: fit-content;
+}
+
 
 .fps_display {
-  position: absolute;
-  top: 0;
-  left: 0;
   color: white;
   background-color: rgba(0, 0, 0, 0.5);
   padding: 5px;
@@ -25,9 +35,6 @@ canvas {
 }
 
 .position_display {
-  position: absolute;
-  top: 20px;
-  left: 0;
   color: white;
   background-color: rgba(0, 0, 0, 0.5);
   padding: 5px;
@@ -35,9 +42,6 @@ canvas {
 }
 
 .controls_toggle_button {
-  position: absolute;
-  top: 50px;
-  left: 0;
   color: white;
   background-color: rgba(0, 0, 0, 0.5);
   padding: 5px;
