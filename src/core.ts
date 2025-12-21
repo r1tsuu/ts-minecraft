@@ -6,6 +6,9 @@ import { FPSControls } from "./FPSControls.ts";
 export const createMinecraftInstance = (): MinecraftInstance => {
   const scene = new THREE.Scene();
   const renderer = new THREE.WebGLRenderer({ antialias: true });
+  // renderer.outputColorSpace = THREE.SRGBColorSpace;
+  // renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  // renderer.toneMappingExposure = 1.0;
   const camera = new THREE.PerspectiveCamera(
     75,
     window.innerWidth / window.innerHeight,

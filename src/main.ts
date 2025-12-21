@@ -24,16 +24,26 @@ const raycaster = createRaycaster({
   player: minecraft.player,
 });
 
+let updatePromise: Promise<void> | null = null;
+let lastUpdated: null | number = null;
+
 const loop = async () => {
   requestAnimationFrame(loop);
   const delta = clock.getDelta();
 
   minecraft.renderer.render(minecraft.scene, minecraft.camera);
-
   minecraft.controls.handler.update(delta);
-  await updateWorld(minecraft.world, minecraft.camera.position);
 
-  raycaster.update();
+  if (!updatePromise) {
+    updatePromise = updateWorld(
+      minecraft.world,
+      minecraft.camera.position
+    ).then(() => {
+      lastUpdated = Date.now();
+      raycaster.update();
+      updatePromise = null;
+    });
+  }
 
   updateUI();
 };

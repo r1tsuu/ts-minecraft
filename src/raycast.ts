@@ -13,7 +13,7 @@ export const createRaycaster = ({
   scene: THREE.Scene;
 }) => {
   const raycaster = new THREE.Raycaster();
-  raycaster.far = 8;
+  raycaster.far = 5;
 
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(1.01, 1.01, 1.01),
@@ -23,7 +23,7 @@ export const createRaycaster = ({
   let lastUpdated: null | number = null;
 
   const update = () => {
-    if (lastUpdated !== null && Date.now() - lastUpdated < 100) return;
+    if (lastUpdated !== null && Date.now() - lastUpdated < 50) return;
 
     scene.remove(mesh);
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);

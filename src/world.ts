@@ -34,14 +34,14 @@ export const createWorld = (scene: THREE.Scene): World => {
   scene.fog = new THREE.Fog(backgroundColor, 1, 96);
   scene.background = new THREE.Color(backgroundColor);
 
-  const sunLight = new THREE.PointLight(0xffffff, 0.5);
+  const sunLight = new THREE.DirectionalLight(0xffffff, 3);
   sunLight.position.set(500, 500, 500);
   scene.add(sunLight);
-  const sunLight2 = new THREE.PointLight(0xffffff, 0.2);
+  const sunLight2 = new THREE.DirectionalLight(0xffffff, 3);
   sunLight2.position.set(-500, 500, -500);
   scene.add(sunLight2);
 
-  const reflectionLight = new THREE.AmbientLight(0x404040);
+  const reflectionLight = new THREE.AmbientLight(0x404040, 0.5);
   scene.add(reflectionLight);
 
   const blockMeshes = new Map<number, THREE.InstancedMesh>();
