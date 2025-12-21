@@ -3,49 +3,96 @@ import * as THREE from "three";
 import "./style.css";
 import { initBlocks } from "./block.js";
 import { updateWorld } from "./world.js";
-import { initUI } from "./initUI.js";
+import { initMenu, initUI } from "./initUI.js";
 import { createMinecraftInstance } from "./core.ts";
 import { createRaycaster } from "./raycast.ts";
+import { min } from "three/tsl";
+import { FPSControls } from "./FPSControls.ts";
+import { FreeControls } from "./FreeControls.ts";
 
 await initBlocks();
 
-const clock = new THREE.Clock();
+const startGame = async () => {
+  let stopped = false;
 
-const minecraft = createMinecraftInstance();
+  const clock = new THREE.Clock();
 
-const { updateUI } = initUI({
-  minecraft,
-});
+  const minecraft = await createMinecraftInstance();
 
-const raycaster = createRaycaster({
-  camera: minecraft.camera,
-  world: minecraft.world,
-  scene: minecraft.scene,
-  player: minecraft.player,
-});
+  const { updateUI } = initUI({
+    minecraft,
+    onExitToMainMenu: () => {
+      stopped = true;
+    },
+  });
 
-let updatePromise: Promise<void> | null = null;
-let lastUpdated: null | number = null;
+  const raycaster = createRaycaster({
+    camera: minecraft.camera,
+    world: minecraft.world,
+    scene: minecraft.scene,
+    player: minecraft.player,
+  });
 
-const loop = async () => {
-  requestAnimationFrame(loop);
-  const delta = clock.getDelta();
+  let updatePromise: Promise<void> | null = null;
+  let lastUpdated: null | number = null;
 
-  minecraft.renderer.render(minecraft.scene, minecraft.camera);
-  minecraft.controls.handler.update(delta);
+  let lastPaused = false;
 
-  if (!updatePromise) {
-    updatePromise = updateWorld(
-      minecraft.world,
-      minecraft.camera.position
-    ).then(() => {
-      lastUpdated = Date.now();
-      raycaster.update();
-      updatePromise = null;
-    });
-  }
+  const loop = async () => {
+    requestAnimationFrame(loop);
+    updateUI();
 
-  updateUI();
+    if (minecraft.paused) {
+      console.log("Game paused, skipping frame");
+      clock.stop();
+      lastPaused = true;
+      // Dispose controls to free up event listeners
+      minecraft.controls.handler.dispose();
+      return;
+    }
+
+    if (lastPaused) {
+      clock.start();
+      minecraft.controls =
+        minecraft.controls.type === "fps"
+          ? FPSControls.controls(
+              minecraft.camera,
+              minecraft.renderer,
+              minecraft.world,
+              minecraft.player
+            )
+          : FreeControls.controls(
+              minecraft.camera,
+              minecraft.renderer.domElement
+            );
+      lastPaused = false;
+    }
+
+    const delta = clock.getDelta();
+
+    minecraft.renderer.render(minecraft.scene, minecraft.camera);
+
+    if (!document.pointerLockElement) {
+      await minecraft.renderer.domElement.requestPointerLock();
+    }
+
+    minecraft.controls.handler.update(delta);
+
+    if (!updatePromise) {
+      updatePromise = updateWorld(
+        minecraft.world,
+        minecraft.camera.position
+      ).then(() => {
+        lastUpdated = Date.now();
+        raycaster.update();
+        updatePromise = null;
+      });
+    }
+  };
+
+  if (!stopped) loop();
 };
 
-loop();
+initMenu({
+  onStartGame: startGame,
+});

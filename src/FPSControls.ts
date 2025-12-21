@@ -83,7 +83,7 @@ export class FPSControls implements ControlsHandler {
 
   initMouse() {
     const onMouseMove = (e: MouseEvent) => {
-      if (document.pointerLockElement !== this.domElement) return;
+      // if (document.pointerLockElement !== this.domElement) return;
 
       const sensitivity = 0.002;
       this.yaw -= e.movementX * sensitivity;

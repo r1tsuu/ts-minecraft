@@ -1,9 +1,14 @@
 import { getBlockIdByName, initBlocksWorker } from "./block.js";
+import { PGlite } from "@electric-sql/pglite";
 import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
 import type { Chunk } from "./types.js";
 import { CHUNK_SIZE, getBlockIndex, WORLD_HEIGHT } from "./util.js";
 
 initBlocksWorker();
+
+const db = new PGlite("idb://minecraft_worker_db");
+
+const initDatabase = async () => {};
 
 const simplex = new SimplexNoise();
 

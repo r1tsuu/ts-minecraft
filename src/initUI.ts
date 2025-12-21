@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import background from "./static/background.jpeg";
 import type { MinecraftInstance } from "./types.js";
 import { FreeControls } from "./FreeControls.js";
 import { FPSControls } from "./FPSControls.js";
@@ -50,11 +51,98 @@ const customElement = (args: {
   };
 };
 
+export const initMenu = ({ onStartGame }: { onStartGame: () => void }) => {
+  const menuOverlay = customElement({
+    tag: "div",
+    className: "menu_overlay",
+    parent: document.body,
+  });
+
+  menuOverlay.element.style.backgroundImage = `url("${background}")`;
+
+  customElement({
+    tag: "h1",
+    className: "menu_title",
+    text: "Minecraft TS",
+    parent: menuOverlay,
+  });
+
+  const startButton = customElement({
+    tag: "button",
+    className: "menu_button",
+    text: "Start Game",
+    parent: menuOverlay,
+  });
+
+  const startGame = () => {
+    document.body.removeChild(menuOverlay.element);
+
+    onStartGame();
+  };
+
+  startButton.element.onclick = startGame;
+};
+
+const initPauseMenu = ({
+  onExitToMainMenu,
+  onResume,
+}: {
+  onResume: () => void;
+  onExitToMainMenu: () => void;
+}): CustomElement => {
+  const overlay = customElement({
+    tag: "div",
+    className: "pause_menu_overlay",
+    parent: document.body,
+  });
+
+  customElement({
+    tag: "h1",
+    className: "pause_menu_title",
+    text: "Paused",
+    parent: overlay,
+  });
+
+  const resumeButton = customElement({
+    tag: "button",
+    className: "pause_menu_button",
+    text: "Resume",
+    parent: overlay,
+  });
+
+  const resume = () => {
+    document.body.removeChild(overlay.element);
+    onResume();
+  };
+
+  overlay.element.focus();
+
+  const exitButton = customElement({
+    tag: "button",
+    className: "pause_menu_button",
+    text: "Exit to Main Menu",
+    parent: overlay,
+  });
+
+  const exitToMainMenu = () => {
+    document.body.removeChild(overlay.element);
+    onExitToMainMenu();
+  };
+
+  resumeButton.element.onclick = resume;
+  exitButton.element.onclick = exitToMainMenu;
+
+  return overlay;
+};
+
 export const initUI = ({
-  minecraft: { camera, controls, renderer, player, world },
+  minecraft,
+  onExitToMainMenu,
 }: {
   minecraft: MinecraftInstance;
+  onExitToMainMenu: () => void;
 }) => {
+  const { camera, renderer, world, controls, player } = minecraft;
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
@@ -121,13 +209,37 @@ export const initUI = ({
     }
   };
 
-  toggleControlsButton.element.addEventListener("click", () => {
-    toggleControls();
-  });
+  toggleControlsButton.element.onclick = toggleControls;
+
+  let pauseOverlay: CustomElement | null = null;
 
   window.addEventListener("keydown", (e) => {
+    e.preventDefault();
     if (e.code === "KeyC") {
       toggleControls();
+    }
+
+    if (e.code === "KeyP") {
+      if (minecraft.paused) {
+        minecraft.paused = false;
+        if (pauseOverlay) {
+          document.body.removeChild(pauseOverlay.element);
+          pauseOverlay = null;
+        }
+        return;
+      }
+
+      minecraft.paused = true;
+
+      pauseOverlay = initPauseMenu({
+        onExitToMainMenu: () => {
+          minecraft.paused = false;
+          onExitToMainMenu();
+        },
+        onResume: () => {
+          minecraft.paused = false;
+        },
+      });
     }
   });
 

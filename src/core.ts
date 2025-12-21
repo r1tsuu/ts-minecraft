@@ -3,7 +3,7 @@ import type { MinecraftInstance } from "./types.ts";
 import { createWorld } from "./world.ts";
 import { FPSControls } from "./FPSControls.ts";
 
-export const createMinecraftInstance = (): MinecraftInstance => {
+export const createMinecraftInstance = async (): Promise<MinecraftInstance> => {
   const scene = new THREE.Scene();
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   // renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -31,6 +31,7 @@ export const createMinecraftInstance = (): MinecraftInstance => {
     controls: FPSControls.controls(camera, renderer, world, player),
     renderer,
     scene,
+    paused: false,
     world,
     player,
   };

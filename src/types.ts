@@ -41,6 +41,7 @@ export type MinecraftInstance = {
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
   world: World;
+  paused: boolean;
   controls: Controls;
   player: PlayerConfig;
 };
