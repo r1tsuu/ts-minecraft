@@ -86,9 +86,11 @@ export const initMenu = ({ onStartGame }: { onStartGame: () => void }) => {
 const initPauseMenu = ({
   onExitToMainMenu,
   onResume,
+  minecraft,
 }: {
   onResume: () => void;
   onExitToMainMenu: () => void;
+  minecraft: MinecraftInstance;
 }): CustomElement => {
   const overlay = customElement({
     tag: "div",
@@ -131,6 +133,11 @@ const initPauseMenu = ({
 
   resumeButton.element.onclick = resume;
   exitButton.element.onclick = exitToMainMenu;
+
+  minecraft.renderer.domElement.style.cursor = "default";
+  if (document.pointerLockElement === minecraft.renderer.domElement) {
+    document.exitPointerLock();
+  }
 
   return overlay;
 };
@@ -184,10 +191,17 @@ export const initUI = ({
     parent: wrapper,
   });
 
-  const toggleControlsButton = customElement({
-    tag: "button",
+  const controlsDisplay = customElement({
+    tag: "div",
     className: "ui_element",
-    text: "Switch to Free Controls (C)",
+    text: "Press C to Toggle Controls (FPS)",
+    parent: wrapper,
+  });
+
+  const pauseDisplay = customElement({
+    tag: "div",
+    className: "ui_element",
+    text: "Press P to Pause",
     parent: wrapper,
   });
 
@@ -196,7 +210,7 @@ export const initUI = ({
     if (controls.type === "fps") {
       controls.type = "free";
       controls.handler = new FreeControls(camera, renderer.domElement);
-      toggleControlsButton.setText("Switch to FPS Controls (C)");
+      controlsDisplay.setText("Press C to Toggle Controls (Free)");
     } else {
       controls.type = "fps";
       controls.handler = new FPSControls(
@@ -205,13 +219,26 @@ export const initUI = ({
         world,
         player
       );
-      toggleControlsButton.setText("Switch to Free Controls (C)");
+      controlsDisplay.setText("Press C to Toggle Controls (FPS)");
     }
   };
 
-  toggleControlsButton.element.onclick = toggleControls;
+  controlsDisplay.element.onclick = toggleControls;
 
   let pauseOverlay: CustomElement | null = null;
+
+  const resumeFromPause = () => {
+    if (pauseOverlay) {
+      document.body.removeChild(pauseOverlay.element);
+      pauseOverlay = null;
+    }
+    minecraft.paused = false;
+    pauseDisplay.setText("Press P to Pause");
+    if (document.pointerLockElement !== renderer.domElement) {
+      renderer.domElement.requestPointerLock();
+    }
+    minecraft.renderer.domElement.style.cursor = "none";
+  };
 
   window.addEventListener("keydown", (e) => {
     e.preventDefault();
@@ -221,24 +248,21 @@ export const initUI = ({
 
     if (e.code === "KeyP") {
       if (minecraft.paused) {
-        minecraft.paused = false;
-        if (pauseOverlay) {
-          document.body.removeChild(pauseOverlay.element);
-          pauseOverlay = null;
-        }
+        resumeFromPause();
         return;
       }
 
       minecraft.paused = true;
+
+      pauseDisplay.setText("Press P to Resume");
 
       pauseOverlay = initPauseMenu({
         onExitToMainMenu: () => {
           minecraft.paused = false;
           onExitToMainMenu();
         },
-        onResume: () => {
-          minecraft.paused = false;
-        },
+        minecraft,
+        onResume: resumeFromPause,
       });
     }
   });
@@ -285,7 +309,7 @@ export const initUI = ({
   return {
     fpsDisplay,
     positionDisplay,
-    toggleControlsButton,
+    toggleControlsButton: controlsDisplay,
     updateUI,
   };
 };
