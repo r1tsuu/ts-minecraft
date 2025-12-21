@@ -32,7 +32,7 @@ export const initUI = ({
 
   const toggleControlsButton = document.createElement("button");
   toggleControlsButton.classList.add("controls_toggle_button");
-  toggleControlsButton.textContent = "Switch to Free Controls";
+  toggleControlsButton.textContent = "Switch to Free Controls (C)";
   wrapper.appendChild(toggleControlsButton);
 
   const toggleControls = () => {
@@ -40,11 +40,11 @@ export const initUI = ({
     if (controls.type === "fps") {
       controls.type = "free";
       controls.handler = new FreeControls(camera, renderer.domElement);
-      toggleControlsButton.textContent = "Switch to FPS Controls";
+      toggleControlsButton.textContent = "Switch to FPS Controls (C)";
     } else {
       controls.type = "fps";
       controls.handler = new FPSControls(camera, renderer.domElement, world);
-      toggleControlsButton.textContent = "Switch to Free Controls";
+      toggleControlsButton.textContent = "Switch to Free Controls (C)";
     }
   };
 
