@@ -40,17 +40,21 @@ export const initBlocksWorker = () => {
   }
 };
 
-const loadTexture = async (path: string) => {
+const loadTexture = async (importPromise: Promise<{ default: string }>) => {
   const { TextureLoader } = await import("three");
-  const texture = await import(path);
+  const texture = await importPromise;
   return new TextureLoader().load(texture.default);
 };
 
 export const initBlocks = async () => {
   const { MeshStandardMaterial } = await import("three");
-  const dirtTexture = await loadTexture("./static/dirt.png");
-  const grassTexture = await loadTexture("./static/grass_block_side.png");
-  const grassTopTexture = await loadTexture("./static/grass_block_top.png");
+  const dirtTexture = await loadTexture(import("./static/dirt.png"));
+  const grassTexture = await loadTexture(
+    import("./static/grass_block_side.png")
+  );
+  const grassTopTexture = await loadTexture(
+    import("./static/grass_block_top.png")
+  );
 
   for (const name of BLOCK_NAMES) {
     const nameMaterialMap: Record<BlockName, Material | Material[]> = {
