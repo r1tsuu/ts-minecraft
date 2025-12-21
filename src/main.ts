@@ -39,7 +39,7 @@ const controls: {
   handler: ControlsHandler;
   type: "free" | "fps";
 } = {
-  handler: new FPSControls(camera, renderer.domElement, null as any),
+  handler: new FPSControls(camera, renderer.domElement, world),
   type: "fps",
 };
 

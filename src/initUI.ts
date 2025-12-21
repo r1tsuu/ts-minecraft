@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { ControlsHandler, World } from "./types.ts";
+import type { ControlsHandler, World } from "./types.js";
 import { FreeControls } from "./FreeControls.js";
 import { FPSControls } from "./FPSControls.js";
 
@@ -69,9 +69,18 @@ export const initUI = ({
 
     // Update position display
     const pos = camera.position;
+
+    let displayY = pos.y;
+    if (
+      "playerHeight" in controls.handler &&
+      typeof controls.handler.playerHeight === "number"
+    ) {
+      displayY -= controls.handler.playerHeight;
+    }
+
     positionDisplay.textContent = `Position: X: ${pos.x.toFixed(
       2
-    )} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)}`;
+    )} Y: ${displayY.toFixed(2)} Z: ${pos.z.toFixed(2)}`;
   };
 
   return {
