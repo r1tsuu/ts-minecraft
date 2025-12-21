@@ -19,14 +19,12 @@ const generateTerrain = async (
   chunkKeys: string[]
 ): Promise<Map<string, Chunk>> => {
   return new Promise((resolve) => {
-    if (!TerrainGeneratorWorker.onmessage)
-      TerrainGeneratorWorker.onmessage = (
-        msg: MessageEvent<{ chunks: Map<string, Chunk> }>
-      ) => {
-        console.log("Received generated chunks from worker", msg.data.chunks);
-        TerrainGeneratorWorker.onmessage = null;
-        resolve(msg.data.chunks);
-      };
+    TerrainGeneratorWorker.onmessage = (
+      msg: MessageEvent<{ chunks: Map<string, Chunk> }>
+    ) => {
+      console.log("Received generated chunks from worker", msg.data.chunks);
+      resolve(msg.data.chunks);
+    };
     TerrainGeneratorWorker.postMessage({ chunkKeys });
   });
 };
@@ -64,7 +62,6 @@ export const createWorld = (scene: THREE.Scene): World => {
     scene.add(mesh);
     blockMeshes.set(id, mesh);
     blockMeshesCount.set(id, 0);
-    mesh.frustumCulled = false;
   }
 
   return {
@@ -194,10 +191,8 @@ export const updateWorld = async (
   }
 
   for (const mesh of world.blockMeshes.values()) {
-    // mesh.instanceMatrix = new THREE.InstancedBufferAttribute(
-    //   mesh.instanceMatrix.array,
-    //   16
-    // );
     mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingBox();
+    mesh.computeBoundingSphere();
   }
 };

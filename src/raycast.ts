@@ -23,11 +23,7 @@ export const createRaycaster = ({
   let lastUpdated: null | number = null;
 
   const update = () => {
-    if (
-      !player.needsRaycastUpdate ||
-      (lastUpdated !== null && Date.now() - lastUpdated < 1)
-    )
-      return;
+    if (lastUpdated !== null && Date.now() - lastUpdated < 100) return;
 
     scene.remove(mesh);
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
@@ -49,7 +45,6 @@ export const createRaycaster = ({
       scene.add(mesh);
     }
 
-    player.needsRaycastUpdate = false;
     lastUpdated = Date.now();
   };
 
