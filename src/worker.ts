@@ -1,14 +1,10 @@
 import { getBlockIdByName, initBlocksWorker } from "./block.js";
-import { PGlite } from "@electric-sql/pglite";
+
 import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
 import type { Chunk } from "./types.js";
 import { CHUNK_SIZE, getBlockIndex, WORLD_HEIGHT } from "./util.js";
 
 initBlocksWorker();
-
-const db = new PGlite("idb://minecraft_worker_db");
-
-const initDatabase = async () => {};
 
 const simplex = new SimplexNoise();
 
@@ -44,21 +40,47 @@ const generateChunk = (chunkX: number, chunkZ: number): Chunk => {
   return chunk;
 };
 
-onmessage = (
-  msg: MessageEvent<{
-    chunkKeys: string[];
-  }>
-) => {
-  const { chunkKeys } = msg.data;
-  const chunks = new Map<string, Chunk>();
-
-  for (const key of chunkKeys) {
-    const [chunkXStr, chunkZStr] = key.split(",");
-    const chunkX = parseInt(chunkXStr, 10);
-    const chunkZ = parseInt(chunkZStr, 10);
-    const chunk = generateChunk(chunkX, chunkZ);
-    chunks.set(key, chunk);
-  }
-
-  postMessage({ chunks });
+const sendEventToClient = (event: MinecraftWorkerEvent) => {
+  postMessage(event);
 };
+
+onmessage = (msg: MessageEvent<MinecraftClientEvent>) => {
+  switch (msg.data.type) {
+    case "requestChunks": {
+      const { chunkKeys } = msg.data.payload;
+      const chunks = new Map<string, Chunk>();
+
+      for (const key of chunkKeys) {
+        const [chunkXStr, chunkZStr] = key.split(",");
+        const chunkX = parseInt(chunkXStr, 10);
+        const chunkZ = parseInt(chunkZStr, 10);
+        const chunk = generateChunk(chunkX, chunkZ);
+        chunks.set(key, chunk);
+      }
+
+      sendEventToClient({
+        type: "chunksGenerated",
+        payload: { chunks },
+      });
+      break;
+    }
+  }
+};
+
+type BaseEvent<T extends string, Data> = {
+  type: T;
+  payload: Data;
+};
+
+export type MinecraftWorkerChunksGeneratedEvent = BaseEvent<
+  "chunksGenerated",
+  { chunks: Map<string, Chunk> }
+>;
+
+export type MinecraftClientRequestChunksEvent = BaseEvent<
+  "requestChunks",
+  { chunkKeys: string[] }
+>;
+
+export type MinecraftClientEvent = MinecraftClientRequestChunksEvent;
+export type MinecraftWorkerEvent = MinecraftWorkerChunksGeneratedEvent;

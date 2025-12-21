@@ -7,27 +7,7 @@ import {
   WORLD_HEIGHT,
   getBlockIndex as getIndex,
 } from "./util.js";
-
-const TerrainGeneratorWorker = new Worker(
-  new URL("./worker.ts", import.meta.url),
-  {
-    type: "module",
-  }
-);
-
-const generateTerrain = async (
-  chunkKeys: string[]
-): Promise<Map<string, Chunk>> => {
-  return new Promise((resolve) => {
-    TerrainGeneratorWorker.onmessage = (
-      msg: MessageEvent<{ chunks: Map<string, Chunk> }>
-    ) => {
-      console.log("Received generated chunks from worker", msg.data.chunks);
-      resolve(msg.data.chunks);
-    };
-    TerrainGeneratorWorker.postMessage({ chunkKeys });
-  });
-};
+import { sendEventToWorker } from "./workerClient.ts";
 
 export const createWorld = (scene: THREE.Scene): World => {
   const backgroundColor = 0x87ceeb;
@@ -68,6 +48,7 @@ export const createWorld = (scene: THREE.Scene): World => {
     chunks: new Map<string, Chunk>(),
     blockMeshes: blockMeshes,
     blockMeshesCount,
+    requestingChunksState: "idle",
   };
 };
 
@@ -112,9 +93,6 @@ export const updateWorld = async (
   const needed = new Set<string>();
   let chunksToLoad: string[] = [];
 
-  let needsBlockMeshesUpdate = false;
-
-  // Load required chunks
   for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
     for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
       const cx = playerChunkX + dx * CHUNK_SIZE;
@@ -125,74 +103,76 @@ export const updateWorld = async (
 
       if (!world.chunks.has(key)) {
         chunksToLoad.push(key);
-        needsBlockMeshesUpdate = true;
       }
     }
   }
 
   if (chunksToLoad.length) {
-    let current = Date.now();
-    const chunks = await generateTerrain(chunksToLoad);
-    console.log(`Generated new chunks in ${Date.now() - current} ms`);
-    for (const [key, chunk] of chunks) {
-      world.chunks.set(key, chunk);
+    if (world.requestingChunksState === "idle") {
+      sendEventToWorker({
+        type: "requestChunks",
+        payload: { chunkKeys: chunksToLoad },
+      });
+      world.requestingChunksState = "requesting";
     }
+  }
 
-    needsBlockMeshesUpdate = true;
+  let needsMeshUpdate = world.requestingChunksState === "received";
+
+  if (world.requestingChunksState === "received") {
+    world.requestingChunksState = "idle";
   }
 
   // Unload chunks outside render distance
   for (const key of world.chunks.keys()) {
     if (!needed.has(key)) {
       world.chunks.delete(key);
-      needsBlockMeshesUpdate = true;
+      needsMeshUpdate = true;
     }
   }
 
-  if (!needsBlockMeshesUpdate) {
-    return;
-  }
+  if (needsMeshUpdate) {
+    const matrix = new THREE.Matrix4();
 
-  const matrix = new THREE.Matrix4();
+    for (const block of world.blockMeshesCount.keys()) {
+      world.blockMeshesCount.set(block, 0);
+    }
 
-  for (const block of world.blockMeshesCount.keys()) {
-    world.blockMeshesCount.set(block, 0);
-  }
+    for (const chunk of world.chunks.values()) {
+      for (let x = 0; x < CHUNK_SIZE; x++) {
+        for (let y = 0; y < WORLD_HEIGHT; y++) {
+          for (let z = 0; z < CHUNK_SIZE; z++) {
+            const blockId = chunk.blocks[getIndex(x, y, z)];
+            if (blockId === 0) continue; // Air block, skip rendering
 
-  for (const chunk of world.chunks.values()) {
-    for (let x = 0; x < CHUNK_SIZE; x++) {
-      for (let y = 0; y < WORLD_HEIGHT; y++) {
-        for (let z = 0; z < CHUNK_SIZE; z++) {
-          const blockId = chunk.blocks[getIndex(x, y, z)];
-          if (blockId === 0) continue; // Air block, skip rendering
+            const block = getBlockById(blockId);
 
-          const block = getBlockById(blockId);
+            if (!block) continue;
 
-          if (!block) continue;
+            const mesh = world.blockMeshes.get(blockId);
 
-          const mesh = world.blockMeshes.get(blockId);
+            if (!mesh) {
+              throw new Error(`Mesh for block ID ${blockId} not found`);
+            }
 
-          if (!mesh) {
-            throw new Error(`Mesh for block ID ${blockId} not found`);
+            matrix.setPosition(chunk.x + x, y, chunk.z + z);
+            const index = world.blockMeshesCount.get(blockId);
+
+            if (index === undefined) {
+              throw new Error(`Mesh count for block ID ${blockId} not found`);
+            }
+
+            mesh.setMatrixAt(index, matrix);
+            world.blockMeshesCount.set(blockId, index + 1);
           }
-
-          matrix.setPosition(chunk.x + x, y, chunk.z + z);
-          const index = world.blockMeshesCount.get(blockId);
-
-          if (index === undefined) {
-            throw new Error(`Mesh count for block ID ${blockId} not found`);
-          }
-
-          mesh.setMatrixAt(index, matrix);
-          world.blockMeshesCount.set(blockId, index + 1);
         }
       }
     }
-  }
 
-  for (const mesh of world.blockMeshes.values()) {
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingBox();
-    mesh.computeBoundingSphere();
+    for (const mesh of world.blockMeshes.values()) {
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingBox();
+      mesh.computeBoundingSphere();
+    }
   }
 };

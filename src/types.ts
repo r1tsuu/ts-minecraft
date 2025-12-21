@@ -19,6 +19,7 @@ export type World = {
   chunks: Map<string, Chunk>;
   blockMeshes: Map<number, THREE.InstancedMesh>;
   blockMeshesCount: Map<number, number>;
+  requestingChunksState: "idle" | "requesting" | "received";
 };
 
 export interface ControlsHandler {
@@ -44,4 +45,5 @@ export type MinecraftInstance = {
   paused: boolean;
   controls: Controls;
   player: PlayerConfig;
+  dispose: () => void;
 };

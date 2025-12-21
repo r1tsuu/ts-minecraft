@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { MinecraftInstance } from "./types.ts";
 import { createWorld } from "./world.ts";
 import { FPSControls } from "./FPSControls.ts";
+import { listenToWorkerEvents } from "./workerClient.ts";
 
 export const createMinecraftInstance = async (): Promise<MinecraftInstance> => {
   const scene = new THREE.Scene();
@@ -26,6 +27,26 @@ export const createMinecraftInstance = async (): Promise<MinecraftInstance> => {
     height: 1.8,
   };
 
+  const unsubscribeFromWorkerEvents = listenToWorkerEvents((event) => {
+    console.log("Received event from worker:", event);
+
+    switch (event.type) {
+      case "chunksGenerated": {
+        const { chunks } = event.payload;
+        for (const [key, chunk] of chunks) {
+          world.chunks.set(key, chunk);
+        }
+        world.requestingChunksState = "received";
+        break;
+      }
+    }
+  });
+
+  const dispose = () => {
+    unsubscribeFromWorkerEvents();
+    renderer.dispose();
+  };
+
   return {
     camera,
     controls: FPSControls.controls(camera, renderer, world, player),
@@ -34,5 +55,6 @@ export const createMinecraftInstance = async (): Promise<MinecraftInstance> => {
     paused: false,
     world,
     player,
+    dispose,
   };
 };

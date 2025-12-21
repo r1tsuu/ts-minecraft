@@ -6,7 +6,6 @@ import { updateWorld } from "./world.js";
 import { initMenu, initUI } from "./initUI.js";
 import { createMinecraftInstance } from "./core.ts";
 import { createRaycaster } from "./raycast.ts";
-import { min } from "three/tsl";
 import { FPSControls } from "./FPSControls.ts";
 import { FreeControls } from "./FreeControls.ts";
 
@@ -39,11 +38,15 @@ const startGame = async () => {
   let lastPaused = false;
 
   const loop = async () => {
-    requestAnimationFrame(loop);
+    if (!stopped) requestAnimationFrame(loop);
+    else {
+      minecraft.dispose();
+      return;
+    }
+
     updateUI();
 
     if (minecraft.paused) {
-      console.log("Game paused, skipping frame");
       clock.stop();
       lastPaused = true;
       // Dispose controls to free up event listeners
@@ -90,7 +93,7 @@ const startGame = async () => {
     }
   };
 
-  if (!stopped) loop();
+  loop();
 };
 
 initMenu({
