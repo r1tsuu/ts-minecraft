@@ -25,3 +25,14 @@ export interface ControlsHandler {
   update(delta: number): void;
   dispose(): void;
 }
+
+export type Minecraft = {
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  renderer: THREE.WebGLRenderer;
+  world: World;
+  controls: {
+    handler: ControlsHandler;
+    type: "free" | "fps";
+  };
+};

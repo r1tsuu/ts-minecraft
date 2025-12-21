@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { ControlsHandler, World } from "./types.js";
+import type { Minecraft } from "./types.js";
 import { FreeControls } from "./FreeControls.js";
 import { FPSControls } from "./FPSControls.js";
 
@@ -51,16 +51,18 @@ const customElement = (args: {
 };
 
 export const initUI = ({
-  renderer,
-  camera,
-  controls,
-  world,
+  minecraft: { camera, controls, renderer, world },
 }: {
-  camera: THREE.PerspectiveCamera;
-  world: World;
-  controls: { handler: ControlsHandler; type: "free" | "fps" };
-  renderer: THREE.WebGLRenderer;
+  minecraft: Minecraft;
 }) => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  window.addEventListener("resize", () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+  renderer.domElement.style.outline = "none"; // remove default outline
+
   const wrapper = customElement({
     tag: "div",
     className: "ui_wrapper",
