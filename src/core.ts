@@ -1,9 +1,9 @@
 import * as THREE from "three";
-import type { ControlsHandler, Minecraft } from "./types.ts";
+import type { MinecraftInstance } from "./types.ts";
 import { createWorld } from "./world.ts";
 import { FPSControls } from "./FPSControls.ts";
 
-export const createMinecraftInstance = (): Minecraft => {
+export const createMinecraftInstance = (): MinecraftInstance => {
   const scene = new THREE.Scene();
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   const camera = new THREE.PerspectiveCamera(
@@ -18,19 +18,17 @@ export const createMinecraftInstance = (): Minecraft => {
 
   const world = createWorld(scene);
 
-  const controls: {
-    handler: ControlsHandler;
-    type: "free" | "fps";
-  } = {
-    handler: new FPSControls(camera, renderer.domElement, world),
-    type: "fps",
+  const player = {
+    width: 0.6,
+    height: 1.8,
   };
 
   return {
     camera,
-    controls,
+    controls: FPSControls.controls(camera, renderer, world, player),
     renderer,
     scene,
     world,
+    player,
   };
 };

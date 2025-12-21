@@ -1,5 +1,10 @@
 import * as THREE from "three";
-import type { ControlsHandler, World } from "./types.js";
+import type {
+  Controls,
+  ControlsHandler,
+  MinecraftInstance,
+  World,
+} from "./types.js";
 import { getBlockInWorld } from "./world.js";
 
 export class FPSControls implements ControlsHandler {
@@ -24,9 +29,7 @@ export class FPSControls implements ControlsHandler {
   jumpStrength = 5;
   gravity = 9.8;
 
-  // Player dimensions
-  playerHeight = 1.8;
-  playerRadius = 0.3;
+  player: MinecraftInstance["player"];
 
   // Reusable Box3 instances
   playerBox = new THREE.Box3();
@@ -37,15 +40,29 @@ export class FPSControls implements ControlsHandler {
   constructor(
     camera: THREE.PerspectiveCamera,
     domElement: HTMLElement,
-    world: World
+    world: World,
+    player: MinecraftInstance["player"]
   ) {
     this.camera = camera;
     this.domElement = domElement;
     this.world = world;
+    this.player = player;
 
     this.initPointerLock();
     this.initKeyboard();
     this.initMouse();
+  }
+
+  static controls(
+    camera: THREE.PerspectiveCamera,
+    renderer: THREE.WebGLRenderer,
+    world: World,
+    player: MinecraftInstance["player"]
+  ): Controls {
+    return {
+      handler: new FPSControls(camera, renderer.domElement, world, player),
+      type: "fps",
+    };
   }
 
   initPointerLock() {
@@ -134,14 +151,14 @@ export class FPSControls implements ControlsHandler {
 
   getPlayerBox(position: THREE.Vector3): THREE.Box3 {
     const min = new THREE.Vector3(
-      position.x - this.playerRadius,
-      position.y - this.playerHeight,
-      position.z - this.playerRadius
+      position.x - this.player.width / 2,
+      position.y - this.player.height,
+      position.z - this.player.width / 2
     );
     const max = new THREE.Vector3(
-      position.x + this.playerRadius,
+      position.x + this.player.width / 2,
       position.y,
-      position.z + this.playerRadius
+      position.z + this.player.width / 2
     );
     this.playerBox.set(min, max);
     return this.playerBox;
@@ -240,8 +257,8 @@ export class FPSControls implements ControlsHandler {
         // Hit ground while falling
         this.canJump = true;
         this.velocity.y = 0;
-        const feetY = testPosY.y - this.playerHeight;
-        this.camera.position.y = Math.ceil(feetY) + this.playerHeight;
+        const feetY = testPosY.y - this.player.height;
+        this.camera.position.y = Math.ceil(feetY) + this.player.height;
       }
     } else {
       // Free movement in air

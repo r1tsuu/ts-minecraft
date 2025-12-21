@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { Minecraft } from "./types.js";
+import type { MinecraftInstance } from "./types.js";
 import { FreeControls } from "./FreeControls.js";
 import { FPSControls } from "./FPSControls.js";
 
@@ -51,9 +51,9 @@ const customElement = (args: {
 };
 
 export const initUI = ({
-  minecraft: { camera, controls, renderer, world },
+  minecraft: { camera, controls, renderer, player, world },
 }: {
-  minecraft: Minecraft;
+  minecraft: MinecraftInstance;
 }) => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
@@ -66,6 +66,12 @@ export const initUI = ({
   const wrapper = customElement({
     tag: "div",
     className: "ui_wrapper",
+    parent: document.body,
+  });
+
+  customElement({
+    tag: "div",
+    className: "crosshair",
     parent: document.body,
   });
 
@@ -105,7 +111,12 @@ export const initUI = ({
       toggleControlsButton.setText("Switch to FPS Controls (C)");
     } else {
       controls.type = "fps";
-      controls.handler = new FPSControls(camera, renderer.domElement, world);
+      controls.handler = new FPSControls(
+        camera,
+        renderer.domElement,
+        world,
+        player
+      );
       toggleControlsButton.setText("Switch to Free Controls (C)");
     }
   };

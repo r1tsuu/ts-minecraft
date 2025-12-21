@@ -26,13 +26,21 @@ export interface ControlsHandler {
   dispose(): void;
 }
 
-export type Minecraft = {
+export type Controls = {
+  handler: ControlsHandler;
+  type: "free" | "fps";
+};
+
+export type PlayerConfig = {
+  width: number;
+  height: number;
+};
+
+export type MinecraftInstance = {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
   world: World;
-  controls: {
-    handler: ControlsHandler;
-    type: "free" | "fps";
-  };
+  controls: Controls;
+  player: PlayerConfig;
 };

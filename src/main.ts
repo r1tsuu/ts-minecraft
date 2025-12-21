@@ -5,6 +5,7 @@ import { initBlocks } from "./block.js";
 import { updateWorld } from "./world.js";
 import { initUI } from "./initUI.js";
 import { createMinecraftInstance } from "./core.ts";
+import { createRaycaster } from "./raycast.ts";
 
 await initBlocks();
 
@@ -16,6 +17,13 @@ const { updateUI } = initUI({
   minecraft,
 });
 
+const raycaster = createRaycaster({
+  camera: minecraft.camera,
+  world: minecraft.world,
+  scene: minecraft.scene,
+  player: minecraft.player,
+});
+
 const loop = async () => {
   requestAnimationFrame(loop);
   const delta = clock.getDelta();
@@ -24,6 +32,9 @@ const loop = async () => {
 
   minecraft.controls.handler.update(delta);
   await updateWorld(minecraft.world, minecraft.camera.position);
+
+  const lookingAt = raycaster.getLookingAtBlock();
+  if (lookingAt) console.log(lookingAt);
 
   updateUI();
 };

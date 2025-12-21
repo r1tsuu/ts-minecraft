@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { ControlsHandler } from "./types.js";
+import type { Controls, ControlsHandler } from "./types.js";
 
 export class FreeControls implements ControlsHandler {
   camera: THREE.PerspectiveCamera;
@@ -27,6 +27,18 @@ export class FreeControls implements ControlsHandler {
     this.initPointerLock();
     this.initKeyboard();
     this.initMouse();
+  }
+
+  static controls(
+    camera: THREE.PerspectiveCamera,
+    domElement: HTMLElement
+  ): Controls {
+    const handler = new FreeControls(camera, domElement);
+
+    return {
+      handler,
+      type: "free",
+    };
   }
 
   initPointerLock() {

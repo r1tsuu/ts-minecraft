@@ -24,7 +24,39 @@ canvas {
   flex-direction: column;
   gap: 5px;
   max-width: fit-content;
+}
 
+.crosshair {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.crosshair::before,
+.crosshair::after {
+  content: "";
+  position: absolute;
+  background: white;
+}
+
+.crosshair::before {
+  width: 2px;
+  height: 20px;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+.crosshair::after {
+  width: 20px;
+  height: 2px;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .ui_element {
