@@ -62,7 +62,6 @@ export const createWorld = (scene: THREE.Scene): World => {
     scene.add(mesh);
     blockMeshes.set(id, mesh);
     blockMeshesCount.set(id, 0);
-    mesh.frustumCulled = false;
   }
 
   return {
@@ -193,5 +192,7 @@ export const updateWorld = async (
 
   for (const mesh of world.blockMeshes.values()) {
     mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingBox();
+    mesh.computeBoundingSphere();
   }
 };

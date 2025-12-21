@@ -1,12 +1,11 @@
 import * as THREE from "three";
 import type { PlayerConfig, World } from "./types.ts";
-import { CHUNK_SIZE, WORLD_HEIGHT } from "./util.ts";
 
 export const createRaycaster = ({
-  // player,
   camera,
   world,
   scene,
+  player,
 }: {
   player: PlayerConfig;
   world: World;
@@ -17,46 +16,39 @@ export const createRaycaster = ({
   raycaster.far = 8;
 
   const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(0.1, 0.1, 0.1),
-    new THREE.MeshBasicMaterial({ color: 0xff0000 })
+    new THREE.BoxGeometry(1.01, 1.01, 1.01),
+    new THREE.MeshStandardMaterial({ opacity: 0.5, transparent: true })
   );
-  scene.add(mesh);
 
-  const getLookingAtBlock = (): {
-    position: THREE.Vector3;
-    face: THREE.Vector3;
-  } | null => {
+  let lastUpdated: null | number = null;
+
+  const update = () => {
+    if (lastUpdated !== null && Date.now() - lastUpdated < 100) return;
+
+    scene.remove(mesh);
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    const intersects = raycaster.intersectObjects(
+
+    const [intersects] = raycaster.intersectObjects(
       Array.from(world.blockMeshes.values()),
-      true
+      false
     );
 
-    if (intersects.length === 0) {
-      return null;
+    if (
+      intersects &&
+      intersects.object instanceof THREE.InstancedMesh &&
+      typeof intersects.instanceId === "number"
+    ) {
+      const matrix = new THREE.Matrix4();
+      intersects.object.getMatrixAt(intersects.instanceId, matrix);
+      const poistion = new THREE.Vector3().setFromMatrixPosition(matrix);
+      mesh.position.set(poistion.x, poistion.y, poistion.z);
+      scene.add(mesh);
     }
 
-    const intersect = intersects[0];
-    const point = intersect.point;
-    const normal = intersect.face?.normal;
-
-    console.log(intersect);
-    if (!normal) {
-      return null;
-    }
-
-    const position = new THREE.Vector3(
-      Math.floor(point.x + normal.x * 0.5),
-      Math.floor(point.y + normal.y * 0.5),
-      Math.floor(point.z + normal.z * 0.5)
-    );
-
-    mesh.position.copy(position);
-
-    return { position, face: normal };
+    lastUpdated = Date.now();
   };
 
   return {
-    getLookingAtBlock,
+    update,
   };
 };
