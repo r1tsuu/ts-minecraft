@@ -1,8 +1,8 @@
 import * as THREE from "three";
-import type { Controls, World } from "./types.js";
+import type { ControlsHandler, World } from "./types.js";
 import { getBlockInWorld } from "./world.js";
 
-export class FPSControls implements Controls {
+export class FPSControls implements ControlsHandler {
   camera: THREE.PerspectiveCamera;
   domElement: HTMLElement;
 

@@ -21,7 +21,7 @@ export type World = {
   blockMeshesCount: Map<number, number>;
 };
 
-export interface Controls {
+export interface ControlsHandler {
   update(delta: number): void;
   dispose(): void;
 }

@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import type { Controls } from "./types.js";
+import type { ControlsHandler } from "./types.js";
 
-export class FreeControls implements Controls {
+export class FreeControls implements ControlsHandler {
   camera: THREE.PerspectiveCamera;
   velocity = new THREE.Vector3();
   speed = 10;

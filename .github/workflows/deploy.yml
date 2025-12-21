@@ -41,6 +41,8 @@ jobs:
         run: pnpm i
       - name: Build
         run: pnpm build
+        env:
+          GH_PAGES: "true"
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
