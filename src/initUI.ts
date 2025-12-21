@@ -113,7 +113,6 @@ const initPauseMenu = ({
   });
 
   const resume = () => {
-    document.body.removeChild(overlay.element);
     onResume();
   };
 
