@@ -50,21 +50,14 @@ const { updateUI } = initUI({
   world,
 });
 
-let updateWorldPromise: Promise<void> | null = null;
-
-const loop = () => {
+const loop = async () => {
   requestAnimationFrame(loop);
   const delta = clock.getDelta();
 
   renderer.render(scene, camera);
 
   controls.handler.update(delta);
-
-  if (!updateWorldPromise) {
-    updateWorldPromise = updateWorld(world, camera.position).then(() => {
-      updateWorldPromise = null;
-    });
-  }
+  await updateWorld(world, camera.position);
 
   updateUI();
 };

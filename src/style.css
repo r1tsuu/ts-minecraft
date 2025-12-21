@@ -27,8 +27,7 @@ canvas {
 
 }
 
-
-.fps_display {
+.ui_element {
   color: white;
   background-color: rgba(0, 0, 0, 0.5);
   padding: 5px;
@@ -36,18 +35,7 @@ canvas {
   width: fit-content;
 }
 
-.position_display {
-  color: white;
-  background-color: rgba(0, 0, 0, 0.5);
-  padding: 5px;
-  font-family: monospace;
-}
-
-.controls_toggle_button {
-  color: white;
-  background-color: rgba(0, 0, 0, 0.5);
-  padding: 5px;
-  font-family: monospace;
+button.ui_element {
   cursor: pointer;
-
 }
+
