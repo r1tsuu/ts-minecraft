@@ -31,9 +31,10 @@ const loop = async () => {
   minecraft.renderer.render(minecraft.scene, minecraft.camera);
 
   minecraft.controls.handler.update(delta);
-
   await updateWorld(minecraft.world, minecraft.camera.position);
-  raycaster.update();
+
+  const lookingAt = raycaster.getLookingAtBlock();
+  if (lookingAt) console.log(lookingAt);
 
   updateUI();
 };
