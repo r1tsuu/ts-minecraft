@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import background from "./static/background.png";
+import background from "./static/images (1).jpeg";
 import type { MinecraftInstance } from "./types.js";
 import { FreeControls } from "./FreeControls.js";
 import { FPSControls } from "./FPSControls.js";
@@ -20,6 +20,7 @@ const customElement = <T extends keyof HTMLElementTagNameMap>(args: {
   className?: string | string[];
   text?: string;
   parent?: HTMLElement | CustomElement;
+  attributes?: Record<string, string>;
 }): CustomElement<T> => {
   const el = document.createElement(args.tag);
   if (args.className) {
@@ -42,6 +43,12 @@ const customElement = <T extends keyof HTMLElementTagNameMap>(args: {
       args.parent.element.appendChild(el);
     } else {
       args.parent.appendChild(el);
+    }
+  }
+
+  if (args.attributes) {
+    for (const [key, value] of Object.entries(args.attributes)) {
+      el.setAttribute(key, value);
     }
   }
 
@@ -139,6 +146,7 @@ const worldsMenu = async ({
 
     playButton.element.onclick = () => {
       onSelectWorld(world.id);
+      menuOverlay.element.remove();
     };
 
     deleteButton.element.onclick = async () => {
@@ -177,15 +185,21 @@ const worldsMenu = async ({
     tag: "input",
     className: "game_input",
     parent: createWorldWrapper,
+    attributes: {
+      placeholder: "World Name",
+      name: "worldName",
+    },
   });
-  createWorldNameInput.element.placeholder = "World Name";
 
   const createWorldSeedInput = customElement({
     tag: "input",
     className: "game_input",
     parent: createWorldWrapper,
+    attributes: {
+      placeholder: "World Seed (optional)",
+      name: "worldSeed",
+    },
   });
-  createWorldSeedInput.element.placeholder = "World Seed (optional)";
 
   const createWorldButton = customElement({
     tag: "button",

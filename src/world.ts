@@ -151,6 +151,7 @@ export const updateWorld = async (
       world.blockMeshesCount.set(block, 0);
     }
 
+    let now = Date.now();
     for (const chunk of world.chunks.values()) {
       for (let x = 0; x < CHUNK_SIZE; x++) {
         for (let y = 0; y < WORLD_HEIGHT; y++) {
@@ -179,10 +180,12 @@ export const updateWorld = async (
       }
     }
 
+    console.log("Mesh update preparation took", Date.now() - now, "ms");
     for (const mesh of world.blockMeshes.values()) {
       mesh.instanceMatrix.needsUpdate = true;
       mesh.computeBoundingBox();
       mesh.computeBoundingSphere();
     }
+    console.log(`Updated meshes in ${Date.now() - now}ms`);
   }
 };

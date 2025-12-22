@@ -3,7 +3,7 @@ import seedrandom from "seedrandom";
 
 import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
 import type { BlockInWorld } from "../types.js";
-import { CHUNK_SIZE } from "../util.js";
+import { CHUNK_SIZE, WORLD_HEIGHT } from "../util.js";
 import { getDatabaseClient } from "./database.ts";
 
 initBlocksWorker();
@@ -38,7 +38,7 @@ const generateChunk = async ({
 }> => {
   const world = getWorld(worldID);
   const rng = seedrandom(`${world.seed}_chunk_${chunkX}_${chunkZ}`);
-  const simplex = new SimplexNoise(rng);
+  const simplex = new SimplexNoise();
 
   const existingChunk = await databaseClient.fetchChunk({
     worldID,
@@ -58,11 +58,14 @@ const generateChunk = async ({
   const insertChunkData: Parameters<(typeof databaseClient)["createChunk"]>[0] =
     {
       worldID,
-      data: { blocks: [] },
+      data: {
+        blocks: Array((CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT) / 2).fill(null),
+      },
       x: chunkX,
       z: chunkZ,
     };
 
+  let blockIndex = 0;
   // Generate terrain
   for (let x = 0; x < CHUNK_SIZE; x++) {
     for (let z = 0; z < CHUNK_SIZE; z++) {
@@ -80,16 +83,16 @@ const generateChunk = async ({
 
       for (let y = 0; y <= height; y++) {
         const block = y === height ? "grass" : "dirt";
-        insertChunkData.data.blocks.push({
+        insertChunkData.data.blocks[blockIndex++] = {
           x,
           y,
           z,
           typeID: getBlockIdByName(block),
-        });
+        };
       }
     }
   }
-
+  insertChunkData.data.blocks = insertChunkData.data.blocks.filter(Boolean);
   const { id } = await databaseClient.createChunk(insertChunkData);
 
   return {
