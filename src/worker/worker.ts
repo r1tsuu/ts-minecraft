@@ -364,6 +364,18 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
 
         break;
       }
+
+      case "stopActiveWorld": {
+        activeWorld = null;
+
+        sendEventToClient({
+          type: "activeWorldStopped",
+          payload: {},
+          uuid: msg.data.uuid,
+          status: "SUCCESS",
+        });
+        break;
+      }
     }
   } catch (error) {
     console.error("Error in worker message handler:", error);

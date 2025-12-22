@@ -8,7 +8,7 @@ import { createMinecraftInstance } from "./core.ts";
 import { createRaycaster } from "./raycast.ts";
 import { FPSControls } from "./FPSControls.ts";
 import { FreeControls } from "./FreeControls.ts";
-import { waitUntilWorkerEvent } from "./worker/workerClient.ts";
+import { requestWorker, waitUntilWorkerEvent } from "./worker/workerClient.ts";
 import type { ActiveWorld } from "./worker/types.ts";
 
 initMenu({ onSelectWorld: async () => {}, isLoading: true });
@@ -27,8 +27,15 @@ const startGame = async (activeWorld: ActiveWorld) => {
 
   const { updateUI, destroyUI } = initUI({
     minecraft,
-    onExitToMainMenu: () => {
+    onExitToMainMenu: async () => {
       stopped = true;
+      await requestWorker(
+        {
+          type: "stopActiveWorld",
+          payload: {},
+        },
+        "activeWorldStopped"
+      );
     },
   });
 

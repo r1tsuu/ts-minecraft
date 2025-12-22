@@ -45,10 +45,15 @@ export const createMinecraftInstance = async ({
   camera.position.copy(player.position);
   camera.rotation.set(player.pitch, player.yaw, 0, "YXZ");
   let disposed = false;
+  let syncying = false;
 
   const syncPlayer = async () => {
-    if (disposed) return;
+    if (disposed || syncying) {
+      console.log("Skipping syncPlayer because disposed or syncying");
+      return;
+    }
     try {
+      syncying = true;
       await requestWorker(
         {
           type: "syncPlayer",
@@ -64,6 +69,7 @@ export const createMinecraftInstance = async ({
         "playerSynced"
       );
     } finally {
+      syncying = false;
       setTimeout(syncPlayer, 1000);
     }
   };

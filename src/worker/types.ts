@@ -44,7 +44,8 @@ export type MinecraftWorkerEvent =
   | BaseEvent<"requestListWorlds", {}>
   | BaseEvent<"deleteWorld", { worldID: number }>
   | BaseEvent<"initializeWorld", { worldID: number }>
-  | BaseEvent<"syncPlayer", { playerData: DatabasePlayerData }>;
+  | BaseEvent<"syncPlayer", { playerData: DatabasePlayerData }>
+  | BaseEvent<"stopActiveWorld", {}>;
 
 export type MinecraftClientEvent =
   | BaseClientEvent<
@@ -81,4 +82,5 @@ export type MinecraftClientEvent =
   | BaseClientEvent<"worldDeleted", { worldID: number }>
   | BaseClientEvent<"worldInitialized", ActiveWorld>
   | BaseClientEvent<"workerInitialized", {}>
-  | BaseClientEvent<"playerSynced", {}>;
+  | BaseClientEvent<"playerSynced", {}>
+  | BaseClientEvent<"activeWorldStopped", {}>;

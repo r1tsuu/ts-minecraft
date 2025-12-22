@@ -319,7 +319,7 @@ const initPauseMenu = ({
   minecraft,
 }: {
   onResume: () => void;
-  onExitToMainMenu: () => void;
+  onExitToMainMenu: () => Promise<void>;
   minecraft: MinecraftInstance;
 }): CustomElement => {
   const overlay = customElement({
@@ -355,9 +355,10 @@ const initPauseMenu = ({
     parent: overlay,
   });
 
-  const exitToMainMenu = () => {
+  const exitToMainMenu = async () => {
+    exitButton.element.disabled = true;
+    await onExitToMainMenu();
     document.body.removeChild(overlay.element);
-    onExitToMainMenu();
   };
 
   resumeButton.element.onclick = resume;
@@ -376,7 +377,7 @@ export const initUI = ({
   onExitToMainMenu,
 }: {
   minecraft: MinecraftInstance;
-  onExitToMainMenu: () => void;
+  onExitToMainMenu: () => Promise<void>;
 }) => {
   const { camera, renderer, world, controls, player } = minecraft;
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -509,9 +510,9 @@ export const initUI = ({
       updatePauseText();
 
       pauseOverlay = initPauseMenu({
-        onExitToMainMenu: () => {
+        onExitToMainMenu: async () => {
           minecraft.paused = false;
-          onExitToMainMenu();
+          await onExitToMainMenu();
         },
         minecraft,
         onResume: resumeFromPause,
