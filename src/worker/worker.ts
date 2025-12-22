@@ -1,7 +1,7 @@
 import { getBlockIdByName, initBlocksWorker } from "../block.js";
 import seedrandom from "seedrandom";
 
-import { ImprovedNoise } from "three/addons/math/ImprovedNoise.js";
+import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
 import type { BlockInWorld } from "../types.js";
 import { CHUNK_SIZE, WORLD_HEIGHT } from "../util.js";
 import { getDatabaseClient } from "./database.ts";
@@ -22,7 +22,7 @@ const getWorld = (id: number) => {
   return maybeWorld;
 };
 
-const noise = new ImprovedNoise();
+const noise = new SimplexNoise();
 
 const generateChunk = async ({
   chunkX,
@@ -38,9 +38,6 @@ const generateChunk = async ({
   id: number;
   blocks: BlockInWorld[];
 }> => {
-  const world = getWorld(worldID);
-  const rng = seedrandom(`${world.seed}_chunk_${chunkX}_${chunkZ}`);
-
   const existingChunk = await databaseClient.fetchChunk({
     worldID,
     x: chunkX,
@@ -66,8 +63,6 @@ const generateChunk = async ({
       z: chunkZ,
     };
 
-  let blockIndex = 0;
-  // Generate terrain
   for (let x = 0; x < CHUNK_SIZE; x++) {
     for (let z = 0; z < CHUNK_SIZE; z++) {
       const worldX = chunkX + x;
@@ -76,10 +71,9 @@ const generateChunk = async ({
       const heightVariation = 12;
       const amplitude = heightVariation / 2;
       const frequency = 0.005;
-      const random = rng.quick();
 
       const yOffset = Math.floor(
-        noise.noise(worldX * frequency, worldZ * frequency, random) * amplitude
+        (noise.noise(worldX * frequency, worldZ * frequency) + 1) * amplitude
       );
 
       const height = baseY + yOffset;

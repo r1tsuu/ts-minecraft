@@ -29,8 +29,11 @@ export type DatabaseSchema = {
   };
 };
 
+// Increment this when making changes to the database schema
+const DB_VERSION = 1;
+
 export const getDatabaseClient = async () => {
-  const pg = new PGlite("idb://minecraft_worker_db");
+  const pg = new PGlite(`idb://minecraft_worker_db_v${DB_VERSION}`);
 
   const tableExists = async (name: string) => {
     const result = await pg.query<{ exists: boolean }>(
