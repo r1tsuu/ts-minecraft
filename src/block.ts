@@ -61,24 +61,24 @@ export const initBlocks = async () => {
   const grassTexture = await loadTexture(grassBlockSideTextureImg);
   const grassTopTexture = await loadTexture(grassBlockTopTextureImg);
 
-  for (const name of BLOCK_NAMES) {
-    const nameMaterialMap: Record<BlockName, Material | Material[]> = {
-      dirt: new MeshStandardMaterial({
-        map: dirtTexture,
-      }),
-      stone: new MeshStandardMaterial({
-        color: 0x888888,
-      }),
-      grass: [
-        new MeshStandardMaterial({ map: grassTexture }), // sides
-        new MeshStandardMaterial({ map: grassTexture }), // sides
-        new MeshStandardMaterial({ map: grassTopTexture }), // top
-        new MeshStandardMaterial({ map: dirtTexture }), // dirt
-        new MeshStandardMaterial({ map: grassTexture }), // sides
-        new MeshStandardMaterial({ map: grassTexture }), // sides
-      ],
-    };
+  const nameMaterialMap: Record<BlockName, Material | Material[]> = {
+    dirt: new MeshStandardMaterial({
+      map: dirtTexture,
+    }),
+    stone: new MeshStandardMaterial({
+      color: 0x888888,
+    }),
+    grass: [
+      new MeshStandardMaterial({ map: grassTexture }), // sides
+      new MeshStandardMaterial({ map: grassTexture }), // sides
+      new MeshStandardMaterial({ map: grassTopTexture }), // top
+      new MeshStandardMaterial({ map: dirtTexture }), // dirt
+      new MeshStandardMaterial({ map: grassTexture }), // sides
+      new MeshStandardMaterial({ map: grassTexture }), // sides
+    ],
+  };
 
+  for (const name of BLOCK_NAMES) {
     registerBlock({
       name,
       material: nameMaterialMap[name],
