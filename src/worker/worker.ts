@@ -131,6 +131,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
         type: "worldCreated",
         payload: world,
         uuid: msg.data.uuid,
+        status: "SUCCESS",
       });
 
       break;
@@ -142,6 +143,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
           worlds,
         },
         uuid: msg.data.uuid,
+        status: "SUCCESS",
       });
       break;
     }
@@ -157,6 +159,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
         type: "worldDeleted",
         payload: { worldID },
         uuid: msg.data.uuid,
+        status: "SUCCESS",
       });
       break;
     }
@@ -186,6 +189,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
           type: "chunksGenerated",
           payload: { chunks },
           uuid: msg.data.uuid,
+          status: "SUCCESS",
         });
       }
 
@@ -193,10 +197,16 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
   }
 };
 
+type Status = "SUCCESS" | "UNKNOWN_ERROR";
+
 type BaseEvent<T extends string, Data> = {
   type: T;
   payload: Data;
   uuid?: string;
+};
+
+type BaseClientEvent<T extends string, Data> = BaseEvent<T, Data> & {
+  status: Status;
 };
 
 export type MinecraftWorkerEvent =
@@ -218,10 +228,11 @@ export type MinecraftWorkerEvent =
       }
     >
   | BaseEvent<"requestListWorlds", {}>
-  | BaseEvent<"deleteWorld", { worldID: number }>;
+  | BaseEvent<"deleteWorld", { worldID: number }>
+  | BaseEvent<"initializeWorld", { worldID: number }>;
 
 export type MinecraftClientEvent =
-  | BaseEvent<
+  | BaseClientEvent<
       "chunksGenerated",
       {
         chunks: {
@@ -232,7 +243,7 @@ export type MinecraftClientEvent =
         }[];
       }
     >
-  | BaseEvent<
+  | BaseClientEvent<
       "worldCreated",
       {
         name: string;
@@ -241,7 +252,7 @@ export type MinecraftClientEvent =
         id: number;
       }
     >
-  | BaseEvent<
+  | BaseClientEvent<
       "listWorldsResponse",
       {
         worlds: {
@@ -252,4 +263,5 @@ export type MinecraftClientEvent =
         }[];
       }
     >
-  | BaseEvent<"worldDeleted", { worldID: number }>;
+  | BaseClientEvent<"worldDeleted", { worldID: number }>
+  | BaseClientEvent<"worldInitialized", { worldID: number }>;

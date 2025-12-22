@@ -54,11 +54,13 @@ export const requestWorker = <
   event: TEvent,
   responseType: TResponseEventType
 ): Promise<Extract<MinecraftClientEvent, { type: TResponseEventType }>> => {
-  const uuid = crypto.randomUUID();
+  if (!event.uuid) {
+    event.uuid = crypto.randomUUID();
+  }
 
   return new Promise((resolve) => {
     const unsubscribe = listenToWorkerEvent(responseType, (responseEvent) => {
-      if ((responseEvent as any).uuid !== uuid) return;
+      if ((responseEvent as any).uuid !== event.uuid) return;
 
       resolve(
         responseEvent as Extract<
@@ -69,6 +71,6 @@ export const requestWorker = <
       unsubscribe();
     });
 
-    sendEventToWorker({ ...event, uuid });
+    sendEventToWorker(event);
   });
 };

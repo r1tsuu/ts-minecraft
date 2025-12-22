@@ -71,6 +71,22 @@ html, body {
   image-rendering: crisp-edges;
 }
 
+a {
+  text-decoration: none;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+}
+
+button {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+}
+
 /* Menu Overlay */
 .menu_overlay {
   position: fixed;
@@ -87,7 +103,22 @@ html, body {
   font-family: var(--font);
   gap: 10px;
   z-index: 10;
+  padding: 20px;
 }
+
+.menu_wrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 20px;
+}
+
+.menu_wrapper button,
+.menu_wrapper a {
+  width: auto;
+}
+
 
 .menu_title {
   font-size: 48px;
@@ -108,6 +139,9 @@ html, body {
   transition: all 0.1s;
   text-shadow: var(--button-text-shadow);
   box-shadow: 0 4px 0 #1a1a1a;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .game_button:hover {
@@ -144,6 +178,7 @@ html, body {
   gap: 10px;
   max-height: 50vh;
   overflow-y: auto;
+
 }
 
 .no_worlds_text {

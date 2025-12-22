@@ -6,7 +6,6 @@ import {
   RENDER_DISTANCE,
   WORLD_HEIGHT,
   getBlockIndex,
-  getBlockKey,
 } from "./util.js";
 import { sendEventToWorker } from "./worker/workerClient.js";
 

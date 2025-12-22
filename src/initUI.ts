@@ -238,19 +238,35 @@ export const initMenu = ({
   onSelectWorld: (worldID: number) => void;
 }) => {
   const menuOverlay = createMenuOverlay();
-  console.log(menuOverlay);
+
+  const menuWrapper = customElement({
+    tag: "div",
+    className: "menu_wrapper",
+    parent: menuOverlay,
+  });
+
   customElement({
     tag: "h1",
     className: "menu_title",
     text: "Minecraft TS",
-    parent: menuOverlay,
+    parent: menuWrapper,
   });
 
   const playButton = customElement({
     tag: "button",
     className: "game_button",
     text: "Play",
-    parent: menuOverlay,
+    parent: menuWrapper,
+  });
+
+  customElement({
+    tag: "a",
+    className: "game_button",
+    text: "GitHub Repository",
+    parent: menuWrapper,
+    attributes: {
+      href: "https://github.com/r1tsuu/ts-minecraft",
+    },
   });
 
   playButton.element.onclick = async () => {
