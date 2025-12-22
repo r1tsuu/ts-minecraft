@@ -1,11 +1,12 @@
 import * as THREE from "three";
-import background from "./static/background.jpeg";
+import background from "./static/background.png";
 import type { MinecraftInstance } from "./types.js";
 import { FreeControls } from "./FreeControls.js";
 import { FPSControls } from "./FPSControls.js";
+import { requestWorker } from "./worker/workerClient.ts";
 
-type CustomElement = {
-  element: HTMLElement;
+type CustomElement<T extends keyof HTMLElementTagNameMap = "div"> = {
+  element: HTMLElementTagNameMap[T];
   setText: (text: string) => void;
   _isCustomElement: true;
 };
@@ -14,12 +15,12 @@ const isCustomElement = (el: any): el is CustomElement => {
   return "_isCustomElement" in el && el._isCustomElement;
 };
 
-const customElement = (args: {
-  tag: keyof HTMLElementTagNameMap;
+const customElement = <T extends keyof HTMLElementTagNameMap>(args: {
+  tag: T;
   className?: string | string[];
   text?: string;
   parent?: HTMLElement | CustomElement;
-}): CustomElement => {
+}): CustomElement<T> => {
   const el = document.createElement(args.tag);
   if (args.className) {
     if (Array.isArray(args.className)) {
@@ -51,7 +52,12 @@ const customElement = (args: {
   };
 };
 
-export const initMenu = ({ onStartGame }: { onStartGame: () => void }) => {
+const createMenuOverlay = () => {
+  const existing = document.querySelector(".menu_overlay");
+  if (existing) {
+    existing.remove();
+  }
+
   const menuOverlay = customElement({
     tag: "div",
     className: "menu_overlay",
@@ -59,6 +65,149 @@ export const initMenu = ({ onStartGame }: { onStartGame: () => void }) => {
   });
 
   menuOverlay.element.style.backgroundImage = `url("${background}")`;
+  return menuOverlay;
+};
+
+const worldsMenu = async ({
+  onSelectWorld,
+}: {
+  onSelectWorld: (worldID: number) => void;
+}) => {
+  const menuOverlay = createMenuOverlay();
+
+  const title = customElement({
+    tag: "h1",
+    className: "menu_title",
+    text: "Select World",
+    parent: menuOverlay,
+  });
+
+  const worldsList = customElement({
+    tag: "div",
+    className: "worlds_list",
+    parent: menuOverlay,
+  });
+
+  const {
+    payload: { worlds },
+  } = await requestWorker(
+    { type: "requestListWorlds", payload: {} },
+    "listWorldsResponse"
+  );
+
+  for (const world of worlds) {
+    const worldItem = customElement({
+      tag: "div",
+      className: "world_item_wrapper",
+      parent: worldsList,
+    });
+
+    customElement({
+      tag: "div",
+      className: "world_item_inner",
+      text: `World: ${world.name}`,
+      parent: worldItem,
+    });
+
+    customElement({
+      tag: "div",
+      className: "world_item_inner",
+      text: `Seed: ${world.seed}`,
+      parent: worldItem,
+    });
+
+    customElement({
+      tag: "div",
+      className: "world_item_inner",
+      text: `Created At: ${new Date(world.createdAt).toLocaleString()}`,
+      parent: worldItem,
+    });
+
+    const playButton = customElement({
+      tag: "button",
+      className: "game_button",
+      text: "Play",
+      parent: worldItem,
+    });
+
+    playButton.element.onclick = () => {
+      onSelectWorld(world.id);
+    };
+  }
+
+  if (!worlds.length) {
+    customElement({
+      tag: "div",
+      className: "no_worlds_text",
+      text: "No worlds found.",
+      parent: menuOverlay,
+    });
+
+    customElement({
+      tag: "div",
+      className: "no_worlds_text",
+      text: "Create a new world to get started!",
+      parent: menuOverlay,
+    });
+  }
+
+  const createWorldWrapper = customElement({
+    tag: "div",
+    className: "create_world_wrapper",
+    parent: menuOverlay,
+  });
+
+  const createWorldNameInput = customElement({
+    tag: "input",
+    className: "game_input",
+    parent: createWorldWrapper,
+  });
+  createWorldNameInput.element.placeholder = "World Name";
+
+  const createWorldSeedInput = customElement({
+    tag: "input",
+    className: "game_input",
+    parent: createWorldWrapper,
+  });
+  createWorldSeedInput.element.placeholder = "World Seed (optional)";
+
+  const createWorldButton = customElement({
+    tag: "button",
+    className: "game_button",
+    text: "Create New World",
+    parent: createWorldWrapper,
+  });
+
+  createWorldButton.element.onclick = async () => {
+    const name = createWorldNameInput.element.value || "New World";
+    const seed = createWorldSeedInput.element.value || crypto.randomUUID();
+
+    await requestWorker(
+      { type: "createWorld", payload: { name, seed } },
+      "worldCreated"
+    );
+
+    await worldsMenu({ onSelectWorld });
+  };
+
+  const backButton = customElement({
+    tag: "button",
+    className: "game_button",
+    text: "Back",
+    parent: menuOverlay,
+  });
+
+  backButton.element.onclick = () => {
+    initMenu({ onSelectWorld });
+  };
+};
+
+export const initMenu = ({
+  onSelectWorld,
+}: {
+  onSelectWorld: (worldID: number) => void;
+}) => {
+  const menuOverlay = createMenuOverlay();
 
   customElement({
     tag: "h1",
@@ -67,20 +216,16 @@ export const initMenu = ({ onStartGame }: { onStartGame: () => void }) => {
     parent: menuOverlay,
   });
 
-  const startButton = customElement({
+  const playButton = customElement({
     tag: "button",
-    className: "menu_button",
-    text: "Start Game",
+    className: "game_button",
+    text: "Play",
     parent: menuOverlay,
   });
 
-  const startGame = () => {
-    document.body.removeChild(menuOverlay.element);
-
-    onStartGame();
+  playButton.element.onclick = async () => {
+    await worldsMenu({ onSelectWorld });
   };
-
-  startButton.element.onclick = startGame;
 };
 
 const initPauseMenu = ({

@@ -11,12 +11,14 @@ import { FreeControls } from "./FreeControls.ts";
 
 await initBlocks();
 
-const startGame = async () => {
+const startGame = async (worldID: number) => {
   let stopped = false;
 
   const clock = new THREE.Clock();
 
-  const { minecraft, disposeMinecraft } = await createMinecraftInstance();
+  const { minecraft, disposeMinecraft } = await createMinecraftInstance({
+    worldID,
+  });
 
   const { updateUI } = initUI({
     minecraft,
@@ -97,5 +99,5 @@ const startGame = async () => {
 };
 
 initMenu({
-  onStartGame: startGame,
+  onSelectWorld: startGame,
 });

@@ -17,7 +17,7 @@ export type DatabaseSchema = {
   worlds: {
     id: Generated<number>;
     name: string;
-    seed: number;
+    seed: string;
     createdAt: Generated<Date>;
   };
   chunks: {
@@ -59,9 +59,9 @@ export const getDatabaseClient = async () => {
 
     await db.schema
       .createTable("worlds")
-      .addColumn("id", "integer", (col) => col.primaryKey().autoIncrement())
-      .addColumn("name", "text", (col) => col.notNull())
-      .addColumn("seed", "integer", (col) => col.notNull())
+      .addColumn("id", "serial", (col) => col.primaryKey())
+      .addColumn("name", "text", (col) => col.notNull().unique())
+      .addColumn("seed", "text", (col) => col.notNull())
       .addColumn("createdAt", "timestamp", (col) =>
         col
           .notNull()
@@ -72,7 +72,7 @@ export const getDatabaseClient = async () => {
 
     await db.schema
       .createTable("chunks")
-      .addColumn("id", "integer", (col) => col.primaryKey().autoIncrement())
+      .addColumn("id", "serial", (col) => col.primaryKey())
       .addColumn("worldID", "integer", (col) =>
         col.references("worlds.id").onDelete("cascade").notNull()
       )
@@ -85,7 +85,7 @@ export const getDatabaseClient = async () => {
     await db.schema
       .createIndex("idx_chunks_world_id")
       .on("chunks")
-      .column("world_id")
+      .column("worldID")
       .execute();
 
     console.log("Database tables created.");
@@ -96,7 +96,7 @@ export const getDatabaseClient = async () => {
     seed,
   }: {
     name: string;
-    seed: number;
+    seed: string;
   }) => {
     const result = await db
       .insertInto("worlds")

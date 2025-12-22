@@ -5,11 +5,17 @@ import {
   CHUNK_SIZE,
   RENDER_DISTANCE,
   WORLD_HEIGHT,
-  getBlockIndex as getIndex,
+  getBlockKey,
 } from "./util.js";
 import { sendEventToWorker } from "./worker/workerClient.js";
 
-export const createWorld = (scene: THREE.Scene): World => {
+export const createWorld = ({
+  scene,
+  id,
+}: {
+  scene: THREE.Scene;
+  id: number;
+}): World => {
   const backgroundColor = 0x87ceeb;
   scene.fog = new THREE.Fog(backgroundColor, 1, 96);
   scene.background = new THREE.Color(backgroundColor);
@@ -49,6 +55,7 @@ export const createWorld = (scene: THREE.Scene): World => {
     blockMeshes: blockMeshes,
     blockMeshesCount,
     requestingChunksState: "idle",
+    id,
   };
 };
 
@@ -72,13 +79,13 @@ export const getBlockInWorld = (
     return null;
   }
 
-  const blockId = chunk.blocks[getIndex(localX, y, localZ)];
+  const block = chunk.blocks.get(getBlockKey(localX, y, localZ));
 
-  if (blockId === 0) {
+  if (!block) {
     return null;
   }
 
-  return getBlockById(blockId);
+  return getBlockById(block.typeID);
 };
 
 const chunkKey = (x: number, z: number) => `${x},${z}`;
@@ -111,7 +118,13 @@ export const updateWorld = async (
     if (world.requestingChunksState === "idle") {
       sendEventToWorker({
         type: "requestChunks",
-        payload: { chunkKeys: chunksToLoad },
+        payload: {
+          worldID: world.id,
+          chunksCoordinates: chunksToLoad.map((key) => {
+            const [x, z] = key.split(",").map(Number);
+            return { x, z };
+          }),
+        },
       });
       world.requestingChunksState = "requesting";
     }
@@ -142,28 +155,25 @@ export const updateWorld = async (
       for (let x = 0; x < CHUNK_SIZE; x++) {
         for (let y = 0; y < WORLD_HEIGHT; y++) {
           for (let z = 0; z < CHUNK_SIZE; z++) {
-            const blockId = chunk.blocks[getIndex(x, y, z)];
-            if (blockId === 0) continue; // Air block, skip rendering
-
-            const block = getBlockById(blockId);
-
+            const block = chunk.blocks.get(getBlockKey(x, y, z));
             if (!block) continue;
 
-            const mesh = world.blockMeshes.get(blockId);
+            const mesh = world.blockMeshes.get(block.typeID);
 
             if (!mesh) {
-              throw new Error(`Mesh for block ID ${blockId} not found`);
+              throw new Error(`Mesh for block ID ${block.typeID} not found`);
             }
 
             matrix.setPosition(chunk.x + x, y, chunk.z + z);
-            const index = world.blockMeshesCount.get(blockId);
-
+            const index = world.blockMeshesCount.get(block.typeID);
             if (index === undefined) {
-              throw new Error(`Mesh count for block ID ${blockId} not found`);
+              throw new Error(
+                `Mesh count for block ID ${block.typeID} not found`
+              );
             }
 
             mesh.setMatrixAt(index, matrix);
-            world.blockMeshesCount.set(blockId, index + 1);
+            world.blockMeshesCount.set(block.typeID, index + 1);
           }
         }
       }

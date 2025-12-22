@@ -35,3 +35,29 @@ export const listenToWorkerEvent = <T extends MinecraftClientEvent["type"]>(
     minecraftWorker.removeEventListener("message", onMessage);
   };
 };
+
+export const requestWorker = <
+  TResponseEventType extends MinecraftClientEvent["type"],
+  TEvent extends MinecraftWorkerEvent
+>(
+  event: TEvent,
+  responseType: TResponseEventType
+): Promise<Extract<MinecraftClientEvent, { type: TResponseEventType }>> => {
+  const uuid = crypto.randomUUID();
+
+  return new Promise((resolve) => {
+    const unsubscribe = listenToWorkerEvent(responseType, (responseEvent) => {
+      if ((responseEvent as any).uuid !== uuid) return;
+
+      resolve(
+        responseEvent as Extract<
+          MinecraftClientEvent,
+          { type: TResponseEventType }
+        >
+      );
+      unsubscribe();
+    });
+
+    sendEventToWorker({ ...event, uuid });
+  });
+};

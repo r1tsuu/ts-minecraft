@@ -1,4 +1,5 @@
 import { getBlockIdByName, initBlocksWorker } from "../block.js";
+import seedrandom from "seedrandom";
 
 import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
 import type { BlockInWorld } from "../types.js";
@@ -7,11 +8,19 @@ import { getDatabaseClient } from "./database.ts";
 
 initBlocksWorker();
 
-const simplex = new SimplexNoise();
-
 const databaseClient = await getDatabaseClient();
 
 const worlds = await databaseClient.fetchWorlds();
+
+const getWorld = (id: number) => {
+  const maybeWorld = worlds.find((w) => w.id === id);
+
+  if (!maybeWorld) {
+    throw new Error(`World with ID ${id} not found`);
+  }
+
+  return maybeWorld;
+};
 
 const generateChunk = async ({
   chunkX,
@@ -27,6 +36,10 @@ const generateChunk = async ({
   id: number;
   blocks: BlockInWorld[];
 }> => {
+  const world = getWorld(worldID);
+  const rng = seedrandom(`${world.seed}_chunk_${chunkX}_${chunkZ}`);
+  const simplex = new SimplexNoise(rng);
+
   const existingChunk = await databaseClient.fetchChunk({
     worldID,
     x: chunkX,
@@ -102,6 +115,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
       sendEventToClient({
         type: "worldCreated",
         payload: world,
+        uuid: msg.data.uuid,
       });
 
       break;
@@ -112,6 +126,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
         payload: {
           worlds,
         },
+        uuid: msg.data.uuid,
       });
       break;
     }
@@ -140,6 +155,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
         sendEventToClient({
           type: "chunksGenerated",
           payload: { chunks },
+          uuid: msg.data.uuid,
         });
       }
 
@@ -150,6 +166,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
 type BaseEvent<T extends string, Data> = {
   type: T;
   payload: Data;
+  uuid?: string;
 };
 
 export type MinecraftWorkerEvent =
@@ -167,7 +184,7 @@ export type MinecraftWorkerEvent =
       "createWorld",
       {
         name: string;
-        seed: number;
+        seed: string;
       }
     >
   | BaseEvent<"requestListWorlds", {}>;
@@ -188,7 +205,7 @@ export type MinecraftClientEvent =
       "worldCreated",
       {
         name: string;
-        seed: number;
+        seed: string;
         createdAt: Date;
         id: number;
       }
@@ -198,7 +215,7 @@ export type MinecraftClientEvent =
       {
         worlds: {
           name: string;
-          seed: number;
+          seed: string;
           createdAt: Date;
           id: number;
         }[];

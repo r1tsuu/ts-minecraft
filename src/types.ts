@@ -24,9 +24,11 @@ export type Chunk = {
   blocks: Map<string, BlockInWorld>;
   x: number;
   z: number;
+  id: number;
 };
 
 export type World = {
+  id: number;
   chunks: Map<string, Chunk>;
   blockMeshes: Map<number, THREE.InstancedMesh>;
   blockMeshesCount: Map<number, number>;

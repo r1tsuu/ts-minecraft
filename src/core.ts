@@ -1,10 +1,14 @@
 import * as THREE from "three";
-import type { MinecraftInstance } from "./types.ts";
+import type { BlockInWorld, MinecraftInstance } from "./types.ts";
 import { createWorld } from "./world.ts";
 import { FPSControls } from "./FPSControls.ts";
 import { listenToWorkerEvents } from "./worker/workerClient.js";
 
-export const createMinecraftInstance = async (): Promise<{
+export const createMinecraftInstance = async ({
+  worldID,
+}: {
+  worldID: number;
+}): Promise<{
   minecraft: MinecraftInstance;
   disposeMinecraft: () => void;
 }> => {
@@ -23,7 +27,7 @@ export const createMinecraftInstance = async (): Promise<{
   camera.position.set(0, 40, 0);
   camera.lookAt(30, 35, 30);
 
-  const world = createWorld(scene);
+  const world = createWorld({ scene, id: worldID });
 
   const player = {
     width: 0.6,
@@ -36,8 +40,21 @@ export const createMinecraftInstance = async (): Promise<{
     switch (event.type) {
       case "chunksGenerated": {
         const { chunks } = event.payload;
-        for (const [key, chunk] of chunks) {
-          world.chunks.set(key, chunk);
+        for (const chunk of chunks) {
+          const key = `${chunk.x},${chunk.z}`;
+          const blocks: Map<string, BlockInWorld> = new Map();
+
+          for (const block of chunk.blocks) {
+            const blockKey = `${block.x},${block.y},${block.z}`;
+            blocks.set(blockKey, block);
+          }
+
+          world.chunks.set(key, {
+            blocks,
+            id: chunk.id,
+            x: chunk.x,
+            z: chunk.z,
+          });
         }
         world.requestingChunksState = "received";
         break;

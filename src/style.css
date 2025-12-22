@@ -1,11 +1,77 @@
+:root {
+  /* Text & Background */
+  --color-text: #ffffff;
+  --color-background: #000000;
+  
+  /* Primary / Secondary highlights */
+  --color-primary: #8b8b8b;
+  --color-secondary: #5b5b5b;
+
+  /* Scrollbar */
+  --scrollbar-thumb-start: #8b8b8b;
+  --scrollbar-thumb-end: #5b5b5b;
+  --scrollbar-track: #2b2b2b;
+
+  /* Buttons and Inputs */
+  --button-bg: rgba(0, 0, 0, 0.7);
+  --button-hover-bg: rgba(255, 255, 255, 0.3);
+  --button-text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+  --input-bg: rgba(0, 0, 0, 0.5);
+  --input-focus-bg: rgba(255, 255, 255, 0.1);
+
+  /* Overlay */
+  --overlay-bg: rgba(0, 0, 0, 0.7);
+
+  /* Crosshair */
+  --crosshair-color: white;
+
+  /* Font */
+  --font: 'Press Start 2P', 'Courier New', monospace;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--scrollbar-thumb-start), var(--scrollbar-thumb-end));
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--scrollbar-thumb-end), var(--scrollbar-thumb-start));
+}
+
+::-webkit-scrollbar-track {
+  display: none;
+  background: var(--scrollbar-track);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
+}
+
+/* HTML & Body */
 html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
   width: 100%;
   height: 100%;
+  color: var(--color-text);
+  font-family: var(--font);
+  background-color: var(--color-background);
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
 }
 
+/* Menu Overlay */
 .menu_overlay {
   position: fixed;
   top: 0;
@@ -15,28 +81,84 @@ html, body {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
   background-repeat: no-repeat;
   background-size: cover;
-  align-items: center;
-  color: white;
-  font-family: monospace;
+  font-family: var(--font);
   gap: 10px;
   z-index: 10;
 }
 
 .menu_title {
   font-size: 48px;
+  text-shadow: 3px 3px 0px rgba(0, 0, 0, 0.8);
+  letter-spacing: 2px;
 }
 
-
-.menu_button {
+.game_button {
   padding: 10px 20px;
   font-size: 24px;
-  background-color: rgba(0, 0, 0, 0.5);
-  border: none;
-  color: white;
+  background-color: var(--button-bg);
+  border: 2px solid #5b5b5b;
+  border-bottom: 4px solid #2b2b2b;
+  border-right: 2px solid #2b2b2b;
+  color: var(--color-text);
   cursor: pointer;
-  font-family: monospace;
+  font-family: var(--font);
+  transition: all 0.1s;
+  text-shadow: var(--button-text-shadow);
+  box-shadow: 0 4px 0 #1a1a1a;
+}
+
+.game_button:hover {
+  background-color: var(--button-hover-bg);
+  border-color: #7b7b7b;
+  transform: translateY(1px);
+  box-shadow: 0 3px 0 #1a1a1a;
+}
+
+.game_button:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #1a1a1a;
+}
+
+.game_input {
+  color: var(--color-text);
+  padding: 10px 20px;
+  font-size: 24px;
+  border: 2px solid var(--color-primary);
+  font-family: var(--font);
+  background-color: var(--input-bg);
+  transition: border 0.3s, background-color 0.3s;
+}
+
+.game_input:focus {
+  outline: none;
+  border: 2px solid var(--color-secondary);
+  background-color: var(--input-focus-bg);
+}
+
+.worlds_list {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 10px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.no_worlds_text {
+  font-size: 18px;
+  font-family: var(--font);
+  margin-bottom: 10px;
+}
+
+.world_item_wrapper, .create_world_wrapper {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--overlay-bg);
+  padding: 10px;
+  gap: 5px;
+  border: 1px solid var(--color-primary);
 }
 
 .pause_menu_overlay {
@@ -48,9 +170,8 @@ html, body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background-color: rgba(0, 0, 0, 0.5);
-  color: white;
-  font-family: monospace;
+  background-color: var(--overlay-bg);
+  font-family: var(--font);
   gap: 10px;
   z-index: 10;
 }
@@ -59,22 +180,11 @@ html, body {
   font-size: 36px;
 }
 
-.pause_menu_button {
-  padding: 8px 16px;
-  font-size: 20px;
-  background-color: rgba(0, 0, 0, 0.5);
-  border: none;
-  color: white;
-  cursor: pointer;
-  font-family: monospace;
-}
-
 canvas {
-position: fixed;
+  position: fixed;
   width: 100vw;
   height: 100vh;
-cursor: none;
-
+  cursor: none;
 }
 
 .ui_wrapper {
@@ -104,7 +214,7 @@ cursor: none;
 .crosshair::after {
   content: "";
   position: absolute;
-  background: white;
+  background: var(--crosshair-color);
 }
 
 .crosshair::before {
@@ -124,14 +234,12 @@ cursor: none;
 }
 
 .ui_element {
-  color: white;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--overlay-bg);
   padding: 5px;
-  font-family: monospace;
+  font-family: var(--font);
   width: fit-content;
 }
 
 button.ui_element {
   cursor: pointer;
 }
-
