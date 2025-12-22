@@ -46,6 +46,7 @@ export const createWorld = ({
 
   for (const [id, block] of blockRegistry) {
     const mesh = new THREE.InstancedMesh(geometry, block.material, MAX_COUNT);
+    mesh.frustumCulled = false;
     scene.add(mesh);
     blockMeshes.set(id, mesh);
     blockMeshesCount.set(id, 0);
@@ -80,13 +81,13 @@ export const getBlockInWorld = (
     return null;
   }
 
-  const block = chunk.blocks.get(getBlockKey(localX, y, localZ));
+  const block = chunk.blocksUint[getBlockIndex(localX, y, localZ)];
 
   if (!block) {
     return null;
   }
 
-  return getBlockById(block.typeID);
+  return getBlockById(block);
 };
 
 const chunkKey = (x: number, z: number) => `${x},${z}`;
@@ -154,38 +155,57 @@ export const updateWorld = async (
 
     let now = Date.now();
     for (const chunk of world.chunks.values()) {
-      for (let x = 0; x < CHUNK_SIZE; x++) {
-        for (let y = 0; y < WORLD_HEIGHT; y++) {
-          for (let z = 0; z < CHUNK_SIZE; z++) {
-            const blockTypeID = chunk.blocksUint[getBlockIndex(x, y, z)];
-            if (!blockTypeID) continue;
+      for (const block of chunk.blocks.values()) {
+        const blockTypeID = block.typeID;
+        if (!blockTypeID) continue;
 
-            const mesh = world.blockMeshes.get(blockTypeID);
+        const mesh = world.blockMeshes.get(blockTypeID);
 
-            if (!mesh) {
-              throw new Error(`Mesh for block ID ${blockTypeID} not found`);
-            }
-
-            matrix.setPosition(chunk.x + x, y, chunk.z + z);
-            const index = world.blockMeshesCount.get(blockTypeID);
-            if (index === undefined) {
-              throw new Error(
-                `Mesh count for block ID ${blockTypeID} not found`
-              );
-            }
-
-            mesh.setMatrixAt(index, matrix);
-            world.blockMeshesCount.set(blockTypeID, index + 1);
-          }
+        if (!mesh) {
+          throw new Error(`Mesh for block ID ${blockTypeID} not found`);
         }
+
+        matrix.setPosition(chunk.x + block.x, block.y, chunk.z + block.z);
+        const index = world.blockMeshesCount.get(blockTypeID);
+        if (index === undefined) {
+          throw new Error(`Mesh count for block ID ${blockTypeID} not found`);
+        }
+
+        mesh.setMatrixAt(index, matrix);
+        world.blockMeshesCount.set(blockTypeID, index + 1);
       }
+      // for (let x = 0; x < CHUNK_SIZE; x++) {
+      //   for (let y = 0; y < WORLD_HEIGHT; y++) {
+      //     for (let z = 0; z < CHUNK_SIZE; z++) {
+      //       const blockTypeID = chunk.blocksUint[getBlockIndex(x, y, z)];
+      //       if (!blockTypeID) continue;
+
+      //       const mesh = world.blockMeshes.get(blockTypeID);
+
+      //       if (!mesh) {
+      //         throw new Error(`Mesh for block ID ${blockTypeID} not found`);
+      //       }
+
+      //       matrix.setPosition(chunk.x + x, y, chunk.z + z);
+      //       const index = world.blockMeshesCount.get(blockTypeID);
+      //       if (index === undefined) {
+      //         throw new Error(
+      //           `Mesh count for block ID ${blockTypeID} not found`
+      //         );
+      //       }
+
+      //       mesh.setMatrixAt(index, matrix);
+      //       world.blockMeshesCount.set(blockTypeID, index + 1);
+      //     }
+      //   }
+      // }
     }
 
     console.log("Mesh update preparation took", Date.now() - now, "ms");
     for (const mesh of world.blockMeshes.values()) {
       mesh.instanceMatrix.needsUpdate = true;
-      mesh.computeBoundingBox();
-      mesh.computeBoundingSphere();
+      // mesh.computeBoundingBox();
+      // mesh.computeBoundingSphere();
     }
     console.log(`Updated meshes in ${Date.now() - now}ms`);
   }

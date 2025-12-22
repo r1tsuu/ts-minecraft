@@ -14,10 +14,10 @@ export const createMinecraftInstance = async ({
   disposeMinecraft: () => void;
 }> => {
   const scene = new THREE.Scene();
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  // renderer.outputColorSpace = THREE.SRGBColorSpace;
-  // renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  // renderer.toneMappingExposure = 1.0;
+  const renderer = new THREE.WebGLRenderer({ antialias: false });
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
   const camera = new THREE.PerspectiveCamera(
     75,
     window.innerWidth / window.innerHeight,
@@ -44,9 +44,10 @@ export const createMinecraftInstance = async ({
         const now = Date.now();
         for (const chunk of chunks) {
           const key = `${chunk.x},${chunk.z}`;
+
           const blocks: Map<string, BlockInWorld> = new Map();
           const blocksUint = new Uint8Array(
-            (CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT) / 2
+            CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT
           );
           for (const block of chunk.blocks) {
             const blockKey = `${block.x},${block.y},${block.z}`;
