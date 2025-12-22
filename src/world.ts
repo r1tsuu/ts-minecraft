@@ -5,6 +5,7 @@ import {
   CHUNK_SIZE,
   RENDER_DISTANCE,
   WORLD_HEIGHT,
+  getBlockIndex,
   getBlockKey,
 } from "./util.js";
 import { sendEventToWorker } from "./worker/workerClient.js";
@@ -156,25 +157,25 @@ export const updateWorld = async (
       for (let x = 0; x < CHUNK_SIZE; x++) {
         for (let y = 0; y < WORLD_HEIGHT; y++) {
           for (let z = 0; z < CHUNK_SIZE; z++) {
-            const block = chunk.blocks.get(getBlockKey(x, y, z));
-            if (!block) continue;
+            const blockTypeID = chunk.blocksUint[getBlockIndex(x, y, z)];
+            if (!blockTypeID) continue;
 
-            const mesh = world.blockMeshes.get(block.typeID);
+            const mesh = world.blockMeshes.get(blockTypeID);
 
             if (!mesh) {
-              throw new Error(`Mesh for block ID ${block.typeID} not found`);
+              throw new Error(`Mesh for block ID ${blockTypeID} not found`);
             }
 
             matrix.setPosition(chunk.x + x, y, chunk.z + z);
-            const index = world.blockMeshesCount.get(block.typeID);
+            const index = world.blockMeshesCount.get(blockTypeID);
             if (index === undefined) {
               throw new Error(
-                `Mesh count for block ID ${block.typeID} not found`
+                `Mesh count for block ID ${blockTypeID} not found`
               );
             }
 
             mesh.setMatrixAt(index, matrix);
-            world.blockMeshesCount.set(block.typeID, index + 1);
+            world.blockMeshesCount.set(blockTypeID, index + 1);
           }
         }
       }

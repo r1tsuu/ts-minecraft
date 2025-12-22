@@ -3,6 +3,7 @@ import type { BlockInWorld, MinecraftInstance } from "./types.ts";
 import { createWorld } from "./world.ts";
 import { FPSControls } from "./FPSControls.ts";
 import { listenToWorkerEvents } from "./worker/workerClient.js";
+import { CHUNK_SIZE, getBlockIndex, WORLD_HEIGHT } from "./util.ts";
 
 export const createMinecraftInstance = async ({
   worldID,
@@ -40,22 +41,28 @@ export const createMinecraftInstance = async ({
     switch (event.type) {
       case "chunksGenerated": {
         const { chunks } = event.payload;
+        const now = Date.now();
         for (const chunk of chunks) {
           const key = `${chunk.x},${chunk.z}`;
           const blocks: Map<string, BlockInWorld> = new Map();
-
+          const blocksUint = new Uint8Array(
+            (CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT) / 2
+          );
           for (const block of chunk.blocks) {
             const blockKey = `${block.x},${block.y},${block.z}`;
             blocks.set(blockKey, block);
+            blocksUint[getBlockIndex(block.x, block.y, block.z)] = block.typeID;
           }
 
           world.chunks.set(key, {
             blocks,
+            blocksUint,
             id: chunk.id,
             x: chunk.x,
             z: chunk.z,
           });
         }
+        console.log("Processing chunks took", Date.now() - now, "ms");
         world.requestingChunksState = "received";
         break;
       }
