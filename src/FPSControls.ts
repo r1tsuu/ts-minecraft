@@ -6,29 +6,13 @@ import type {
   World,
 } from "./types.js";
 import { getBlockInWorld } from "./world.js";
+import { GRAVITY_ACCELERATION } from "./util.ts";
 
 export class FPSControls implements ControlsHandler {
   camera: THREE.PerspectiveCamera;
   domElement: HTMLElement;
 
-  velocity = new THREE.Vector3();
-  direction = new THREE.Vector3();
-
   world: World;
-
-  yaw = 0;
-  pitch = 0;
-
-  moveForward = false;
-  moveBackward = false;
-  moveLeft = false;
-  moveRight = false;
-  canJump = false;
-
-  speed = 6;
-  jumpStrength = 5;
-  gravity = 9.8;
-
   player: MinecraftInstance["player"];
 
   // Reusable Box3 instances
@@ -86,12 +70,15 @@ export class FPSControls implements ControlsHandler {
       // if (document.pointerLockElement !== this.domElement) return;
 
       const sensitivity = 0.002;
-      this.yaw -= e.movementX * sensitivity;
-      this.pitch -= e.movementY * sensitivity;
+      this.player.yaw -= e.movementX * sensitivity;
+      this.player.pitch -= e.movementY * sensitivity;
 
-      this.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.pitch));
+      this.player.pitch = Math.max(
+        -Math.PI / 2,
+        Math.min(Math.PI / 2, this.player.pitch)
+      );
 
-      this.camera.rotation.set(this.pitch, this.yaw, 0, "YXZ");
+      this.camera.rotation.set(this.player.pitch, this.player.yaw, 0, "YXZ");
     };
     document.addEventListener("mousemove", onMouseMove);
     this.onDisposeCallbacks.push(() => {
@@ -103,21 +90,21 @@ export class FPSControls implements ControlsHandler {
     const onKeyDown = (e: KeyboardEvent) => {
       switch (e.code) {
         case "KeyW":
-          this.moveForward = true;
+          this.player.isMovingForward = true;
           break;
         case "KeyS":
-          this.moveBackward = true;
+          this.player.isMovingBackward = true;
           break;
         case "KeyA":
-          this.moveLeft = true;
+          this.player.isMovingLeft = true;
           break;
         case "KeyD":
-          this.moveRight = true;
+          this.player.isMovingRight = true;
           break;
         case "Space":
-          if (this.canJump) {
-            this.velocity.y = this.jumpStrength;
-            this.canJump = false;
+          if (this.player.canJump) {
+            this.player.velocity.y = this.player.jumpStrength;
+            this.player.canJump = false;
           }
           break;
       }
@@ -130,16 +117,16 @@ export class FPSControls implements ControlsHandler {
     const onKeyUp = (e: KeyboardEvent) => {
       switch (e.code) {
         case "KeyW":
-          this.moveForward = false;
+          this.player.isMovingForward = false;
           break;
         case "KeyS":
-          this.moveBackward = false;
+          this.player.isMovingBackward = false;
           break;
         case "KeyA":
-          this.moveLeft = false;
+          this.player.isMovingLeft = false;
           break;
         case "KeyD":
-          this.moveRight = false;
+          this.player.isMovingRight = false;
           break;
       }
     };
@@ -203,17 +190,17 @@ export class FPSControls implements ControlsHandler {
     }
 
     // Apply gravity
-    this.velocity.y -= this.gravity * delta;
+    this.player.velocity.y -= GRAVITY_ACCELERATION * delta;
 
     // Calculate movement direction
-    this.direction.set(0, 0, 0);
-    if (this.moveForward) this.direction.z += 1;
-    if (this.moveBackward) this.direction.z -= 1;
-    if (this.moveLeft) this.direction.x -= 1;
-    if (this.moveRight) this.direction.x += 1;
+    this.player.direction.set(0, 0, 0);
+    if (this.player.isMovingForward) this.player.direction.z += 1;
+    if (this.player.isMovingBackward) this.player.direction.z -= 1;
+    if (this.player.isMovingLeft) this.player.direction.x -= 1;
+    if (this.player.isMovingRight) this.player.direction.x += 1;
 
-    if (this.direction.lengthSq() > 0) {
-      this.direction.normalize();
+    if (this.player.direction.lengthSq() > 0) {
+      this.player.direction.normalize();
     }
 
     // Convert direction to world space
@@ -226,57 +213,59 @@ export class FPSControls implements ControlsHandler {
     right.crossVectors(forward, this.camera.up).normalize();
 
     const move = new THREE.Vector3();
-    move.addScaledVector(forward, this.direction.z);
-    move.addScaledVector(right, this.direction.x);
+    move.addScaledVector(forward, this.player.direction.z);
+    move.addScaledVector(right, this.player.direction.x);
 
     // Handle horizontal movement with collision
-    const horizontalVelocity = move.multiplyScalar(this.speed * delta);
+    const horizontalVelocity = move.multiplyScalar(this.player.speed * delta);
 
     // Test X movement
-    const testPosX = this.camera.position.clone();
+    const testPosX = this.player.position.clone();
     testPosX.x += horizontalVelocity.x;
     if (!this.checkCollisionAtPosition(testPosX)) {
-      this.camera.position.x = testPosX.x;
+      this.player.position.x = testPosX.x;
     }
 
     // Test Z movement
-    const testPosZ = this.camera.position.clone();
+    const testPosZ = this.player.position.clone();
     testPosZ.z += horizontalVelocity.z;
     if (!this.checkCollisionAtPosition(testPosZ)) {
-      this.camera.position.z = testPosZ.z;
+      this.player.position.z = testPosZ.z;
     }
 
     // Handle vertical movement with collision
-    const testPosY = this.camera.position.clone();
-    testPosY.y += this.velocity.y * delta;
+    const testPosY = this.player.position.clone();
+    testPosY.y += this.player.velocity.y * delta;
 
     // Check if new position would collide
     if (this.checkCollisionAtPosition(testPosY)) {
       // Hit something (ceiling or ground)
-      if (this.velocity.y > 0) {
+      if (this.player.velocity.y > 0) {
         // Hit ceiling
-        this.velocity.y = 0;
-        this.camera.position.y = Math.floor(this.camera.position.y);
+        this.player.velocity.y = 0;
+        this.player.position.y = Math.floor(this.player.position.y);
       } else {
         // Hit ground while falling
-        this.canJump = true;
-        this.velocity.y = 0;
+        this.player.canJump = true;
+        this.player.velocity.y = 0;
         const feetY = testPosY.y - this.player.height;
-        this.camera.position.y = Math.ceil(feetY) + this.player.height;
+        this.player.position.y = Math.ceil(feetY) + this.player.height;
       }
     } else {
       // Free movement in air
-      this.camera.position.y = testPosY.y;
-
+      this.player.position.y = testPosY.y;
       // Check if we're on ground (slightly below current feet position)
       const groundCheck = this.camera.position.clone();
       groundCheck.y -= 0.05;
 
       if (this.checkCollisionAtPosition(groundCheck)) {
-        this.canJump = true;
+        this.player.canJump = true;
       } else {
-        this.canJump = false;
+        this.player.canJump = false;
       }
     }
+
+    // Sync camera position with player
+    this.camera.position.copy(this.player.position);
   }
 }
