@@ -144,6 +144,13 @@ button {
   align-items: center;
 }
 
+.game_button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+  transform: none;
+}
+
 .game_button:hover {
   background-color: var(--button-hover-bg);
   border-color: #7b7b7b;

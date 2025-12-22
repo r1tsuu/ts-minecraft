@@ -197,6 +197,12 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
   }
 };
 
+sendEventToClient({
+  type: "workerInitialized",
+  payload: {},
+  status: "SUCCESS",
+});
+
 type Status = "SUCCESS" | "UNKNOWN_ERROR";
 
 type BaseEvent<T extends string, Data> = {
@@ -264,4 +270,5 @@ export type MinecraftClientEvent =
       }
     >
   | BaseClientEvent<"worldDeleted", { worldID: number }>
-  | BaseClientEvent<"worldInitialized", { worldID: number }>;
+  | BaseClientEvent<"worldInitialized", { worldID: number }>
+  | BaseClientEvent<"workerInitialized", {}>;

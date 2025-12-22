@@ -8,8 +8,12 @@ import { createMinecraftInstance } from "./core.ts";
 import { createRaycaster } from "./raycast.ts";
 import { FPSControls } from "./FPSControls.ts";
 import { FreeControls } from "./FreeControls.ts";
+import { waitUntilWorkerEvent } from "./worker/workerClient.ts";
+
+initMenu({ onSelectWorld: async () => {}, isLoading: true });
 
 await initBlocks();
+await waitUntilWorkerEvent("workerInitialized");
 
 const startGame = async (worldID: number) => {
   let stopped = false;
@@ -45,6 +49,7 @@ const startGame = async (worldID: number) => {
       destroyUI();
 
       initMenu({
+        isLoading: false,
         onSelectWorld: startGame,
       });
 
@@ -106,5 +111,6 @@ const startGame = async (worldID: number) => {
 };
 
 initMenu({
+  isLoading: false,
   onSelectWorld: startGame,
 });

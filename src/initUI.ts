@@ -228,13 +228,15 @@ const worldsMenu = async ({
   });
 
   backButton.element.onclick = () => {
-    initMenu({ onSelectWorld });
+    initMenu({ onSelectWorld, isLoading: false });
   };
 };
 
 export const initMenu = ({
   onSelectWorld,
+  isLoading,
 }: {
+  isLoading: boolean;
   onSelectWorld: (worldID: number) => void;
 }) => {
   const menuOverlay = createMenuOverlay();
@@ -258,6 +260,11 @@ export const initMenu = ({
     text: "Play",
     parent: menuWrapper,
   });
+
+  if (isLoading) {
+    playButton.element.disabled = true;
+    playButton.setText("Loading...");
+  }
 
   customElement({
     tag: "a",

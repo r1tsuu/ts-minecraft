@@ -9,6 +9,7 @@ export const sendEventToWorker = (event: MinecraftWorkerEvent) => {
   if (DEBUG) {
     console.log("Sending event to worker:", event);
   }
+
   minecraftWorker.postMessage(event);
 };
 
@@ -45,6 +46,17 @@ export const listenToWorkerEvent = <T extends MinecraftClientEvent["type"]>(
   return () => {
     minecraftWorker.removeEventListener("message", onMessage);
   };
+};
+
+export const waitUntilWorkerEvent = <T extends MinecraftClientEvent["type"]>(
+  type: T
+): Promise<Extract<MinecraftClientEvent, { type: T }>> => {
+  return new Promise((resolve) => {
+    const unsubscribe = listenToWorkerEvent(type, (event) => {
+      resolve(event);
+      unsubscribe();
+    });
+  });
 };
 
 export const requestWorker = <
