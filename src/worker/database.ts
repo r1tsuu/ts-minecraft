@@ -9,18 +9,10 @@ import {
   type Updateable,
 } from "kysely";
 import { PGliteDialect } from "kysely-pglite-dialect";
-import type { BlockInWorld } from "../types.ts";
+import type { BlockInWorld, PlayerData, RawVector3 } from "../types.ts";
 
 export type ChunkDatabaseData = {
   blocks: BlockInWorld[];
-};
-
-export type DatabasePlayerData = {
-  x: number;
-  y: number;
-  z: number;
-  yaw: number;
-  pitch: number;
 };
 
 export type DatabaseSchema = {
@@ -29,7 +21,13 @@ export type DatabaseSchema = {
     name: string;
     seed: string;
     createdAt: Generated<Date>;
-    playerData: JSONColumnType<DatabasePlayerData>;
+    playerData: JSONColumnType<
+      Omit<PlayerData, "position" | "direction" | "velocity"> & {
+        position: RawVector3; // Cannot use THREE.Vector3 in the database
+        direction: RawVector3; // Cannot use THREE.Vector3 in the database
+        velocity: RawVector3; // Cannot use THREE.Vector3 in the database
+      }
+    >;
     initialized: boolean;
   };
   chunks: {
@@ -48,6 +46,9 @@ export type DatabaseSchema = {
 };
 
 export type DatabaseWorldData = Selectable<DatabaseSchema["worlds"]>;
+export type DatabasePlayerData = Selectable<
+  DatabaseSchema["worlds"]
+>["playerData"];
 
 // Increment this when making changes to the database schema
 const DB_VERSION = 1;
@@ -301,7 +302,7 @@ export const getDatabaseClient = async () => {
     await pg.close();
   };
 
-  return {
+  const methods = {
     createWorld,
     createChunk,
     fetchWorlds,
@@ -312,4 +313,17 @@ export const getDatabaseClient = async () => {
     createChunks,
     updateWorld,
   };
+
+  for (const [name, func] of Object.entries(methods)) {
+    methods[name as keyof typeof methods] = async (...args: any[]) => {
+      try {
+        return await (func as Function)(...args);
+      } catch (error) {
+        console.error(`Database error in ${name}:`, error);
+        throw error;
+      }
+    };
+  }
+
+  return methods;
 };

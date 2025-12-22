@@ -6,15 +6,17 @@ import {
   RENDER_DISTANCE,
   WORLD_HEIGHT,
   getBlockIndex,
+  syncServerChunksOnClient,
 } from "./util.js";
 import { sendEventToWorker } from "./worker/workerClient.js";
+import type { ActiveWorld } from "./worker/types.ts";
 
 export const createWorld = ({
   scene,
-  id,
+  activeWorld,
 }: {
   scene: THREE.Scene;
-  id: number;
+  activeWorld: ActiveWorld;
 }): World => {
   const backgroundColor = 0x87ceeb;
   scene.fog = new THREE.Fog(backgroundColor, 1, 96);
@@ -51,13 +53,17 @@ export const createWorld = ({
     blockMeshesCount.set(id, 0);
   }
 
-  return {
-    chunks: new Map<string, Chunk>(),
+  const world: World = {
     blockMeshes: blockMeshes,
     blockMeshesCount,
     requestingChunksState: "idle",
-    id,
+    id: activeWorld.world.id,
+    chunks: new Map(),
   };
+
+  syncServerChunksOnClient(activeWorld.loadedChunks, world);
+
+  return world;
 };
 
 export const getBlockInWorld = (

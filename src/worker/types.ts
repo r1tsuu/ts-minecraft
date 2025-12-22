@@ -1,5 +1,5 @@
 import type { BlockInWorld } from "../types.ts";
-import type { DatabaseWorldData } from "./database.ts";
+import type { DatabasePlayerData, DatabaseWorldData } from "./database.ts";
 
 export type Status = "SUCCESS" | "UNKNOWN_ERROR";
 
@@ -18,6 +18,7 @@ export type ActiveWorld = {
   loadedChunks: {
     x: number;
     z: number;
+    id: number;
     blocks: BlockInWorld[];
   }[];
 };
@@ -42,7 +43,8 @@ export type MinecraftWorkerEvent =
     >
   | BaseEvent<"requestListWorlds", {}>
   | BaseEvent<"deleteWorld", { worldID: number }>
-  | BaseEvent<"initializeWorld", { worldID: number }>;
+  | BaseEvent<"initializeWorld", { worldID: number }>
+  | BaseEvent<"syncPlayer", { playerData: DatabasePlayerData }>;
 
 export type MinecraftClientEvent =
   | BaseClientEvent<
@@ -78,4 +80,5 @@ export type MinecraftClientEvent =
     >
   | BaseClientEvent<"worldDeleted", { worldID: number }>
   | BaseClientEvent<"worldInitialized", ActiveWorld>
-  | BaseClientEvent<"workerInitialized", {}>;
+  | BaseClientEvent<"workerInitialized", {}>
+  | BaseClientEvent<"playerSynced", {}>;

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { PlayerConfig, World } from "./types.ts";
+import type { PlayerData, World } from "./types.ts";
 import { getBlockInWorld } from "./world.ts";
 
 const FAR = 5;
@@ -10,7 +10,7 @@ export const createRaycaster = ({
   scene,
   player,
 }: {
-  player: PlayerConfig;
+  player: PlayerData;
   world: World;
   camera: THREE.PerspectiveCamera;
   scene: THREE.Scene;

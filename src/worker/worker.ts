@@ -1,14 +1,16 @@
 import { getBlockIdByName, initBlocksWorker } from "../block.js";
 
 import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
-import type { BlockInWorld } from "../types.js";
+import type { BlockInWorld, RawVector3 } from "../types.js";
 import {
   CHUNK_SIZE,
   findByXYZ,
   findByXZ,
   getChunksCoordinatesInRadius,
+  rawVector3,
   RENDER_DISTANCE,
   WORLD_HEIGHT,
+  zeroRawVector3,
 } from "../util.js";
 import { getDatabaseClient } from "./database.ts";
 import type {
@@ -24,6 +26,14 @@ const databaseClient = await getDatabaseClient();
 let worlds = await databaseClient.fetchWorlds();
 
 let activeWorld: ActiveWorld | null = null;
+
+const getActiveWorld = (): ActiveWorld => {
+  if (!activeWorld) {
+    throw new Error("Active world is not initialized");
+  }
+
+  return activeWorld;
+};
 
 const noise = new SimplexNoise();
 
@@ -182,18 +192,20 @@ const getChunks = async ({
     });
   }
 
-  const createdChunks = await databaseClient.createChunks({
-    worldID,
-    chunks: generatedChunks,
-  });
-
-  for (const chunk of createdChunks) {
-    result.push({
-      x: chunk.x,
-      z: chunk.z,
-      id: chunk.id,
-      blocks: chunk.data.blocks,
+  if (generatedChunks.length) {
+    const createdChunks = await databaseClient.createChunks({
+      worldID,
+      chunks: generatedChunks,
     });
+
+    for (const chunk of createdChunks) {
+      result.push({
+        x: chunk.x,
+        z: chunk.z,
+        id: chunk.id,
+        blocks: chunk.data.blocks,
+      });
+    }
   }
 
   return result;
@@ -208,12 +220,16 @@ const getInitialPlayerPosition = ({
     id: number;
     blocks: BlockInWorld[];
   };
-}) => {
+}): RawVector3 => {
   let latestBlock: BlockInWorld | null = null;
-  for (let y = 0; y < WORLD_HEIGHT; y++) {
-    latestBlock = findByXYZ(centralChunk.blocks, 0, y, 0);
+  console.log(centralChunk.blocks);
 
-    if (!latestBlock) {
+  for (let y = 0; y < WORLD_HEIGHT; y++) {
+    const maybeBlock = findByXYZ(centralChunk.blocks, 0, y, 0);
+
+    if (maybeBlock) {
+      latestBlock = maybeBlock;
+    } else {
       break;
     }
   }
@@ -222,11 +238,11 @@ const getInitialPlayerPosition = ({
     throw new Error("TODO: Include spawn platform generation");
   }
 
-  return {
-    x: latestBlock.x,
-    y: latestBlock.y + 1,
-    z: latestBlock.z,
-  };
+  return rawVector3(
+    latestBlock.x,
+    Math.floor(latestBlock.y) + 2,
+    latestBlock.z
+  );
 };
 
 const sendEventToClient = (event: MinecraftClientEvent) => {
@@ -284,6 +300,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
         }[] = [];
 
         if (!world.initialized) {
+          console.log(world);
           const chunksCoordinates = getChunksCoordinatesInRadius({
             centerX: 0,
             centerZ: 0,
@@ -308,15 +325,23 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
           }
 
           const centralChunk = findByXZ(chunks, 0, 0)!;
-
           const playerPosition = getInitialPlayerPosition({ centralChunk });
 
           world.playerData = {
+            width: 0.6,
+            height: 1.8,
             pitch: 0,
             yaw: 0,
-            x: playerPosition.x,
-            y: playerPosition.y,
-            z: playerPosition.z,
+            position: playerPosition,
+            canJump: true,
+            speed: 5,
+            jumpStrength: 8,
+            isMovingForward: false,
+            isMovingBackward: false,
+            isMovingLeft: false,
+            isMovingRight: false,
+            velocity: zeroRawVector3(),
+            direction: zeroRawVector3(),
           };
 
           await databaseClient.updateWorld({
@@ -377,23 +402,10 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
         {
           const { chunksCoordinates } = msg.data.payload;
 
-          const promises: Promise<{
-            x: number;
-            z: number;
-            id: number;
-            blocks: BlockInWorld[];
-          }>[] = [];
-          for (const coordinates of chunksCoordinates) {
-            promises.push(
-              generateChunk({
-                chunkX: coordinates.x,
-                chunkZ: coordinates.z,
-                worldID: msg.data.payload.worldID,
-              })
-            );
-          }
-
-          const chunks = await Promise.all(promises);
+          const chunks = await getChunks({
+            worldID: getActiveWorld().world.id,
+            coordinates: chunksCoordinates,
+          });
 
           sendEventToClient({
             type: "chunksGenerated",
@@ -404,6 +416,30 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
         }
 
         break;
+
+      case "syncPlayer": {
+        const { playerData } = msg.data.payload;
+
+        const activeWorld = getActiveWorld();
+
+        activeWorld.world.playerData = playerData;
+
+        await databaseClient.updateWorld({
+          worldID: activeWorld.world.id,
+          data: {
+            playerData,
+          },
+        });
+
+        sendEventToClient({
+          type: "playerSynced",
+          payload: {},
+          uuid: msg.data.uuid,
+          status: "SUCCESS",
+        });
+
+        break;
+      }
     }
   } catch (error) {
     console.error("Error in worker message handler:", error);

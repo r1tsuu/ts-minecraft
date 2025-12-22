@@ -1,14 +1,19 @@
 import * as THREE from "three";
-import type { BlockInWorld, MinecraftInstance } from "./types.ts";
+import type { MinecraftInstance, PlayerData } from "./types.ts";
 import { createWorld } from "./world.ts";
 import { FPSControls } from "./FPSControls.ts";
-import { listenToWorkerEvents } from "./worker/workerClient.js";
-import { CHUNK_SIZE, getBlockIndex, WORLD_HEIGHT } from "./util.ts";
+import { listenToWorkerEvents, requestWorker } from "./worker/workerClient.js";
+import { syncServerChunksOnClient } from "./util.ts";
+import type { ActiveWorld } from "./worker/types.ts";
+import {
+  rawVector3ToThreeVector3,
+  threeVector3ToRawVector3,
+} from "./client.ts";
 
 export const createMinecraftInstance = async ({
-  worldID,
+  activeWorld,
 }: {
-  worldID: number;
+  activeWorld: ActiveWorld;
 }): Promise<{
   minecraft: MinecraftInstance;
   disposeMinecraft: () => void;
@@ -28,12 +33,42 @@ export const createMinecraftInstance = async ({
   camera.position.set(0, 40, 0);
   camera.lookAt(30, 35, 30);
 
-  const world = createWorld({ scene, id: worldID });
+  const world = createWorld({ scene, activeWorld });
 
-  const player = {
-    width: 0.6,
-    height: 1.8,
+  const player: PlayerData = {
+    ...activeWorld.world.playerData,
+    position: rawVector3ToThreeVector3(activeWorld.world.playerData.position),
+    velocity: rawVector3ToThreeVector3(activeWorld.world.playerData.velocity),
+    direction: rawVector3ToThreeVector3(activeWorld.world.playerData.direction),
   };
+
+  camera.position.copy(player.position);
+  camera.rotation.set(player.pitch, player.yaw, 0, "YXZ");
+  let disposed = false;
+
+  const syncPlayer = async () => {
+    if (disposed) return;
+    try {
+      await requestWorker(
+        {
+          type: "syncPlayer",
+          payload: {
+            playerData: {
+              ...player,
+              position: threeVector3ToRawVector3(player.position),
+              velocity: threeVector3ToRawVector3(player.velocity),
+              direction: threeVector3ToRawVector3(player.direction),
+            },
+          },
+        },
+        "playerSynced"
+      );
+    } finally {
+      setTimeout(syncPlayer, 1000);
+    }
+  };
+
+  setTimeout(syncPlayer, 1000);
 
   const unsubscribeFromWorkerEvents = listenToWorkerEvents((event) => {
     console.log("Received event from worker:", event);
@@ -42,27 +77,7 @@ export const createMinecraftInstance = async ({
       case "chunksGenerated": {
         const { chunks } = event.payload;
         const now = Date.now();
-        for (const chunk of chunks) {
-          const key = `${chunk.x},${chunk.z}`;
-
-          const blocks: Map<string, BlockInWorld> = new Map();
-          const blocksUint = new Uint8Array(
-            CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT
-          );
-          for (const block of chunk.blocks) {
-            const blockKey = `${block.x},${block.y},${block.z}`;
-            blocks.set(blockKey, block);
-            blocksUint[getBlockIndex(block.x, block.y, block.z)] = block.typeID;
-          }
-
-          world.chunks.set(key, {
-            blocks,
-            blocksUint,
-            id: chunk.id,
-            x: chunk.x,
-            z: chunk.z,
-          });
-        }
+        syncServerChunksOnClient(chunks, world);
         console.log("Processing chunks took", Date.now() - now, "ms");
         world.requestingChunksState = "received";
         break;
@@ -75,6 +90,7 @@ export const createMinecraftInstance = async ({
     renderer.dispose();
     scene.clear();
     renderer.domElement.remove();
+    disposed = true;
   };
 
   const minecraft: MinecraftInstance = {

@@ -4,6 +4,7 @@ import type { MinecraftInstance } from "./types.js";
 import { FreeControls } from "./FreeControls.js";
 import { FPSControls } from "./FPSControls.js";
 import { requestWorker } from "./worker/workerClient.ts";
+import type { ActiveWorld } from "./worker/types.ts";
 
 type CustomElement<T extends keyof HTMLElementTagNameMap = "div"> = {
   element: HTMLElementTagNameMap[T];
@@ -75,10 +76,23 @@ const createMenuOverlay = () => {
   return menuOverlay;
 };
 
+const worldIsLoading = (name: string) => {
+  const loadingOverlay = createMenuOverlay();
+
+  customElement({
+    tag: "h1",
+    className: "menu_title",
+    text: `Loading World: ${name}...`,
+    parent: loadingOverlay,
+  });
+
+  return loadingOverlay;
+};
+
 const worldsMenu = async ({
   onSelectWorld,
 }: {
-  onSelectWorld: (worldID: number) => void;
+  onSelectWorld: (activeWorld: ActiveWorld) => void;
 }) => {
   const menuOverlay = createMenuOverlay();
 
@@ -144,9 +158,27 @@ const worldsMenu = async ({
       parent: worldItem,
     });
 
-    playButton.element.onclick = () => {
-      onSelectWorld(world.id);
-      menuOverlay.element.remove();
+    playButton.element.onclick = async () => {
+      const buttons =
+        worldsList.element.querySelectorAll<HTMLButtonElement>("button");
+
+      for (const btn of buttons) {
+        btn.disabled = true;
+      }
+
+      const loadingOverlay = worldIsLoading(world.name);
+      const { payload: activeWorld } = await requestWorker(
+        {
+          type: "initializeWorld",
+          payload: {
+            worldID: world.id,
+          },
+        },
+        "worldInitialized"
+      );
+
+      loadingOverlay.element.remove();
+      onSelectWorld(activeWorld);
     };
 
     deleteButton.element.onclick = async () => {
@@ -237,7 +269,7 @@ export const initMenu = ({
   isLoading,
 }: {
   isLoading: boolean;
-  onSelectWorld: (worldID: number) => void;
+  onSelectWorld: (activeWorld: ActiveWorld) => void;
 }) => {
   const menuOverlay = createMenuOverlay();
 
@@ -503,15 +535,9 @@ export const initUI = ({
     }
 
     // Update position display
-    const pos = camera.position;
+    const pos = minecraft.player.position;
 
-    let displayY = pos.y;
-    if (
-      "playerHeight" in controls.handler &&
-      typeof controls.handler.playerHeight === "number"
-    ) {
-      displayY -= controls.handler.playerHeight;
-    }
+    let displayY = pos.y - minecraft.player.height;
 
     positionDisplay.setText(
       `Position: X: ${pos.x.toFixed(2)} Y: ${displayY.toFixed(
@@ -520,9 +546,11 @@ export const initUI = ({
     );
 
     rotationDisplay.setText(
-      `Rotation: Pitch: ${THREE.MathUtils.radToDeg(camera.rotation.x).toFixed(
-        2
-      )}° Yaw: ${THREE.MathUtils.radToDeg(camera.rotation.y).toFixed(2)}°`
+      `Rotation: Pitch: ${THREE.MathUtils.radToDeg(
+        minecraft.player.pitch
+      ).toFixed(2)}° Yaw: ${THREE.MathUtils.radToDeg(
+        minecraft.player.yaw
+      ).toFixed(2)}°`
     );
   };
 

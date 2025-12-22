@@ -46,9 +46,21 @@ export type Controls = {
   type: "free" | "fps";
 };
 
-export type PlayerConfig = {
+export type PlayerData = {
   width: number;
   height: number;
+  position: THREE.Vector3;
+  velocity: THREE.Vector3;
+  direction: THREE.Vector3;
+  yaw: number;
+  pitch: number;
+  isMovingForward: boolean;
+  isMovingBackward: boolean;
+  isMovingLeft: boolean;
+  isMovingRight: boolean;
+  canJump: boolean;
+  speed: number;
+  jumpStrength: number;
 };
 
 export type MinecraftInstance = {
@@ -58,5 +70,11 @@ export type MinecraftInstance = {
   world: World;
   paused: boolean;
   controls: Controls;
-  player: PlayerConfig;
+  player: PlayerData;
+};
+
+export type RawVector3 = {
+  x: number;
+  y: number;
+  z: number;
 };

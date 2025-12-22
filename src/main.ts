@@ -9,19 +9,20 @@ import { createRaycaster } from "./raycast.ts";
 import { FPSControls } from "./FPSControls.ts";
 import { FreeControls } from "./FreeControls.ts";
 import { waitUntilWorkerEvent } from "./worker/workerClient.ts";
+import type { ActiveWorld } from "./worker/types.ts";
 
 initMenu({ onSelectWorld: async () => {}, isLoading: true });
 
 await initBlocks();
 await waitUntilWorkerEvent("workerInitialized");
 
-const startGame = async (worldID: number) => {
+const startGame = async (activeWorld: ActiveWorld) => {
   let stopped = false;
 
   const clock = new THREE.Clock();
 
   const { minecraft, disposeMinecraft } = await createMinecraftInstance({
-    worldID,
+    activeWorld,
   });
 
   const { updateUI, destroyUI } = initUI({
