@@ -11,6 +11,15 @@ importers:
       '@electric-sql/pglite':
         specifier: ^0.3.14
         version: 0.3.14
+      kysely:
+        specifier: ^0.28.9
+        version: 0.28.9
+      kysely-pglite-dialect:
+        specifier: ^1.2.0
+        version: 1.2.0(@electric-sql/pglite@0.3.14)(kysely@0.28.9)
+      seedrandom:
+        specifier: ^3.0.5
+        version: 3.0.5
       three:
         specifier: ^0.182.0
         version: 0.182.0
@@ -18,6 +27,9 @@ importers:
       '@types/node':
         specifier: ^25.0.3
         version: 25.0.3
+      '@types/seedrandom':
+        specifier: ^3.0.8
+        version: 3.0.8
       '@types/three':
         specifier: ^0.182.0
         version: 0.182.0
@@ -311,6 +323,9 @@ packages:
   '@types/node@25.0.3':
     resolution: {integrity: sha512-W609buLVRVmeW693xKfzHeIV6nJGGz98uCPfeXI1ELMLXVeKYZ9m15fAMSaUPBHYLGFsVRcMmSCksQOrZV9BYA==}
 
+  '@types/seedrandom@3.0.8':
+    resolution: {integrity: sha512-TY1eezMU2zH2ozQoAFAQFOPpvP15g+ZgSfTZt31AUUH/Rxtnz3H+A/Sv1Snw2/amp//omibc+AEkTaA8KUeOLQ==}
+
   '@types/stats.js@0.17.4':
     resolution: {integrity: sha512-jIBvWWShCvlBqBNIZt0KAshWpvSjhkwkEu4ZUcASoAvhmrgAUI2t1dXrjSL4xXVLB4FznPrIsX3nKXFl/Dt4vA==}
 
@@ -345,6 +360,16 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
+  kysely-pglite-dialect@1.2.0:
+    resolution: {integrity: sha512-VYrShTuV0VGVdCm1qNC6imo45KIK1dtVn57Q95DsTcouzhgd0xWcJ6KG9gowXoQ+l+TJSoemh3FUhOsw0KKlAA==}
+    peerDependencies:
+      '@electric-sql/pglite': ^0.2.0 || ^0.3.0
+      kysely: '>=0.23.0'
+
+  kysely@0.28.9:
+    resolution: {integrity: sha512-3BeXMoiOhpOwu62CiVpO6lxfq4eS6KMYfQdMsN/2kUCRNuF2YiEr7u0HLHaQU+O4Xu8YXE3bHVkwaQ85i72EuA==}
+    engines: {node: '>=20.0.0'}
+
   meshoptimizer@0.22.0:
     resolution: {integrity: sha512-IebiK79sqIy+E4EgOr+CAw+Ke8hAspXKzBd0JdgEmPHiAwmvEj2S4h1rfvo+o/BnfEYd/jAOg5IeeIjzlzSnDg==}
 
@@ -368,6 +393,9 @@ packages:
     resolution: {integrity: sha512-iTNAbFSlRpcHeeWu73ywU/8KuU/LZmNCSxp6fjQkJBD3ivUb8tpDrXhIxEzA05HlYMEwmtaUnb3RP+YNv162OQ==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
+
+  seedrandom@3.0.5:
+    resolution: {integrity: sha512-8OwmbklUNzwezjGInmZ+2clQmExQPvomqjL7LFqOYqtmuxRgQYqOD3mHaU+MvZn5FLUeVxVfQjwLZW/n/JFuqg==}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -586,6 +614,8 @@ snapshots:
     dependencies:
       undici-types: 7.16.0
 
+  '@types/seedrandom@3.0.8': {}
+
   '@types/stats.js@0.17.4': {}
 
   '@types/three@0.182.0':
@@ -640,6 +670,13 @@ snapshots:
   fsevents@2.3.3:
     optional: true
 
+  kysely-pglite-dialect@1.2.0(@electric-sql/pglite@0.3.14)(kysely@0.28.9):
+    dependencies:
+      '@electric-sql/pglite': 0.3.14
+      kysely: 0.28.9
+
+  kysely@0.28.9: {}
+
   meshoptimizer@0.22.0: {}
 
   nanoid@3.3.11: {}
@@ -681,6 +718,8 @@ snapshots:
       '@rollup/rollup-win32-x64-gnu': 4.53.5
       '@rollup/rollup-win32-x64-msvc': 4.53.5
       fsevents: 2.3.3
+
+  seedrandom@3.0.5: {}
 
   source-map-js@1.2.1: {}
 

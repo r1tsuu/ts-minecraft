@@ -11,14 +11,16 @@ import { FreeControls } from "./FreeControls.ts";
 
 await initBlocks();
 
-const startGame = async () => {
+const startGame = async (worldID: number) => {
   let stopped = false;
 
   const clock = new THREE.Clock();
 
-  const minecraft = await createMinecraftInstance();
+  const { minecraft, disposeMinecraft } = await createMinecraftInstance({
+    worldID,
+  });
 
-  const { updateUI } = initUI({
+  const { updateUI, destroyUI } = initUI({
     minecraft,
     onExitToMainMenu: () => {
       stopped = true;
@@ -38,11 +40,18 @@ const startGame = async () => {
   let lastPaused = false;
 
   const loop = async () => {
-    if (!stopped) requestAnimationFrame(loop);
-    else {
-      minecraft.dispose();
+    if (stopped) {
+      disposeMinecraft();
+      destroyUI();
+
+      initMenu({
+        onSelectWorld: startGame,
+      });
+
       return;
     }
+
+    requestAnimationFrame(loop);
 
     updateUI();
 
@@ -97,5 +106,5 @@ const startGame = async () => {
 };
 
 initMenu({
-  onStartGame: startGame,
+  onSelectWorld: startGame,
 });

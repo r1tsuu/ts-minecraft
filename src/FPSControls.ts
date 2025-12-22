@@ -198,6 +198,10 @@ export class FPSControls implements ControlsHandler {
   }
 
   update(delta: number) {
+    if (this.world.chunks.size === 0) {
+      return;
+    }
+
     // Apply gravity
     this.velocity.y -= this.gravity * delta;
 

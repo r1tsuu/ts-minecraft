@@ -1,15 +1,22 @@
 import * as THREE from "three";
-import type { Block, Chunk, World } from "./types.js";
+import type { BlockType, Chunk, World } from "./types.js";
 import { blockRegistry, getBlockById } from "./block.js";
 import {
   CHUNK_SIZE,
   RENDER_DISTANCE,
   WORLD_HEIGHT,
-  getBlockIndex as getIndex,
+  getBlockIndex,
+  getBlockKey,
 } from "./util.js";
-import { sendEventToWorker } from "./workerClient.ts";
+import { sendEventToWorker } from "./worker/workerClient.js";
 
-export const createWorld = (scene: THREE.Scene): World => {
+export const createWorld = ({
+  scene,
+  id,
+}: {
+  scene: THREE.Scene;
+  id: number;
+}): World => {
   const backgroundColor = 0x87ceeb;
   scene.fog = new THREE.Fog(backgroundColor, 1, 96);
   scene.background = new THREE.Color(backgroundColor);
@@ -39,6 +46,7 @@ export const createWorld = (scene: THREE.Scene): World => {
 
   for (const [id, block] of blockRegistry) {
     const mesh = new THREE.InstancedMesh(geometry, block.material, MAX_COUNT);
+    mesh.frustumCulled = false;
     scene.add(mesh);
     blockMeshes.set(id, mesh);
     blockMeshesCount.set(id, 0);
@@ -49,6 +57,7 @@ export const createWorld = (scene: THREE.Scene): World => {
     blockMeshes: blockMeshes,
     blockMeshesCount,
     requestingChunksState: "idle",
+    id,
   };
 };
 
@@ -57,7 +66,7 @@ export const getBlockInWorld = (
   y: number,
   z: number,
   world: World
-): Block | null => {
+): BlockType | null => {
   const chunkX = Math.floor(x / CHUNK_SIZE) * CHUNK_SIZE;
   const chunkZ = Math.floor(z / CHUNK_SIZE) * CHUNK_SIZE;
   const key = chunkKey(chunkX, chunkZ);
@@ -72,13 +81,13 @@ export const getBlockInWorld = (
     return null;
   }
 
-  const blockId = chunk.blocks[getIndex(localX, y, localZ)];
+  const block = chunk.blocksUint[getBlockIndex(localX, y, localZ)];
 
-  if (blockId === 0) {
+  if (!block) {
     return null;
   }
 
-  return getBlockById(blockId);
+  return getBlockById(block);
 };
 
 const chunkKey = (x: number, z: number) => `${x},${z}`;
@@ -111,7 +120,13 @@ export const updateWorld = async (
     if (world.requestingChunksState === "idle") {
       sendEventToWorker({
         type: "requestChunks",
-        payload: { chunkKeys: chunksToLoad },
+        payload: {
+          worldID: world.id,
+          chunksCoordinates: chunksToLoad.map((key) => {
+            const [x, z] = key.split(",").map(Number);
+            return { x, z };
+          }),
+        },
       });
       world.requestingChunksState = "requesting";
     }
@@ -138,41 +153,60 @@ export const updateWorld = async (
       world.blockMeshesCount.set(block, 0);
     }
 
+    let now = Date.now();
     for (const chunk of world.chunks.values()) {
-      for (let x = 0; x < CHUNK_SIZE; x++) {
-        for (let y = 0; y < WORLD_HEIGHT; y++) {
-          for (let z = 0; z < CHUNK_SIZE; z++) {
-            const blockId = chunk.blocks[getIndex(x, y, z)];
-            if (blockId === 0) continue; // Air block, skip rendering
+      for (const block of chunk.blocks.values()) {
+        const blockTypeID = block.typeID;
+        if (!blockTypeID) continue;
 
-            const block = getBlockById(blockId);
+        const mesh = world.blockMeshes.get(blockTypeID);
 
-            if (!block) continue;
-
-            const mesh = world.blockMeshes.get(blockId);
-
-            if (!mesh) {
-              throw new Error(`Mesh for block ID ${blockId} not found`);
-            }
-
-            matrix.setPosition(chunk.x + x, y, chunk.z + z);
-            const index = world.blockMeshesCount.get(blockId);
-
-            if (index === undefined) {
-              throw new Error(`Mesh count for block ID ${blockId} not found`);
-            }
-
-            mesh.setMatrixAt(index, matrix);
-            world.blockMeshesCount.set(blockId, index + 1);
-          }
+        if (!mesh) {
+          throw new Error(`Mesh for block ID ${blockTypeID} not found`);
         }
+
+        matrix.setPosition(chunk.x + block.x, block.y, chunk.z + block.z);
+        const index = world.blockMeshesCount.get(blockTypeID);
+        if (index === undefined) {
+          throw new Error(`Mesh count for block ID ${blockTypeID} not found`);
+        }
+
+        mesh.setMatrixAt(index, matrix);
+        world.blockMeshesCount.set(blockTypeID, index + 1);
       }
+      // for (let x = 0; x < CHUNK_SIZE; x++) {
+      //   for (let y = 0; y < WORLD_HEIGHT; y++) {
+      //     for (let z = 0; z < CHUNK_SIZE; z++) {
+      //       const blockTypeID = chunk.blocksUint[getBlockIndex(x, y, z)];
+      //       if (!blockTypeID) continue;
+
+      //       const mesh = world.blockMeshes.get(blockTypeID);
+
+      //       if (!mesh) {
+      //         throw new Error(`Mesh for block ID ${blockTypeID} not found`);
+      //       }
+
+      //       matrix.setPosition(chunk.x + x, y, chunk.z + z);
+      //       const index = world.blockMeshesCount.get(blockTypeID);
+      //       if (index === undefined) {
+      //         throw new Error(
+      //           `Mesh count for block ID ${blockTypeID} not found`
+      //         );
+      //       }
+
+      //       mesh.setMatrixAt(index, matrix);
+      //       world.blockMeshesCount.set(blockTypeID, index + 1);
+      //     }
+      //   }
+      // }
     }
 
+    console.log("Mesh update preparation took", Date.now() - now, "ms");
     for (const mesh of world.blockMeshes.values()) {
       mesh.instanceMatrix.needsUpdate = true;
-      mesh.computeBoundingBox();
-      mesh.computeBoundingSphere();
+      // mesh.computeBoundingBox();
+      // mesh.computeBoundingSphere();
     }
+    console.log(`Updated meshes in ${Date.now() - now}ms`);
   }
 };
