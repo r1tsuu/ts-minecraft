@@ -72,6 +72,8 @@ export const createMinecraftInstance = async ({
   const disposeMinecraft = () => {
     unsubscribeFromWorkerEvents();
     renderer.dispose();
+    scene.clear();
+    renderer.domElement.remove();
   };
 
   const minecraft: MinecraftInstance = {

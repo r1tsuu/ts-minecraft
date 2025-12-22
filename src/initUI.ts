@@ -238,7 +238,7 @@ export const initMenu = ({
   onSelectWorld: (worldID: number) => void;
 }) => {
   const menuOverlay = createMenuOverlay();
-
+  console.log(menuOverlay);
   customElement({
     tag: "h1",
     className: "menu_title",
@@ -282,7 +282,7 @@ const initPauseMenu = ({
 
   const resumeButton = customElement({
     tag: "button",
-    className: "pause_menu_button",
+    className: "game_button",
     text: "Resume",
     parent: overlay,
   });
@@ -295,7 +295,7 @@ const initPauseMenu = ({
 
   const exitButton = customElement({
     tag: "button",
-    className: "pause_menu_button",
+    className: "game_button",
     text: "Exit to Main Menu",
     parent: overlay,
   });
@@ -338,7 +338,7 @@ export const initUI = ({
     parent: document.body,
   });
 
-  customElement({
+  const crosshair = customElement({
     tag: "div",
     className: "crosshair",
     parent: document.body,
@@ -438,7 +438,7 @@ export const initUI = ({
     minecraft.renderer.domElement.style.cursor = "none";
   };
 
-  window.addEventListener("keydown", (e) => {
+  window.addEventListener("keyup", (e) => {
     e.preventDefault();
     if (e.code === "KeyC") {
       toggleControls();
@@ -508,5 +508,12 @@ export const initUI = ({
     positionDisplay,
     toggleControlsButton: controlsDisplay,
     updateUI,
+    destroyUI: () => {
+      document.body.removeChild(wrapper.element);
+      document.body.removeChild(crosshair.element);
+      if (pauseOverlay) {
+        pauseOverlay.element.remove();
+      }
+    },
   };
 };

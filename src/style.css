@@ -173,7 +173,12 @@ html, body {
   background-color: var(--overlay-bg);
   font-family: var(--font);
   gap: 10px;
+  padding: 20px;
   z-index: 10;
+}
+
+.pause_menu_overlay button {
+  width: 100%
 }
 
 .pause_menu_title {

@@ -20,7 +20,7 @@ const startGame = async (worldID: number) => {
     worldID,
   });
 
-  const { updateUI } = initUI({
+  const { updateUI, destroyUI } = initUI({
     minecraft,
     onExitToMainMenu: () => {
       stopped = true;
@@ -40,11 +40,18 @@ const startGame = async (worldID: number) => {
   let lastPaused = false;
 
   const loop = async () => {
-    if (!stopped) requestAnimationFrame(loop);
-    else {
+    if (stopped) {
       disposeMinecraft();
+      destroyUI();
+
+      initMenu({
+        onSelectWorld: startGame,
+      });
+
       return;
     }
+
+    requestAnimationFrame(loop);
 
     updateUI();
 
