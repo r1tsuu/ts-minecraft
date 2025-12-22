@@ -1,5 +1,5 @@
+import type { MinecraftWorkerEvent, MinecraftClientEvent } from "./types.ts";
 import MinecraftWorker from "./worker.js?worker";
-import type { MinecraftClientEvent, MinecraftWorkerEvent } from "./worker.js";
 
 const minecraftWorker = new MinecraftWorker();
 

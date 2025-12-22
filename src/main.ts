@@ -39,7 +39,6 @@ const startGame = async (worldID: number) => {
   });
 
   let updatePromise: Promise<void> | null = null;
-  let lastUpdated: null | number = null;
 
   let lastPaused = false;
 
@@ -100,7 +99,6 @@ const startGame = async (worldID: number) => {
         minecraft.world,
         minecraft.camera.position
       ).then(() => {
-        lastUpdated = Date.now();
         raycaster.update();
         updatePromise = null;
       });

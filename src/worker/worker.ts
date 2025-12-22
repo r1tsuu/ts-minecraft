@@ -1,10 +1,21 @@
 import { getBlockIdByName, initBlocksWorker } from "../block.js";
-import seedrandom from "seedrandom";
 
 import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
 import type { BlockInWorld } from "../types.js";
-import { CHUNK_SIZE, WORLD_HEIGHT } from "../util.js";
+import {
+  CHUNK_SIZE,
+  findByXYZ,
+  findByXZ,
+  getChunksCoordinatesInRadius,
+  RENDER_DISTANCE,
+  WORLD_HEIGHT,
+} from "../util.js";
 import { getDatabaseClient } from "./database.ts";
+import type {
+  ActiveWorld,
+  MinecraftClientEvent,
+  MinecraftWorkerEvent,
+} from "./types.ts";
 
 initBlocksWorker();
 
@@ -12,15 +23,7 @@ const databaseClient = await getDatabaseClient();
 
 let worlds = await databaseClient.fetchWorlds();
 
-const getWorld = (id: number) => {
-  const maybeWorld = worlds.find((w) => w.id === id);
-
-  if (!maybeWorld) {
-    throw new Error(`World with ID ${id} not found`);
-  }
-
-  return maybeWorld;
-};
+let activeWorld: ActiveWorld | null = null;
 
 const noise = new SimplexNoise();
 
@@ -100,100 +103,310 @@ const generateChunk = async ({
   };
 };
 
+const getChunks = async ({
+  coordinates,
+  worldID,
+}: {
+  worldID: number;
+  coordinates: { x: number; z: number }[];
+}) => {
+  const dbChunks = await databaseClient.fetchChunks({
+    worldID,
+    coordinates,
+  });
+
+  const chunksToGenerate: { x: number; z: number }[] = [];
+  const result: { x: number; z: number; id: number; blocks: BlockInWorld[] }[] =
+    [];
+
+  for (const coord of coordinates) {
+    const existingChunk = findByXZ(dbChunks, coord.x, coord.z);
+
+    if (!existingChunk) {
+      chunksToGenerate.push(coord);
+    } else {
+      result.push({
+        x: existingChunk.x,
+        z: existingChunk.z,
+        id: existingChunk.id,
+        blocks: existingChunk.data.blocks,
+      });
+    }
+  }
+
+  const generatedChunks: {
+    x: number;
+    z: number;
+    data: {
+      blocks: BlockInWorld[];
+    };
+  }[] = [];
+
+  for (const coord of chunksToGenerate) {
+    const { x: chunkX, z: chunkZ } = coord;
+    const blocks: BlockInWorld[] = [];
+
+    for (let x = 0; x < CHUNK_SIZE; x++) {
+      for (let z = 0; z < CHUNK_SIZE; z++) {
+        const worldX = chunkX + x;
+        const worldZ = chunkZ + z;
+        const baseY = 30;
+        const heightVariation = 12;
+        const amplitude = heightVariation / 2;
+        const frequency = 0.005;
+
+        const yOffset = Math.floor(
+          (noise.noise(worldX * frequency, worldZ * frequency) + 1) * amplitude
+        );
+
+        const height = baseY + yOffset;
+
+        for (let y = 0; y <= height; y++) {
+          const block = y === height ? "grass" : "dirt";
+          blocks.push({
+            x,
+            y,
+            z,
+            typeID: getBlockIdByName(block),
+          });
+        }
+      }
+    }
+
+    generatedChunks.push({
+      x: chunkX,
+      z: chunkZ,
+      data: {
+        blocks,
+      },
+    });
+  }
+
+  const createdChunks = await databaseClient.createChunks({
+    worldID,
+    chunks: generatedChunks,
+  });
+
+  for (const chunk of createdChunks) {
+    result.push({
+      x: chunk.x,
+      z: chunk.z,
+      id: chunk.id,
+      blocks: chunk.data.blocks,
+    });
+  }
+
+  return result;
+};
+
+const getInitialPlayerPosition = ({
+  centralChunk,
+}: {
+  centralChunk: {
+    x: number;
+    z: number;
+    id: number;
+    blocks: BlockInWorld[];
+  };
+}) => {
+  let latestBlock: BlockInWorld | null = null;
+  for (let y = 0; y < WORLD_HEIGHT; y++) {
+    latestBlock = findByXYZ(centralChunk.blocks, 0, y, 0);
+
+    if (!latestBlock) {
+      break;
+    }
+  }
+
+  if (!latestBlock) {
+    throw new Error("TODO: Include spawn platform generation");
+  }
+
+  return {
+    x: latestBlock.x,
+    y: latestBlock.y + 1,
+    z: latestBlock.z,
+  };
+};
+
 const sendEventToClient = (event: MinecraftClientEvent) => {
   postMessage(event);
 };
 
 onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
-  switch (msg.data.type) {
-    case "createWorld": {
-      const { name: incomingName, seed } = msg.data.payload;
+  try {
+    switch (msg.data.type) {
+      case "createWorld": {
+        const { name: incomingName, seed } = msg.data.payload;
 
-      let name = incomingName;
+        let name = incomingName;
 
-      let worldByName = worlds.find((w) => w.name === name);
-      let attempt = 1;
+        let worldByName = worlds.find((w) => w.name === name);
+        let attempt = 1;
 
-      while (worldByName) {
-        if (name.match(/\(_\(\d+\)\)$/)) {
-          name = name.replace(/\(_\(\d+\)\)$/, `(_(${attempt}))`);
-        } else {
-          name = `${incomingName} (${attempt})`;
+        while (worldByName) {
+          if (name.match(/\(_\(\d+\)\)$/)) {
+            name = name.replace(/\(_\(\d+\)\)$/, `(_(${attempt}))`);
+          } else {
+            name = `${incomingName} (${attempt})`;
+          }
+          worldByName = worlds.find((w) => w.name === name);
+          attempt++;
         }
-        worldByName = worlds.find((w) => w.name === name);
-        attempt++;
+
+        const world = await databaseClient.createWorld({ name, seed });
+        worlds.push(world);
+
+        sendEventToClient({
+          type: "worldCreated",
+          payload: world,
+          uuid: msg.data.uuid,
+          status: "SUCCESS",
+        });
+
+        break;
       }
 
-      const world = await databaseClient.createWorld({ name, seed });
-      worlds.push(world);
+      case "initializeWorld": {
+        const { worldID } = msg.data.payload;
 
-      sendEventToClient({
-        type: "worldCreated",
-        payload: world,
-        uuid: msg.data.uuid,
-        status: "SUCCESS",
-      });
+        const world = worlds.find((w) => w.id === worldID);
 
-      break;
-    }
-    case "requestListWorlds": {
-      sendEventToClient({
-        type: "listWorldsResponse",
-        payload: {
-          worlds,
-        },
-        uuid: msg.data.uuid,
-        status: "SUCCESS",
-      });
-      break;
-    }
+        if (!world) {
+          throw new Error("World not found");
+        }
 
-    case "deleteWorld": {
-      const { worldID } = msg.data.payload;
-
-      await databaseClient.deleteWorld(worldID);
-
-      worlds = await databaseClient.fetchWorlds();
-
-      sendEventToClient({
-        type: "worldDeleted",
-        payload: { worldID },
-        uuid: msg.data.uuid,
-        status: "SUCCESS",
-      });
-      break;
-    }
-    case "requestChunks":
-      {
-        const { chunksCoordinates } = msg.data.payload;
-
-        const promises: Promise<{
+        const loadedChunks: {
           x: number;
           z: number;
           id: number;
           blocks: BlockInWorld[];
-        }>[] = [];
-        for (const coordinates of chunksCoordinates) {
-          promises.push(
-            generateChunk({
-              chunkX: coordinates.x,
-              chunkZ: coordinates.z,
-              worldID: msg.data.payload.worldID,
-            })
-          );
+        }[] = [];
+
+        if (!world.initialized) {
+          const chunksCoordinates = getChunksCoordinatesInRadius({
+            centerX: 0,
+            centerZ: 0,
+            chunkRadius: RENDER_DISTANCE * 3, // Generate extra chunks for initial world
+          });
+
+          const chunks = await getChunks({
+            worldID: world.id,
+            coordinates: chunksCoordinates,
+          });
+
+          for (const coordinates of getChunksCoordinatesInRadius({
+            centerX: 0,
+            centerZ: 0,
+            chunkRadius: RENDER_DISTANCE,
+          })) {
+            const chunk = findByXZ(chunks, coordinates.x, coordinates.z);
+
+            if (chunk) {
+              loadedChunks.push(chunk);
+            }
+          }
+
+          const centralChunk = findByXZ(chunks, 0, 0)!;
+
+          const playerPosition = getInitialPlayerPosition({ centralChunk });
+
+          world.playerData = {
+            pitch: 0,
+            yaw: 0,
+            x: playerPosition.x,
+            y: playerPosition.y,
+            z: playerPosition.z,
+          };
+
+          await databaseClient.updateWorld({
+            worldID: world.id,
+            data: {
+              initialized: true,
+              playerData: world.playerData,
+            },
+          });
+
+          world.initialized = true;
         }
 
-        const chunks = await Promise.all(promises);
+        activeWorld = {
+          world,
+          loadedChunks,
+        };
 
         sendEventToClient({
-          type: "chunksGenerated",
-          payload: { chunks },
+          type: "worldInitialized",
+          payload: activeWorld,
           uuid: msg.data.uuid,
           status: "SUCCESS",
         });
+
+        break;
       }
 
-      break;
+      case "requestListWorlds": {
+        sendEventToClient({
+          type: "listWorldsResponse",
+          payload: {
+            worlds,
+          },
+          uuid: msg.data.uuid,
+          status: "SUCCESS",
+        });
+        break;
+      }
+
+      case "deleteWorld": {
+        const { worldID } = msg.data.payload;
+
+        await databaseClient.deleteWorld(worldID);
+
+        worlds = await databaseClient.fetchWorlds();
+
+        sendEventToClient({
+          type: "worldDeleted",
+          payload: { worldID },
+          uuid: msg.data.uuid,
+          status: "SUCCESS",
+        });
+        break;
+      }
+
+      case "requestChunks":
+        {
+          const { chunksCoordinates } = msg.data.payload;
+
+          const promises: Promise<{
+            x: number;
+            z: number;
+            id: number;
+            blocks: BlockInWorld[];
+          }>[] = [];
+          for (const coordinates of chunksCoordinates) {
+            promises.push(
+              generateChunk({
+                chunkX: coordinates.x,
+                chunkZ: coordinates.z,
+                worldID: msg.data.payload.worldID,
+              })
+            );
+          }
+
+          const chunks = await Promise.all(promises);
+
+          sendEventToClient({
+            type: "chunksGenerated",
+            payload: { chunks },
+            uuid: msg.data.uuid,
+            status: "SUCCESS",
+          });
+        }
+
+        break;
+    }
+  } catch (error) {
+    console.error("Error in worker message handler:", error);
   }
 };
 
@@ -202,73 +415,3 @@ sendEventToClient({
   payload: {},
   status: "SUCCESS",
 });
-
-type Status = "SUCCESS" | "UNKNOWN_ERROR";
-
-type BaseEvent<T extends string, Data> = {
-  type: T;
-  payload: Data;
-  uuid?: string;
-};
-
-type BaseClientEvent<T extends string, Data> = BaseEvent<T, Data> & {
-  status: Status;
-};
-
-export type MinecraftWorkerEvent =
-  | BaseEvent<
-      "requestChunks",
-      {
-        worldID: number;
-        chunksCoordinates: {
-          x: number;
-          z: number;
-        }[];
-      }
-    >
-  | BaseEvent<
-      "createWorld",
-      {
-        name: string;
-        seed: string;
-      }
-    >
-  | BaseEvent<"requestListWorlds", {}>
-  | BaseEvent<"deleteWorld", { worldID: number }>
-  | BaseEvent<"initializeWorld", { worldID: number }>;
-
-export type MinecraftClientEvent =
-  | BaseClientEvent<
-      "chunksGenerated",
-      {
-        chunks: {
-          x: number;
-          z: number;
-          id: number;
-          blocks: BlockInWorld[];
-        }[];
-      }
-    >
-  | BaseClientEvent<
-      "worldCreated",
-      {
-        name: string;
-        seed: string;
-        createdAt: Date;
-        id: number;
-      }
-    >
-  | BaseClientEvent<
-      "listWorldsResponse",
-      {
-        worlds: {
-          name: string;
-          seed: string;
-          createdAt: Date;
-          id: number;
-        }[];
-      }
-    >
-  | BaseClientEvent<"worldDeleted", { worldID: number }>
-  | BaseClientEvent<"worldInitialized", { worldID: number }>
-  | BaseClientEvent<"workerInitialized", {}>;

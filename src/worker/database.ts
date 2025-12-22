@@ -5,6 +5,8 @@ import {
   sql,
   type Generated,
   type JSONColumnType,
+  type Selectable,
+  type Updateable,
 } from "kysely";
 import { PGliteDialect } from "kysely-pglite-dialect";
 import type { BlockInWorld } from "../types.ts";
@@ -13,12 +15,22 @@ export type ChunkDatabaseData = {
   blocks: BlockInWorld[];
 };
 
+export type DatabasePlayerData = {
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  pitch: number;
+};
+
 export type DatabaseSchema = {
   worlds: {
     id: Generated<number>;
     name: string;
     seed: string;
     createdAt: Generated<Date>;
+    playerData: JSONColumnType<DatabasePlayerData>;
+    initialized: boolean;
   };
   chunks: {
     id: Generated<number>;
@@ -27,13 +39,21 @@ export type DatabaseSchema = {
     z: number;
     data: JSONColumnType<ChunkDatabaseData>;
   };
+  _versionHistory: {
+    createdAt: Generated<Date>;
+    id: Generated<number>;
+    current: boolean;
+    version: number;
+  };
 };
+
+export type DatabaseWorldData = Selectable<DatabaseSchema["worlds"]>;
 
 // Increment this when making changes to the database schema
 const DB_VERSION = 1;
 
 export const getDatabaseClient = async () => {
-  const pg = new PGlite(`idb://minecraft_worker_db_v${DB_VERSION}`);
+  const pg = new PGlite(`idb://minecraft_worker_db`);
 
   const tableExists = async (name: string) => {
     const result = await pg.query<{ exists: boolean }>(
@@ -55,16 +75,55 @@ export const getDatabaseClient = async () => {
     plugins: [new ParseJSONResultsPlugin()],
   });
 
-  const hasTables = await tableExists("worlds");
+  const dropTables = async () => {
+    await db.schema.dropTable("chunks").ifExists().execute();
+    await db.schema.dropTable("worlds").ifExists().execute();
+  };
 
-  if (!hasTables) {
-    console.log("Creating database tables...");
+  if (!(await tableExists("_versionHistory"))) {
+    await db.schema
+      .createTable("_versionHistory")
+      .addColumn("id", "serial", (col) => col.primaryKey())
+      .addColumn("version", "integer", (col) => col.notNull())
+      .addColumn("current", "boolean", (col) => col.notNull())
+      .addColumn("createdAt", "timestamp", (col) =>
+        col.notNull().defaultTo(sql`now()`)
+      )
+      .execute();
+  }
+
+  const versionEntry = await db
+    .selectFrom("_versionHistory")
+    .where("current", "=", true)
+    .where("version", "=", DB_VERSION)
+    .select("id")
+    .executeTakeFirst();
+
+  if (!versionEntry) {
+    console.log(`Setting up database schema for version ${DB_VERSION}...`);
+    await dropTables();
+
+    await db
+      .updateTable("_versionHistory")
+      .set({ current: false })
+      .where("current", "=", true)
+      .execute();
+
+    await db
+      .insertInto("_versionHistory")
+      .values({
+        version: DB_VERSION,
+        current: true,
+      })
+      .execute();
 
     await db.schema
       .createTable("worlds")
       .addColumn("id", "serial", (col) => col.primaryKey())
       .addColumn("name", "text", (col) => col.notNull().unique())
       .addColumn("seed", "text", (col) => col.notNull())
+      .addColumn("initialized", "boolean", (col) => col.notNull())
+      .addColumn("playerData", "json", (col) => col.notNull())
       .addColumn("createdAt", "timestamp", (col) =>
         col
           .notNull()
@@ -91,7 +150,7 @@ export const getDatabaseClient = async () => {
       .column("worldID")
       .execute();
 
-    console.log("Database tables created.");
+    console.log(`Database schema for version ${DB_VERSION} set up complete.`);
   }
 
   const createWorld = async ({
@@ -103,11 +162,43 @@ export const getDatabaseClient = async () => {
   }) => {
     const result = await db
       .insertInto("worlds")
-      .values({ name, seed })
+      .values({
+        name,
+        seed,
+        initialized: false,
+        playerData: JSON.stringify({ x: 0, y: 100, z: 0, yaw: 0, pitch: 0 }),
+      })
       .returningAll()
       .executeTakeFirstOrThrow();
 
     return result;
+  };
+
+  const updateWorld = ({
+    worldID,
+    data,
+  }: {
+    worldID: number;
+    data: Partial<{
+      initialized: boolean;
+      playerData: DatabasePlayerData;
+    }>;
+  }) => {
+    const dataToSet: Updateable<DatabaseSchema["worlds"]> = {};
+
+    if ("initialized" in data) {
+      dataToSet.initialized = data.initialized;
+    }
+
+    if ("playerData" in data) {
+      dataToSet.playerData = JSON.stringify(data.playerData);
+    }
+
+    return db
+      .updateTable("worlds")
+      .set(dataToSet)
+      .where("id", "=", worldID)
+      .execute();
   };
 
   const createChunk = async ({
@@ -130,6 +221,29 @@ export const getDatabaseClient = async () => {
     return result;
   };
 
+  const createChunks = async ({
+    chunks,
+    worldID,
+  }: {
+    worldID: number;
+    chunks: { x: number; z: number; data: ChunkDatabaseData }[];
+  }) => {
+    const results = await db
+      .insertInto("chunks")
+      .values(
+        chunks.map((chunk) => ({
+          worldID,
+          x: chunk.x,
+          z: chunk.z,
+          data: JSON.stringify(chunk.data),
+        }))
+      )
+      .returningAll()
+      .execute();
+
+    return results;
+  };
+
   const fetchChunk = async ({
     worldID,
     x,
@@ -146,6 +260,29 @@ export const getDatabaseClient = async () => {
       .where("z", "=", z)
       .selectAll()
       .executeTakeFirst();
+
+    return result;
+  };
+
+  const fetchChunks = async ({
+    coordinates,
+    worldID,
+  }: {
+    worldID: number;
+    coordinates: { x: number; z: number }[];
+  }) => {
+    const result = await db
+      .selectFrom("chunks")
+      .where("worldID", "=", worldID)
+      .where((eb) =>
+        eb.or(
+          coordinates.map((coord) =>
+            eb.and([eb("x", "=", coord.x), eb("z", "=", coord.z)])
+          )
+        )
+      )
+      .selectAll()
+      .execute();
 
     return result;
   };
@@ -171,5 +308,8 @@ export const getDatabaseClient = async () => {
     destroy,
     deleteWorld,
     fetchChunk,
+    fetchChunks,
+    createChunks,
+    updateWorld,
   };
 };
