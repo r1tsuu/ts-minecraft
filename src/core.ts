@@ -2,9 +2,12 @@ import * as THREE from "three";
 import type { MinecraftInstance } from "./types.ts";
 import { createWorld } from "./world.ts";
 import { FPSControls } from "./FPSControls.ts";
-import { listenToWorkerEvents } from "./workerClient.ts";
+import { listenToWorkerEvents } from "./worker/workerClient.js";
 
-export const createMinecraftInstance = async (): Promise<MinecraftInstance> => {
+export const createMinecraftInstance = async (): Promise<{
+  minecraft: MinecraftInstance;
+  disposeMinecraft: () => void;
+}> => {
   const scene = new THREE.Scene();
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   // renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -42,12 +45,12 @@ export const createMinecraftInstance = async (): Promise<MinecraftInstance> => {
     }
   });
 
-  const dispose = () => {
+  const disposeMinecraft = () => {
     unsubscribeFromWorkerEvents();
     renderer.dispose();
   };
 
-  return {
+  const minecraft: MinecraftInstance = {
     camera,
     controls: FPSControls.controls(camera, renderer, world, player),
     renderer,
@@ -55,6 +58,10 @@ export const createMinecraftInstance = async (): Promise<MinecraftInstance> => {
     paused: false,
     world,
     player,
-    dispose,
+  };
+
+  return {
+    minecraft,
+    disposeMinecraft,
   };
 };

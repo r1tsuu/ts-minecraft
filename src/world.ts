@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { Block, Chunk, World } from "./types.js";
+import type { BlockType, Chunk, World } from "./types.js";
 import { blockRegistry, getBlockById } from "./block.js";
 import {
   CHUNK_SIZE,
@@ -7,7 +7,7 @@ import {
   WORLD_HEIGHT,
   getBlockIndex as getIndex,
 } from "./util.js";
-import { sendEventToWorker } from "./workerClient.ts";
+import { sendEventToWorker } from "./worker/workerClient.js";
 
 export const createWorld = (scene: THREE.Scene): World => {
   const backgroundColor = 0x87ceeb;
@@ -57,7 +57,7 @@ export const getBlockInWorld = (
   y: number,
   z: number,
   world: World
-): Block | null => {
+): BlockType | null => {
   const chunkX = Math.floor(x / CHUNK_SIZE) * CHUNK_SIZE;
   const chunkZ = Math.floor(z / CHUNK_SIZE) * CHUNK_SIZE;
   const key = chunkKey(chunkX, chunkZ);

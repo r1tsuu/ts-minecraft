@@ -11,6 +11,12 @@ importers:
       '@electric-sql/pglite':
         specifier: ^0.3.14
         version: 0.3.14
+      kysely:
+        specifier: ^0.28.9
+        version: 0.28.9
+      kysely-pglite-dialect:
+        specifier: ^1.2.0
+        version: 1.2.0(@electric-sql/pglite@0.3.14)(kysely@0.28.9)
       three:
         specifier: ^0.182.0
         version: 0.182.0
@@ -345,6 +351,16 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
+  kysely-pglite-dialect@1.2.0:
+    resolution: {integrity: sha512-VYrShTuV0VGVdCm1qNC6imo45KIK1dtVn57Q95DsTcouzhgd0xWcJ6KG9gowXoQ+l+TJSoemh3FUhOsw0KKlAA==}
+    peerDependencies:
+      '@electric-sql/pglite': ^0.2.0 || ^0.3.0
+      kysely: '>=0.23.0'
+
+  kysely@0.28.9:
+    resolution: {integrity: sha512-3BeXMoiOhpOwu62CiVpO6lxfq4eS6KMYfQdMsN/2kUCRNuF2YiEr7u0HLHaQU+O4Xu8YXE3bHVkwaQ85i72EuA==}
+    engines: {node: '>=20.0.0'}
+
   meshoptimizer@0.22.0:
     resolution: {integrity: sha512-IebiK79sqIy+E4EgOr+CAw+Ke8hAspXKzBd0JdgEmPHiAwmvEj2S4h1rfvo+o/BnfEYd/jAOg5IeeIjzlzSnDg==}
 
@@ -639,6 +655,13 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  kysely-pglite-dialect@1.2.0(@electric-sql/pglite@0.3.14)(kysely@0.28.9):
+    dependencies:
+      '@electric-sql/pglite': 0.3.14
+      kysely: 0.28.9
+
+  kysely@0.28.9: {}
 
   meshoptimizer@0.22.0: {}
 

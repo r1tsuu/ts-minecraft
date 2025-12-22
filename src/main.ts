@@ -16,7 +16,7 @@ const startGame = async () => {
 
   const clock = new THREE.Clock();
 
-  const minecraft = await createMinecraftInstance();
+  const { minecraft, disposeMinecraft } = await createMinecraftInstance();
 
   const { updateUI } = initUI({
     minecraft,
@@ -40,7 +40,7 @@ const startGame = async () => {
   const loop = async () => {
     if (!stopped) requestAnimationFrame(loop);
     else {
-      minecraft.dispose();
+      disposeMinecraft();
       return;
     }
 

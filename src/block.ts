@@ -1,17 +1,17 @@
 import type { Material } from "three";
-import { BLOCK_NAMES, type Block, type BlockName } from "./types.js";
+import { BLOCK_NAMES, type BlockType, type BlockName } from "./types.js";
 
-export const blockRegistry = new Map<number, Block>();
+export const blockRegistry = new Map<number, BlockType>();
 export const blockNameToId = new Map<BlockName, number>();
 
 let idCounter = 1;
 
-const registerBlock = (block: Block) => {
+const registerBlock = (block: BlockType) => {
   blockNameToId.set(block.name, idCounter);
   blockRegistry.set(idCounter++, block);
 };
 
-export const getBlockById = (id: number): Block => {
+export const getBlockById = (id: number): BlockType => {
   const maybeBlock = blockRegistry.get(id);
 
   if (!maybeBlock) {

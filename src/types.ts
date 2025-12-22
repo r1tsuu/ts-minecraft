@@ -4,13 +4,24 @@ export const BLOCK_NAMES = ["dirt", "grass", "stone"] as const;
 
 export type BlockName = (typeof BLOCK_NAMES)[number];
 
-export type Block = {
+export type BlockType = {
   name: BlockName;
   material: THREE.Material | THREE.Material[];
 };
 
+export type BlockInWorld = {
+  typeID: number;
+
+  /** Within chunk */
+  x: number;
+  /** Within chunk */
+  y: number;
+  /** Within chunk */
+  z: number;
+};
+
 export type Chunk = {
-  blocks: Uint8Array;
+  blocks: Map<string, BlockInWorld>;
   x: number;
   z: number;
 };
@@ -45,5 +56,4 @@ export type MinecraftInstance = {
   paused: boolean;
   controls: Controls;
   player: PlayerConfig;
-  dispose: () => void;
 };
