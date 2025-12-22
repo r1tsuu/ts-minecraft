@@ -1,7 +1,7 @@
 import { getBlockIdByName, initBlocksWorker } from "../block.js";
 import seedrandom from "seedrandom";
 
-import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
+import { ImprovedNoise } from "three/addons/math/ImprovedNoise.js";
 import type { BlockInWorld } from "../types.js";
 import { CHUNK_SIZE, WORLD_HEIGHT } from "../util.js";
 import { getDatabaseClient } from "./database.ts";
@@ -22,6 +22,8 @@ const getWorld = (id: number) => {
   return maybeWorld;
 };
 
+const noise = new ImprovedNoise();
+
 const generateChunk = async ({
   chunkX,
   chunkZ,
@@ -38,7 +40,6 @@ const generateChunk = async ({
 }> => {
   const world = getWorld(worldID);
   const rng = seedrandom(`${world.seed}_chunk_${chunkX}_${chunkZ}`);
-  const simplex = new SimplexNoise();
 
   const existingChunk = await databaseClient.fetchChunk({
     worldID,
@@ -59,7 +60,7 @@ const generateChunk = async ({
     {
       worldID,
       data: {
-        blocks: Array((CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT) / 2).fill(null),
+        blocks: [],
       },
       x: chunkX,
       z: chunkZ,
@@ -75,24 +76,26 @@ const generateChunk = async ({
       const heightVariation = 12;
       const amplitude = heightVariation / 2;
       const frequency = 0.005;
+      const random = rng.quick();
+
       const yOffset = Math.floor(
-        (simplex.noise(worldX * frequency, worldZ * frequency) + 1) * amplitude
+        noise.noise(worldX * frequency, worldZ * frequency, random) * amplitude
       );
 
       const height = baseY + yOffset;
 
       for (let y = 0; y <= height; y++) {
         const block = y === height ? "grass" : "dirt";
-        insertChunkData.data.blocks[blockIndex++] = {
+        insertChunkData.data.blocks.push({
           x,
           y,
           z,
           typeID: getBlockIdByName(block),
-        };
+        });
       }
     }
   }
-  insertChunkData.data.blocks = insertChunkData.data.blocks.filter(Boolean);
+
   const { id } = await databaseClient.createChunk(insertChunkData);
 
   return {
