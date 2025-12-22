@@ -5,6 +5,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: env.GH_PAGES === "true" ? "/ts-minecraft" : "/",
+    worker: { format: "es" },
     optimizeDeps: {
       exclude: ["@electric-sql/pglite"],
     },

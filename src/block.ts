@@ -1,5 +1,8 @@
 import type { Material } from "three";
 import { BLOCK_NAMES, type BlockType, type BlockName } from "./types.js";
+import dirtTextureImg from "./static/dirt.png?no-inline";
+import grassBlockSideTextureImg from "./static/grass_block_side.png?no-inline";
+import grassBlockTopTextureImg from "./static/grass_block_top.png?no-inline";
 
 export const blockRegistry = new Map<number, BlockType>();
 export const blockNameToId = new Map<BlockName, number>();
@@ -40,21 +43,23 @@ export const initBlocksWorker = () => {
   }
 };
 
-const loadTexture = async (importPromise: Promise<{ default: string }>) => {
+const loadTexture = async (
+  textureOrimportPromise: string | Promise<{ default: string }>
+) => {
   const { TextureLoader } = await import("three");
-  const texture = await importPromise;
+  const texture =
+    typeof textureOrimportPromise === "string"
+      ? { default: textureOrimportPromise }
+      : await textureOrimportPromise;
+
   return new TextureLoader().load(texture.default);
 };
 
 export const initBlocks = async () => {
   const { MeshStandardMaterial } = await import("three");
-  const dirtTexture = await loadTexture(import("./static/dirt.png"));
-  const grassTexture = await loadTexture(
-    import("./static/grass_block_side.png")
-  );
-  const grassTopTexture = await loadTexture(
-    import("./static/grass_block_top.png")
-  );
+  const dirtTexture = await loadTexture(dirtTextureImg);
+  const grassTexture = await loadTexture(grassBlockSideTextureImg);
+  const grassTopTexture = await loadTexture(grassBlockTopTextureImg);
 
   for (const name of BLOCK_NAMES) {
     const nameMaterialMap: Record<BlockName, Material | Material[]> = {
