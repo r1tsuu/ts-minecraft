@@ -10,7 +10,7 @@ initBlocksWorker();
 
 const databaseClient = await getDatabaseClient();
 
-const worlds = await databaseClient.fetchWorlds();
+let worlds = await databaseClient.fetchWorlds();
 
 const getWorld = (id: number) => {
   const maybeWorld = worlds.find((w) => w.id === id);
@@ -107,7 +107,22 @@ const sendEventToClient = (event: MinecraftClientEvent) => {
 onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
   switch (msg.data.type) {
     case "createWorld": {
-      const { name, seed } = msg.data.payload;
+      const { name: incomingName, seed } = msg.data.payload;
+
+      let name = incomingName;
+
+      let worldByName = worlds.find((w) => w.name === name);
+      let attempt = 1;
+
+      while (worldByName) {
+        if (name.match(/\(_\(\d+\)\)$/)) {
+          name = name.replace(/\(_\(\d+\)\)$/, `(_(${attempt}))`);
+        } else {
+          name = `${incomingName} (${attempt})`;
+        }
+        worldByName = worlds.find((w) => w.name === name);
+        attempt++;
+      }
 
       const world = await databaseClient.createWorld({ name, seed });
       worlds.push(world);
@@ -126,6 +141,21 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
         payload: {
           worlds,
         },
+        uuid: msg.data.uuid,
+      });
+      break;
+    }
+
+    case "deleteWorld": {
+      const { worldID } = msg.data.payload;
+
+      await databaseClient.deleteWorld(worldID);
+
+      worlds = await databaseClient.fetchWorlds();
+
+      sendEventToClient({
+        type: "worldDeleted",
+        payload: { worldID },
         uuid: msg.data.uuid,
       });
       break;
@@ -187,7 +217,8 @@ export type MinecraftWorkerEvent =
         seed: string;
       }
     >
-  | BaseEvent<"requestListWorlds", {}>;
+  | BaseEvent<"requestListWorlds", {}>
+  | BaseEvent<"deleteWorld", { worldID: number }>;
 
 export type MinecraftClientEvent =
   | BaseEvent<
@@ -220,4 +251,5 @@ export type MinecraftClientEvent =
           id: number;
         }[];
       }
-    >;
+    >
+  | BaseEvent<"worldDeleted", { worldID: number }>;

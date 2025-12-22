@@ -130,8 +130,24 @@ const worldsMenu = async ({
       parent: worldItem,
     });
 
+    const deleteButton = customElement({
+      tag: "button",
+      className: "game_button",
+      text: "Delete",
+      parent: worldItem,
+    });
+
     playButton.element.onclick = () => {
       onSelectWorld(world.id);
+    };
+
+    deleteButton.element.onclick = async () => {
+      await requestWorker(
+        { type: "deleteWorld", payload: { worldID: world.id } },
+        "worldDeleted"
+      );
+
+      await worldsMenu({ onSelectWorld });
     };
   }
 

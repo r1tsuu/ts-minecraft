@@ -152,6 +152,10 @@ export const getDatabaseClient = async () => {
     return results;
   };
 
+  const deleteWorld = async (worldID: number) => {
+    await db.deleteFrom("worlds").where("id", "=", worldID).execute();
+  };
+
   const destroy = async () => {
     await db.destroy();
     await pg.close();
@@ -162,6 +166,7 @@ export const getDatabaseClient = async () => {
     createChunk,
     fetchWorlds,
     destroy,
+    deleteWorld,
     fetchChunk,
   };
 };

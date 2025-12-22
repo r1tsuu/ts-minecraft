@@ -3,7 +3,12 @@ import type { MinecraftClientEvent, MinecraftWorkerEvent } from "./worker.js";
 
 const minecraftWorker = new MinecraftWorker();
 
+const DEBUG = true;
+
 export const sendEventToWorker = (event: MinecraftWorkerEvent) => {
+  if (DEBUG) {
+    console.log("Sending event to worker:", event);
+  }
   minecraftWorker.postMessage(event);
 };
 
@@ -11,6 +16,9 @@ export const listenToWorkerEvents = (
   callback: (event: MinecraftClientEvent) => void
 ) => {
   const onMessage = (msg: MessageEvent<MinecraftClientEvent>) => {
+    if (DEBUG) {
+      console.log("Received event from worker:", msg.data);
+    }
     callback(msg.data);
   };
   minecraftWorker.addEventListener("message", onMessage);
@@ -25,6 +33,9 @@ export const listenToWorkerEvent = <T extends MinecraftClientEvent["type"]>(
   callback: (event: Extract<MinecraftClientEvent, { type: T }>) => void
 ) => {
   const onMessage = (msg: MessageEvent<MinecraftClientEvent>) => {
+    if (DEBUG) {
+      console.log("Received event from worker:", msg.data);
+    }
     if (msg.data.type === type) {
       callback(msg.data as Extract<MinecraftClientEvent, { type: T }>);
     }
