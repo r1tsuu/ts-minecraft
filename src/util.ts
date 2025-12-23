@@ -113,6 +113,7 @@ export const syncServerChunksOnClient = (
       blocks,
       blocksUint,
       id: chunk.id,
+      needsRenderUpdate: true,
       chunkX: chunk.chunkX,
       chunkZ: chunk.chunkZ,
     });

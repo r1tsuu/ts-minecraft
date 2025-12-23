@@ -27,6 +27,7 @@ export type Chunk = {
   chunkX: number;
   chunkZ: number;
   id: number;
+  needsRenderUpdate: boolean;
 };
 
 export type World = {
