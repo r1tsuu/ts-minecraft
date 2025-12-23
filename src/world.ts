@@ -160,10 +160,12 @@ export const updateWorld = async (
           getBlockKey(block.x, block.y, block.z)
         )!;
 
-        const mesh = world.blockMeshes.get(blockTypeID)!;
-        mesh.setMatrixAt(blockMeshIndex, new THREE.Matrix4());
-        world.blocksMeshesFreeIndexes.get(blockTypeID)!.push(blockMeshIndex);
-        meshesNeedUpdate.add(mesh);
+        if (blockMeshIndex !== undefined) {
+          const mesh = world.blockMeshes.get(blockTypeID)!;
+          mesh.setMatrixAt(blockMeshIndex, new THREE.Matrix4());
+          world.blocksMeshesFreeIndexes.get(blockTypeID)!.push(blockMeshIndex);
+          meshesNeedUpdate.add(mesh);
+        }
       }
 
       world.chunks.delete(key);
@@ -204,6 +206,7 @@ export const updateWorld = async (
       }
 
       if (index === undefined) {
+        console.log(world.blockMeshesCount, blockTypeID);
         throw new Error(`Mesh count for block ID ${blockTypeID} not found`);
       }
 

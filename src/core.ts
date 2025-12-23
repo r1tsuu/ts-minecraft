@@ -19,7 +19,10 @@ export const createMinecraftInstance = async ({
   disposeMinecraft: () => void;
 }> => {
   const scene = new THREE.Scene();
-  const renderer = new THREE.WebGLRenderer({ antialias: false });
+  const renderer = new THREE.WebGLRenderer({
+    antialias: false,
+    powerPreference: "high-performance",
+  });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
