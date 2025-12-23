@@ -455,7 +455,7 @@ export const initUI = ({
     minecraft.renderer.domElement.style.cursor = "none";
   };
 
-  window.addEventListener("keyup", (e) => {
+  const onKeyUp = (e: KeyboardEvent) => {
     e.preventDefault();
 
     if (e.code === "KeyP") {
@@ -476,7 +476,8 @@ export const initUI = ({
         onResume: resumeFromPause,
       });
     }
-  });
+  };
+  window.addEventListener("keyup", onKeyUp);
 
   let frameCount = 0;
   let lastTime = performance.now();
@@ -520,6 +521,7 @@ export const initUI = ({
     destroyUI: () => {
       document.body.removeChild(wrapper.element);
       document.body.removeChild(crosshair.element);
+      window.removeEventListener("keyup", onKeyUp);
       if (pauseOverlay) {
         pauseOverlay.element.remove();
       }
