@@ -116,6 +116,7 @@ export const syncServerChunksOnClient = (
       needsRenderUpdate: true,
       chunkX: chunk.chunkX,
       chunkZ: chunk.chunkZ,
+      blocksMeshesIndexes: new Map<string, number>(),
     });
   }
 };

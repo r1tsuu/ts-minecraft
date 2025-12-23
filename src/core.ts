@@ -77,15 +77,13 @@ export const createMinecraftInstance = async ({
   setTimeout(syncPlayer, 1000);
 
   const unsubscribeFromWorkerEvents = listenToWorkerEvents((event) => {
-    console.log("Received event from worker:", event);
-
     switch (event.type) {
       case "chunksGenerated": {
         const { chunks } = event.payload;
         const now = Date.now();
         syncServerChunksOnClient(chunks, world);
         console.log("Processing chunks took", Date.now() - now, "ms");
-        world.requestingChunksState = "received";
+        world.requestingChunksState = "idle";
         break;
       }
     }

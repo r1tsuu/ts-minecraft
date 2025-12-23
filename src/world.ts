@@ -6,6 +6,7 @@ import {
   RENDER_DISTANCE,
   WORLD_HEIGHT,
   getBlockIndex,
+  getBlockKey,
   syncServerChunksOnClient,
 } from "./util.js";
 import { sendEventToWorker } from "./worker/workerClient.js";
@@ -34,6 +35,7 @@ export const createWorld = ({
 
   const blockMeshes = new Map<number, THREE.InstancedMesh>();
   const blockMeshesCount = new Map<number, number>();
+  const blocksMeshesFreeIndexes = new Map<number, number[]>();
 
   const MAX_COUNT =
     (RENDER_DISTANCE *
@@ -51,11 +53,13 @@ export const createWorld = ({
     scene.add(mesh);
     blockMeshes.set(id, mesh);
     blockMeshesCount.set(id, 0);
+    blocksMeshesFreeIndexes.set(id, []);
   }
 
   const world: World = {
     blockMeshes: blockMeshes,
     blockMeshesCount,
+    blocksMeshesFreeIndexes,
     requestingChunksState: "idle",
     id: activeWorld.world.id,
     chunks: new Map(),
@@ -143,17 +147,23 @@ export const updateWorld = async (
   // Unload chunks outside render distance
   for (const key of world.chunks.keys()) {
     if (!needed.has(key)) {
-      for (const block of world.chunks.get(key)!.blocks.values()) {
+      const chunk = world.chunks.get(key)!;
+      for (const block of chunk.blocks.values()) {
         const blockTypeID = block.typeID;
         if (!blockTypeID) continue;
         const count = world.blockMeshesCount.get(blockTypeID);
         if (count === undefined) {
           throw new Error(`Mesh count for block ID ${blockTypeID} not found`);
         }
+
+        const blockMeshIndex = chunk.blocksMeshesIndexes.get(
+          getBlockKey(block.x, block.y, block.z)
+        )!;
+
         const mesh = world.blockMeshes.get(blockTypeID)!;
-        mesh.setMatrixAt(count - 1, new THREE.Matrix4());
+        mesh.setMatrixAt(blockMeshIndex, new THREE.Matrix4());
+        world.blocksMeshesFreeIndexes.get(blockTypeID)!.push(blockMeshIndex);
         meshesNeedUpdate.add(mesh);
-        world.blockMeshesCount.set(blockTypeID, Math.max(0, count - 1));
       }
 
       world.chunks.delete(key);
@@ -171,6 +181,8 @@ export const updateWorld = async (
       const blockTypeID = block.typeID;
       if (!blockTypeID) continue;
 
+      const freeList = world.blocksMeshesFreeIndexes.get(blockTypeID)!;
+
       const mesh = world.blockMeshes.get(blockTypeID);
 
       if (!mesh) {
@@ -182,14 +194,25 @@ export const updateWorld = async (
         block.y,
         chunk.chunkZ * CHUNK_SIZE + block.z
       );
-      const index = world.blockMeshesCount.get(blockTypeID);
+
+      let index: number;
+      if (freeList.length > 0) {
+        index = freeList.pop()!;
+      } else {
+        index = world.blockMeshesCount.get(blockTypeID)!;
+        world.blockMeshesCount.set(blockTypeID, index + 1);
+      }
+
       if (index === undefined) {
         throw new Error(`Mesh count for block ID ${blockTypeID} not found`);
       }
 
       meshesNeedUpdate.add(mesh);
       mesh.setMatrixAt(index, matrix);
-      world.blockMeshesCount.set(blockTypeID, index + 1);
+      chunk.blocksMeshesIndexes.set(
+        getBlockKey(block.x, block.y, block.z),
+        index
+      );
     }
   }
 
