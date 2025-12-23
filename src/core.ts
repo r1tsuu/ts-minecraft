@@ -101,7 +101,7 @@ export const createMinecraftInstance = async ({
 
   const minecraft: MinecraftInstance = {
     camera,
-    controls: FPSControls.controls(camera, renderer, world, player),
+    controls: new FPSControls(camera, renderer.domElement, world, player),
     renderer,
     scene,
     paused: false,

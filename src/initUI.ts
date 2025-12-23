@@ -1,8 +1,7 @@
 import * as THREE from "three";
 import background from "./static/images (1).jpeg";
 import type { MinecraftInstance } from "./types.js";
-import { FreeControls } from "./FreeControls.js";
-import { FPSControls } from "./FPSControls.js";
+
 import { requestWorker } from "./worker/workerClient.ts";
 import type { ActiveWorld } from "./worker/types.ts";
 
@@ -379,7 +378,7 @@ export const initUI = ({
   minecraft: MinecraftInstance;
   onExitToMainMenu: () => Promise<void>;
 }) => {
-  const { camera, renderer, world, controls, player } = minecraft;
+  const { renderer } = minecraft;
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
@@ -421,26 +420,6 @@ export const initUI = ({
     parent: wrapper,
   });
 
-  const controlsDisplay = customElement({
-    tag: "div",
-    className: "ui_element",
-    parent: wrapper,
-  });
-
-  const updateControlText = () => {
-    let text: string;
-
-    if (controls.type === "fps") {
-      text = "Press C to Toggle Controls (FPS)";
-    } else {
-      text = "Press C to Toggle Controls (Free)";
-    }
-
-    controlsDisplay.setText(text);
-  };
-
-  updateControlText();
-
   const pauseDisplay = customElement({
     tag: "div",
     className: "ui_element",
@@ -461,24 +440,6 @@ export const initUI = ({
 
   updatePauseText();
 
-  const toggleControls = () => {
-    controls.handler.dispose();
-    if (controls.type === "fps") {
-      controls.type = "free";
-      controls.handler = new FreeControls(camera, renderer.domElement);
-      updateControlText();
-    } else {
-      controls.type = "fps";
-      controls.handler = new FPSControls(
-        camera,
-        renderer.domElement,
-        world,
-        player
-      );
-      updateControlText();
-    }
-  };
-
   let pauseOverlay: CustomElement | null = null;
 
   const resumeFromPause = () => {
@@ -496,9 +457,6 @@ export const initUI = ({
 
   window.addEventListener("keyup", (e) => {
     e.preventDefault();
-    if (e.code === "KeyC") {
-      toggleControls();
-    }
 
     if (e.code === "KeyP") {
       if (minecraft.paused) {
@@ -558,7 +516,6 @@ export const initUI = ({
   return {
     fpsDisplay,
     positionDisplay,
-    toggleControlsButton: controlsDisplay,
     updateUI,
     destroyUI: () => {
       document.body.removeChild(wrapper.element);

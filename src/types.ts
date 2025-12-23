@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { FPSControls } from "./FPSControls.ts";
 
 export const BLOCK_NAMES = ["dirt", "grass", "stone"] as const;
 
@@ -36,16 +37,6 @@ export type World = {
   requestingChunksState: "idle" | "requesting" | "received";
 };
 
-export interface ControlsHandler {
-  update(delta: number): void;
-  dispose(): void;
-}
-
-export type Controls = {
-  handler: ControlsHandler;
-  type: "free" | "fps";
-};
-
 export type PlayerData = {
   width: number;
   height: number;
@@ -69,7 +60,7 @@ export type MinecraftInstance = {
   renderer: THREE.WebGLRenderer;
   world: World;
   paused: boolean;
-  controls: Controls;
+  controls: FPSControls;
   player: PlayerData;
 };
 

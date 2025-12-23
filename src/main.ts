@@ -5,8 +5,6 @@ import { updateWorld } from "./world.js";
 import { initMenu, initUI } from "./initUI.js";
 import { createMinecraftInstance } from "./core.ts";
 import { createRaycaster } from "./raycast.ts";
-import { FPSControls } from "./FPSControls.ts";
-import { FreeControls } from "./FreeControls.ts";
 import { requestWorker, waitUntilWorkerEvent } from "./worker/workerClient.ts";
 import type { ActiveWorld } from "./worker/types.ts";
 import { initBlocks } from "./client.ts";
@@ -71,24 +69,12 @@ const startGame = async (activeWorld: ActiveWorld) => {
       clock.stop();
       lastPaused = true;
       // Dispose controls to free up event listeners
-      minecraft.controls.handler.dispose();
+      minecraft.controls.dispose();
       return;
     }
 
     if (lastPaused) {
       clock.start();
-      minecraft.controls =
-        minecraft.controls.type === "fps"
-          ? FPSControls.controls(
-              minecraft.camera,
-              minecraft.renderer,
-              minecraft.world,
-              minecraft.player
-            )
-          : FreeControls.controls(
-              minecraft.camera,
-              minecraft.renderer.domElement
-            );
       lastPaused = false;
     }
 
@@ -100,7 +86,7 @@ const startGame = async (activeWorld: ActiveWorld) => {
       await minecraft.renderer.domElement.requestPointerLock();
     }
 
-    minecraft.controls.handler.update(delta);
+    minecraft.controls.update(delta);
 
     if (!updatePromise) {
       updatePromise = updateWorld(

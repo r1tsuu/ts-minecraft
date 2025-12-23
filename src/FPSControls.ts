@@ -1,14 +1,9 @@
 import * as THREE from "three";
-import type {
-  Controls,
-  ControlsHandler,
-  MinecraftInstance,
-  World,
-} from "./types.js";
+import type { MinecraftInstance, World } from "./types.js";
 import { getBlockInWorld } from "./world.js";
 import { GRAVITY_ACCELERATION } from "./util.ts";
 
-export class FPSControls implements ControlsHandler {
+export class FPSControls {
   camera: THREE.PerspectiveCamera;
   domElement: HTMLElement;
 
@@ -35,18 +30,6 @@ export class FPSControls implements ControlsHandler {
     this.initPointerLock();
     this.initKeyboard();
     this.initMouse();
-  }
-
-  static controls(
-    camera: THREE.PerspectiveCamera,
-    renderer: THREE.WebGLRenderer,
-    world: World,
-    player: MinecraftInstance["player"]
-  ): Controls {
-    return {
-      handler: new FPSControls(camera, renderer.domElement, world, player),
-      type: "fps",
-    };
   }
 
   initPointerLock() {
