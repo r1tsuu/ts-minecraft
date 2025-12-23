@@ -1,15 +1,15 @@
 import * as THREE from "three";
-import type { BlockType, Chunk, World } from "./types.js";
+import type { BlockType, World } from "./types.js";
 import { blockRegistry, getBlockById } from "./block.js";
 import {
   CHUNK_SIZE,
   RENDER_DISTANCE,
   WORLD_HEIGHT,
   getBlockIndex,
-  syncServerChunksOnClient,
 } from "./util.js";
 import { sendEventToWorker } from "./worker/workerClient.js";
 import type { ActiveWorld } from "./worker/types.ts";
+import { syncServerChunksOnClient } from "./client.ts";
 
 export const createWorld = ({
   scene,
@@ -32,36 +32,13 @@ export const createWorld = ({
   const reflectionLight = new THREE.AmbientLight(0x404040, 0.5);
   scene.add(reflectionLight);
 
-  const blockMeshes = new Map<number, THREE.InstancedMesh>();
-  const blockMeshesCount = new Map<number, number>();
-
-  const MAX_COUNT =
-    (RENDER_DISTANCE *
-      RENDER_DISTANCE *
-      CHUNK_SIZE *
-      CHUNK_SIZE *
-      WORLD_HEIGHT) /
-    2;
-
-  const geometry = new THREE.BoxGeometry();
-
-  for (const [id, block] of blockRegistry) {
-    const mesh = new THREE.InstancedMesh(geometry, block.material, MAX_COUNT);
-    mesh.frustumCulled = false;
-    scene.add(mesh);
-    blockMeshes.set(id, mesh);
-    blockMeshesCount.set(id, 0);
-  }
-
   const world: World = {
-    blockMeshes: blockMeshes,
-    blockMeshesCount,
     requestingChunksState: "idle",
     id: activeWorld.world.id,
     chunks: new Map(),
   };
 
-  syncServerChunksOnClient(activeWorld.loadedChunks, world);
+  syncServerChunksOnClient(activeWorld.loadedChunks, world, scene);
 
   return world;
 };
@@ -138,8 +115,6 @@ export const updateWorld = async (
     }
   }
 
-  let needsMeshUpdate = world.requestingChunksState === "received";
-
   if (world.requestingChunksState === "received") {
     world.requestingChunksState = "idle";
   }
@@ -147,76 +122,8 @@ export const updateWorld = async (
   // Unload chunks outside render distance
   for (const key of world.chunks.keys()) {
     if (!needed.has(key)) {
+      world.chunks.get(key)!.mesh.removeFromParent();
       world.chunks.delete(key);
-      needsMeshUpdate = true;
     }
-  }
-
-  if (needsMeshUpdate) {
-    const matrix = new THREE.Matrix4();
-
-    for (const block of world.blockMeshesCount.keys()) {
-      world.blockMeshesCount.set(block, 0);
-    }
-
-    let now = Date.now();
-    for (const chunk of world.chunks.values()) {
-      for (const block of chunk.blocks.values()) {
-        const blockTypeID = block.typeID;
-        if (!blockTypeID) continue;
-
-        const mesh = world.blockMeshes.get(blockTypeID);
-
-        if (!mesh) {
-          throw new Error(`Mesh for block ID ${blockTypeID} not found`);
-        }
-
-        matrix.setPosition(
-          chunk.chunkX * CHUNK_SIZE + block.x,
-          block.y,
-          chunk.chunkZ * CHUNK_SIZE + block.z
-        );
-        const index = world.blockMeshesCount.get(blockTypeID);
-        if (index === undefined) {
-          throw new Error(`Mesh count for block ID ${blockTypeID} not found`);
-        }
-
-        mesh.setMatrixAt(index, matrix);
-        world.blockMeshesCount.set(blockTypeID, index + 1);
-      }
-      // for (let x = 0; x < CHUNK_SIZE; x++) {
-      //   for (let y = 0; y < WORLD_HEIGHT; y++) {
-      //     for (let z = 0; z < CHUNK_SIZE; z++) {
-      //       const blockTypeID = chunk.blocksUint[getBlockIndex(x, y, z)];
-      //       if (!blockTypeID) continue;
-
-      //       const mesh = world.blockMeshes.get(blockTypeID);
-
-      //       if (!mesh) {
-      //         throw new Error(`Mesh for block ID ${blockTypeID} not found`);
-      //       }
-
-      //       matrix.setPosition(chunk.x + x, y, chunk.z + z);
-      //       const index = world.blockMeshesCount.get(blockTypeID);
-      //       if (index === undefined) {
-      //         throw new Error(
-      //           `Mesh count for block ID ${blockTypeID} not found`
-      //         );
-      //       }
-
-      //       mesh.setMatrixAt(index, matrix);
-      //       world.blockMeshesCount.set(blockTypeID, index + 1);
-      //     }
-      //   }
-      // }
-    }
-
-    console.log("Mesh update preparation took", Date.now() - now, "ms");
-    for (const mesh of world.blockMeshes.values()) {
-      mesh.instanceMatrix.needsUpdate = true;
-      // mesh.computeBoundingBox();
-      // mesh.computeBoundingSphere();
-    }
-    console.log(`Updated meshes in ${Date.now() - now}ms`);
   }
 };

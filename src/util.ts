@@ -88,37 +88,6 @@ export const findByXYZ = <T extends { x: number; y: number; z: number }>(
   return null;
 };
 
-export const syncServerChunksOnClient = (
-  chunks: {
-    chunkX: number;
-    chunkZ: number;
-    id: number;
-    blocks: BlockInWorld[];
-  }[],
-  world: World
-) => {
-  for (const chunk of chunks) {
-    const key = `${chunk.chunkX},${chunk.chunkZ}`;
-
-    const blocks: Map<string, BlockInWorld> = new Map();
-    const blocksUint = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT);
-
-    for (const block of chunk.blocks) {
-      const blockKey = `${block.x},${block.y},${block.z}`;
-      blocks.set(blockKey, block);
-      blocksUint[getBlockIndex(block.x, block.y, block.z)] = block.typeID;
-    }
-
-    world.chunks.set(key, {
-      blocks,
-      blocksUint,
-      id: chunk.id,
-      chunkX: chunk.chunkX,
-      chunkZ: chunk.chunkZ,
-    });
-  }
-};
-
 export const rawVector3 = (x: number, y: number, z: number): RawVector3 => {
   return { x, y, z };
 };

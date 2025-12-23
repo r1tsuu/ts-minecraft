@@ -93,7 +93,7 @@ const startGame = async (activeWorld: ActiveWorld) => {
         minecraft.world,
         minecraft.camera.position
       ).then(() => {
-        raycaster.update();
+        // raycaster.update();
         updatePromise = null;
       });
     }

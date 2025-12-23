@@ -3,10 +3,10 @@ import type { MinecraftInstance, PlayerData } from "./types.ts";
 import { createWorld } from "./world.ts";
 import { FPSControls } from "./FPSControls.ts";
 import { listenToWorkerEvents, requestWorker } from "./worker/workerClient.js";
-import { syncServerChunksOnClient } from "./util.ts";
 import type { ActiveWorld } from "./worker/types.ts";
 import {
   rawVector3ToThreeVector3,
+  syncServerChunksOnClient,
   threeVector3ToRawVector3,
 } from "./client.ts";
 
@@ -83,7 +83,7 @@ export const createMinecraftInstance = async ({
       case "chunksGenerated": {
         const { chunks } = event.payload;
         const now = Date.now();
-        syncServerChunksOnClient(chunks, world);
+        syncServerChunksOnClient(chunks, world, scene);
         console.log("Processing chunks took", Date.now() - now, "ms");
         world.requestingChunksState = "received";
         break;
