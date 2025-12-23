@@ -12,7 +12,6 @@ export type BlockType = {
 
 export type BlockInWorld = {
   typeID: number;
-
   /** Within chunk */
   x: number;
   /** Within chunk */
@@ -23,10 +22,12 @@ export type BlockInWorld = {
 
 export type Chunk = {
   blocks: Map<string, BlockInWorld>;
+  blocksMeshesIndexes: Map<string, number>;
   blocksUint: Uint8Array;
   chunkX: number;
   chunkZ: number;
   id: number;
+  needsRenderUpdate: boolean;
 };
 
 export type World = {
@@ -34,7 +35,8 @@ export type World = {
   chunks: Map<string, Chunk>;
   blockMeshes: Map<number, THREE.InstancedMesh>;
   blockMeshesCount: Map<number, number>;
-  requestingChunksState: "idle" | "requesting" | "received";
+  blocksMeshesFreeIndexes: Map<number, number[]>;
+  requestingChunksState: "idle" | "requesting";
 };
 
 export type PlayerData = {

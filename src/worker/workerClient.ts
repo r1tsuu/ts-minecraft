@@ -3,7 +3,7 @@ import MinecraftWorker from "./worker.js?worker";
 
 const minecraftWorker = new MinecraftWorker();
 
-const DEBUG = true;
+const DEBUG = false;
 
 export const sendEventToWorker = (event: MinecraftWorkerEvent) => {
   if (DEBUG) {
