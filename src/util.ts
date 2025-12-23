@@ -17,30 +17,32 @@ export const getBlockIndex = (x: number, y: number, z: number): number => {
 };
 
 export const getChunksCoordinatesInRadius = ({
-  centerX,
-  centerZ,
+  centerChunkX,
+  centerChunkZ,
   chunkRadius,
 }: {
-  centerX: number;
-  centerZ: number;
+  centerChunkX: number;
+  centerChunkZ: number;
   chunkRadius: number;
 }): {
-  x: number;
-  z: number;
+  chunkX: number;
+  chunkZ: number;
 }[] => {
-  const chunks: { x: number; z: number }[] = [];
+  const chunks: { chunkX: number; chunkZ: number }[] = [];
 
   for (let dx = -chunkRadius; dx <= chunkRadius; dx++) {
     for (let dz = -chunkRadius; dz <= chunkRadius; dz++) {
       const distanceSquared = dx * dx + dz * dz;
       if (distanceSquared <= chunkRadius * chunkRadius) {
         chunks.push({
-          x: centerX + dx * CHUNK_SIZE,
-          z: centerZ + dz * CHUNK_SIZE,
+          chunkX: centerChunkX + dx,
+          chunkZ: centerChunkZ + dz,
         });
       }
     }
   }
+
+  console.log("Chunks in radius:", chunks);
 
   return chunks;
 };
@@ -52,6 +54,19 @@ export const findByXZ = <T extends { x: number; z: number }>(
 ): T | null => {
   for (const item of array) {
     if (item.x === x && item.z === z) {
+      return item;
+    }
+  }
+  return null;
+};
+
+export const findChunkByXZ = <T extends { chunkX: number; chunkZ: number }>(
+  array: T[],
+  chunkX: number,
+  chunkZ: number
+): T | null => {
+  for (const item of array) {
+    if (item.chunkX === chunkX && item.chunkZ === chunkZ) {
       return item;
     }
   }
@@ -75,18 +90,19 @@ export const findByXYZ = <T extends { x: number; y: number; z: number }>(
 
 export const syncServerChunksOnClient = (
   chunks: {
-    x: number;
-    z: number;
+    chunkX: number;
+    chunkZ: number;
     id: number;
     blocks: BlockInWorld[];
   }[],
   world: World
 ) => {
   for (const chunk of chunks) {
-    const key = `${chunk.x},${chunk.z}`;
+    const key = `${chunk.chunkX},${chunk.chunkZ}`;
 
     const blocks: Map<string, BlockInWorld> = new Map();
     const blocksUint = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT);
+
     for (const block of chunk.blocks) {
       const blockKey = `${block.x},${block.y},${block.z}`;
       blocks.set(blockKey, block);
@@ -97,8 +113,8 @@ export const syncServerChunksOnClient = (
       blocks,
       blocksUint,
       id: chunk.id,
-      x: chunk.x,
-      z: chunk.z,
+      chunkX: chunk.chunkX,
+      chunkZ: chunk.chunkZ,
     });
   }
 };

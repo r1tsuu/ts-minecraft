@@ -16,8 +16,8 @@ export type BaseClientEvent<T extends string, Data> = BaseEvent<T, Data> & {
 export type ActiveWorld = {
   world: DatabaseWorldData;
   loadedChunks: {
-    x: number;
-    z: number;
+    chunkX: number;
+    chunkZ: number;
     id: number;
     blocks: BlockInWorld[];
   }[];
@@ -29,8 +29,8 @@ export type MinecraftWorkerEvent =
       {
         worldID: number;
         chunksCoordinates: {
-          x: number;
-          z: number;
+          chunkX: number;
+          chunkZ: number;
         }[];
       }
     >
@@ -52,8 +52,8 @@ export type MinecraftClientEvent =
       "chunksGenerated",
       {
         chunks: {
-          x: number;
-          z: number;
+          chunkX: number;
+          chunkZ: number;
           id: number;
           blocks: BlockInWorld[];
         }[];

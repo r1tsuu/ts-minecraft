@@ -48,9 +48,9 @@ export const createRaycaster = ({
     for (let x = -FAR; x <= FAR; x++) {
       for (let y = -FAR; y <= FAR; y++) {
         for (let z = -FAR; z <= FAR; z++) {
-          const worldX = Math.floor(camera.position.x + x);
-          const worldY = Math.floor(camera.position.y + y);
-          const worldZ = Math.floor(camera.position.z + z);
+          const worldX = Math.floor(player.position.x + x);
+          const worldY = Math.floor(player.position.y + y);
+          const worldZ = Math.floor(player.position.z + z);
 
           if (!getBlockInWorld(worldX, worldY, worldZ, world)) continue;
 

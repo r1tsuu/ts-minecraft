@@ -23,8 +23,8 @@ export type BlockInWorld = {
 export type Chunk = {
   blocks: Map<string, BlockInWorld>;
   blocksUint: Uint8Array;
-  x: number;
-  z: number;
+  chunkX: number;
+  chunkZ: number;
   id: number;
 };
 

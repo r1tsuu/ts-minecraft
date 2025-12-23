@@ -33,8 +33,8 @@ export type DatabaseSchema = {
   chunks: {
     id: Generated<number>;
     worldID: number;
-    x: number;
-    z: number;
+    chunkX: number;
+    chunkZ: number;
     data: JSONColumnType<ChunkDatabaseData>;
   };
   _versionHistory: {
@@ -51,7 +51,7 @@ export type DatabasePlayerData = Selectable<
 >["playerData"];
 
 // Increment this when making changes to the database schema
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export const getDatabaseClient = async () => {
   const pg = new PGlite(`idb://minecraft_worker_db`);
@@ -139,10 +139,14 @@ export const getDatabaseClient = async () => {
       .addColumn("worldID", "integer", (col) =>
         col.references("worlds.id").onDelete("cascade").notNull()
       )
-      .addColumn("x", "integer", (col) => col.notNull())
-      .addColumn("z", "integer", (col) => col.notNull())
+      .addColumn("chunkX", "integer", (col) => col.notNull())
+      .addColumn("chunkZ", "integer", (col) => col.notNull())
       .addColumn("data", "json", (col) => col.notNull())
-      .addUniqueConstraint("unique_world_chunk", ["worldID", "x", "z"])
+      .addUniqueConstraint("unique_world_chunk", [
+        "worldID",
+        "chunkX",
+        "chunkZ",
+      ])
       .execute();
 
     await db.schema
@@ -205,17 +209,17 @@ export const getDatabaseClient = async () => {
   const createChunk = async ({
     data,
     worldID,
-    x,
-    z,
+    chunkX,
+    chunkZ,
   }: {
     worldID: number;
-    x: number;
-    z: number;
+    chunkX: number;
+    chunkZ: number;
     data: ChunkDatabaseData;
   }) => {
     const result = await db
       .insertInto("chunks")
-      .values({ worldID, x, z, data: JSON.stringify(data) })
+      .values({ worldID, chunkX, chunkZ, data: JSON.stringify(data) })
       .returning("id")
       .executeTakeFirstOrThrow();
 
@@ -227,15 +231,15 @@ export const getDatabaseClient = async () => {
     worldID,
   }: {
     worldID: number;
-    chunks: { x: number; z: number; data: ChunkDatabaseData }[];
+    chunks: { chunkX: number; chunkZ: number; data: ChunkDatabaseData }[];
   }) => {
     const results = await db
       .insertInto("chunks")
       .values(
         chunks.map((chunk) => ({
           worldID,
-          x: chunk.x,
-          z: chunk.z,
+          chunkX: chunk.chunkX,
+          chunkZ: chunk.chunkZ,
           data: JSON.stringify(chunk.data),
         }))
       )
@@ -247,18 +251,18 @@ export const getDatabaseClient = async () => {
 
   const fetchChunk = async ({
     worldID,
-    x,
-    z,
+    chunkX,
+    chunkZ,
   }: {
     worldID: number;
-    x: number;
-    z: number;
+    chunkX: number;
+    chunkZ: number;
   }) => {
     const result = await db
       .selectFrom("chunks")
       .where("worldID", "=", worldID)
-      .where("x", "=", x)
-      .where("z", "=", z)
+      .where("chunkX", "=", chunkX)
+      .where("chunkZ", "=", chunkZ)
       .selectAll()
       .executeTakeFirst();
 
@@ -270,7 +274,7 @@ export const getDatabaseClient = async () => {
     worldID,
   }: {
     worldID: number;
-    coordinates: { x: number; z: number }[];
+    coordinates: { chunkX: number; chunkZ: number }[];
   }) => {
     const result = await db
       .selectFrom("chunks")
@@ -278,7 +282,10 @@ export const getDatabaseClient = async () => {
       .where((eb) =>
         eb.or(
           coordinates.map((coord) =>
-            eb.and([eb("x", "=", coord.x), eb("z", "=", coord.z)])
+            eb.and([
+              eb("chunkX", "=", coord.chunkX),
+              eb("chunkZ", "=", coord.chunkZ),
+            ])
           )
         )
       )

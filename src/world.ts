@@ -72,15 +72,16 @@ export const getBlockInWorld = (
   z: number,
   world: World
 ): BlockType | null => {
-  const chunkX = Math.floor(x / CHUNK_SIZE) * CHUNK_SIZE;
-  const chunkZ = Math.floor(z / CHUNK_SIZE) * CHUNK_SIZE;
+  const chunkX = Math.floor(x / CHUNK_SIZE);
+  const chunkZ = Math.floor(z / CHUNK_SIZE);
   const key = chunkKey(chunkX, chunkZ);
   const chunk = world.chunks.get(key);
+
   if (!chunk) {
     return null;
   }
-  const localX = x - chunkX;
-  const localZ = z - chunkZ;
+  const localX = x - chunkX * CHUNK_SIZE;
+  const localZ = z - chunkZ * CHUNK_SIZE;
 
   if (y < 0 || y >= WORLD_HEIGHT) {
     return null;
@@ -101,16 +102,16 @@ export const updateWorld = async (
   world: World,
   cameraPosition: THREE.Vector3
 ) => {
-  const playerChunkX = Math.floor(cameraPosition.x / CHUNK_SIZE) * CHUNK_SIZE;
-  const playerChunkZ = Math.floor(cameraPosition.z / CHUNK_SIZE) * CHUNK_SIZE;
+  const playerChunkX = Math.floor(cameraPosition.x / CHUNK_SIZE);
+  const playerChunkZ = Math.floor(cameraPosition.z / CHUNK_SIZE);
 
   const needed = new Set<string>();
   let chunksToLoad: string[] = [];
 
   for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
     for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
-      const cx = playerChunkX + dx * CHUNK_SIZE;
-      const cz = playerChunkZ + dz * CHUNK_SIZE;
+      const cx = playerChunkX + dx;
+      const cz = playerChunkZ + dz;
       const key = chunkKey(cx, cz);
 
       needed.add(key);
@@ -128,8 +129,8 @@ export const updateWorld = async (
         payload: {
           worldID: world.id,
           chunksCoordinates: chunksToLoad.map((key) => {
-            const [x, z] = key.split(",").map(Number);
-            return { x, z };
+            const [chunkX, chunkZ] = key.split(",").map(Number);
+            return { chunkX, chunkZ };
           }),
         },
       });
@@ -170,7 +171,11 @@ export const updateWorld = async (
           throw new Error(`Mesh for block ID ${blockTypeID} not found`);
         }
 
-        matrix.setPosition(chunk.x + block.x, block.y, chunk.z + block.z);
+        matrix.setPosition(
+          chunk.chunkX * CHUNK_SIZE + block.x,
+          block.y,
+          chunk.chunkZ * CHUNK_SIZE + block.z
+        );
         const index = world.blockMeshesCount.get(blockTypeID);
         if (index === undefined) {
           throw new Error(`Mesh count for block ID ${blockTypeID} not found`);

@@ -5,7 +5,7 @@ import type { BlockInWorld, RawVector3 } from "../types.js";
 import {
   CHUNK_SIZE,
   findByXYZ,
-  findByXZ,
+  findChunkByXZ,
   getChunksCoordinatesInRadius,
   rawVector3,
   RENDER_DISTANCE,
@@ -42,26 +42,30 @@ const getChunks = async ({
   worldID,
 }: {
   worldID: number;
-  coordinates: { x: number; z: number }[];
+  coordinates: { chunkX: number; chunkZ: number }[];
 }) => {
   const dbChunks = await databaseClient.fetchChunks({
     worldID,
     coordinates,
   });
 
-  const chunksToGenerate: { x: number; z: number }[] = [];
-  const result: { x: number; z: number; id: number; blocks: BlockInWorld[] }[] =
-    [];
+  const chunksToGenerate: { chunkX: number; chunkZ: number }[] = [];
+  const result: {
+    chunkX: number;
+    chunkZ: number;
+    id: number;
+    blocks: BlockInWorld[];
+  }[] = [];
 
   for (const coord of coordinates) {
-    const existingChunk = findByXZ(dbChunks, coord.x, coord.z);
+    const existingChunk = findChunkByXZ(dbChunks, coord.chunkX, coord.chunkZ);
 
     if (!existingChunk) {
       chunksToGenerate.push(coord);
     } else {
       result.push({
-        x: existingChunk.x,
-        z: existingChunk.z,
+        chunkX: existingChunk.chunkX,
+        chunkZ: existingChunk.chunkZ,
         id: existingChunk.id,
         blocks: existingChunk.data.blocks,
       });
@@ -69,21 +73,22 @@ const getChunks = async ({
   }
 
   const generatedChunks: {
-    x: number;
-    z: number;
+    chunkX: number;
+    chunkZ: number;
     data: {
       blocks: BlockInWorld[];
     };
   }[] = [];
 
   for (const coord of chunksToGenerate) {
-    const { x: chunkX, z: chunkZ } = coord;
+    const { chunkX, chunkZ } = coord;
     const blocks: BlockInWorld[] = [];
 
     for (let x = 0; x < CHUNK_SIZE; x++) {
       for (let z = 0; z < CHUNK_SIZE; z++) {
-        const worldX = chunkX + x;
-        const worldZ = chunkZ + z;
+        const worldX = chunkX * CHUNK_SIZE + x;
+        const worldZ = chunkZ * CHUNK_SIZE + z;
+
         const baseY = 30;
         const heightVariation = 12;
         const amplitude = heightVariation / 2;
@@ -108,8 +113,8 @@ const getChunks = async ({
     }
 
     generatedChunks.push({
-      x: chunkX,
-      z: chunkZ,
+      chunkX,
+      chunkZ,
       data: {
         blocks,
       },
@@ -124,8 +129,8 @@ const getChunks = async ({
 
     for (const chunk of createdChunks) {
       result.push({
-        x: chunk.x,
-        z: chunk.z,
+        chunkX: chunk.chunkX,
+        chunkZ: chunk.chunkZ,
         id: chunk.id,
         blocks: chunk.data.blocks,
       });
@@ -139,14 +144,13 @@ const getInitialPlayerPosition = ({
   centralChunk,
 }: {
   centralChunk: {
-    x: number;
-    z: number;
+    chunkX: number;
+    chunkZ: number;
     id: number;
     blocks: BlockInWorld[];
   };
 }): RawVector3 => {
   let latestBlock: BlockInWorld | null = null;
-  console.log(centralChunk.blocks);
 
   for (let y = 0; y < WORLD_HEIGHT; y++) {
     const maybeBlock = findByXYZ(centralChunk.blocks, 0, y, 0);
@@ -217,38 +221,45 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
         }
 
         const loadedChunks: {
-          x: number;
-          z: number;
+          chunkX: number;
+          chunkZ: number;
           id: number;
           blocks: BlockInWorld[];
         }[] = [];
 
-        if (!world.initialized) {
-          console.log(world);
-          const chunksCoordinates = getChunksCoordinatesInRadius({
-            centerX: 0,
-            centerZ: 0,
-            chunkRadius: RENDER_DISTANCE * 3, // Generate extra chunks for initial world
-          });
+        const chunkRadius = world.initialized
+          ? RENDER_DISTANCE
+          : RENDER_DISTANCE * 3;
 
-          const chunks = await getChunks({
-            worldID: world.id,
-            coordinates: chunksCoordinates,
-          });
+        const chunksCoordinates = getChunksCoordinatesInRadius({
+          centerChunkX: 0,
+          centerChunkZ: 0,
+          chunkRadius,
+        });
 
-          for (const coordinates of getChunksCoordinatesInRadius({
-            centerX: 0,
-            centerZ: 0,
-            chunkRadius: RENDER_DISTANCE,
-          })) {
-            const chunk = findByXZ(chunks, coordinates.x, coordinates.z);
+        const chunks = await getChunks({
+          worldID: world.id,
+          coordinates: chunksCoordinates,
+        });
 
-            if (chunk) {
-              loadedChunks.push(chunk);
-            }
+        for (const coordinates of getChunksCoordinatesInRadius({
+          centerChunkX: 0,
+          centerChunkZ: 0,
+          chunkRadius: RENDER_DISTANCE,
+        })) {
+          const chunk = findChunkByXZ(
+            chunks,
+            coordinates.chunkX,
+            coordinates.chunkZ
+          );
+
+          if (chunk) {
+            loadedChunks.push(chunk);
           }
+        }
 
-          const centralChunk = findByXZ(chunks, 0, 0)!;
+        if (!world.initialized) {
+          const centralChunk = findChunkByXZ(chunks, 0, 0)!;
           const playerPosition = getInitialPlayerPosition({ centralChunk });
 
           world.playerData = {
