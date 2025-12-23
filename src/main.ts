@@ -1,7 +1,6 @@
 import * as THREE from "three";
 
 import "./style.css";
-import { initBlocks } from "./block.js";
 import { updateWorld } from "./world.js";
 import { initMenu, initUI } from "./initUI.js";
 import { createMinecraftInstance } from "./core.ts";
@@ -10,6 +9,7 @@ import { FPSControls } from "./FPSControls.ts";
 import { FreeControls } from "./FreeControls.ts";
 import { requestWorker, waitUntilWorkerEvent } from "./worker/workerClient.ts";
 import type { ActiveWorld } from "./worker/types.ts";
+import { initBlocks } from "./client.ts";
 
 initMenu({ onSelectWorld: async () => {}, isLoading: true });
 

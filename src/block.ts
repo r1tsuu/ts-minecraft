@@ -1,15 +1,11 @@
-import type { Material } from "three";
 import { BLOCK_NAMES, type BlockType, type BlockName } from "./types.js";
-import dirtTextureImg from "./static/dirt.png?no-inline";
-import grassBlockSideTextureImg from "./static/grass_block_side.png?no-inline";
-import grassBlockTopTextureImg from "./static/grass_block_top.png?no-inline";
 
 export const blockRegistry = new Map<number, BlockType>();
 export const blockNameToId = new Map<BlockName, number>();
 
 let idCounter = 1;
 
-const registerBlock = (block: BlockType) => {
+export const registerBlock = (block: BlockType) => {
   blockNameToId.set(block.name, idCounter);
   blockRegistry.set(idCounter++, block);
 };
@@ -39,49 +35,6 @@ export const initBlocksWorker = () => {
     registerBlock({
       name,
       material: null as any,
-    });
-  }
-};
-
-const loadTexture = async (
-  textureOrimportPromise: string | Promise<{ default: string }>
-) => {
-  const { TextureLoader } = await import("three");
-  const texture =
-    typeof textureOrimportPromise === "string"
-      ? { default: textureOrimportPromise }
-      : await textureOrimportPromise;
-
-  return new TextureLoader().load(texture.default);
-};
-
-export const initBlocks = async () => {
-  const { MeshStandardMaterial } = await import("three");
-  const dirtTexture = await loadTexture(dirtTextureImg);
-  const grassTexture = await loadTexture(grassBlockSideTextureImg);
-  const grassTopTexture = await loadTexture(grassBlockTopTextureImg);
-
-  const nameMaterialMap: Record<BlockName, Material | Material[]> = {
-    dirt: new MeshStandardMaterial({
-      map: dirtTexture,
-    }),
-    stone: new MeshStandardMaterial({
-      color: 0x888888,
-    }),
-    grass: [
-      new MeshStandardMaterial({ map: grassTexture }), // sides
-      new MeshStandardMaterial({ map: grassTexture }), // sides
-      new MeshStandardMaterial({ map: grassTopTexture }), // top
-      new MeshStandardMaterial({ map: dirtTexture }), // dirt
-      new MeshStandardMaterial({ map: grassTexture }), // sides
-      new MeshStandardMaterial({ map: grassTexture }), // sides
-    ],
-  };
-
-  for (const name of BLOCK_NAMES) {
-    registerBlock({
-      name,
-      material: nameMaterialMap[name],
     });
   }
 };
