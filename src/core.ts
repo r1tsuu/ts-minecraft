@@ -1,8 +1,12 @@
 import * as THREE from "three";
-import type { MinecraftInstance, PlayerData } from "./types.ts";
+import type { GameInstance, MinecraftInstance, PlayerData } from "./types.ts";
 import { createWorld } from "./world.ts";
 import { FPSControls } from "./FPSControls.ts";
-import { listenToWorkerEvents, requestWorker } from "./worker/workerClient.js";
+import {
+  listenToWorkerEvents,
+  requestWorker,
+  sendEventToWorker,
+} from "./worker/workerClient.js";
 import { syncServerChunksOnClient } from "./util.ts";
 import type { ActiveWorld } from "./worker/types.ts";
 import {
@@ -10,19 +14,27 @@ import {
   threeVector3ToRawVector3,
 } from "./client.ts";
 
-export const createMinecraftInstance = async ({
+export const createGameInstance = async ({
   activeWorld,
+  minecraft,
 }: {
-  activeWorld: ActiveWorld;
-}): Promise<{
   minecraft: MinecraftInstance;
-  disposeMinecraft: () => void;
-}> => {
+  activeWorld: ActiveWorld;
+}): Promise<GameInstance> => {
   const scene = new THREE.Scene();
+  const canvas = document.querySelector("#game_canvas") as HTMLCanvasElement;
   const renderer = new THREE.WebGLRenderer({
+    canvas,
     antialias: false,
     powerPreference: "high-performance",
   });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  const onResize = () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  };
+  window.addEventListener("resize", onResize);
+  renderer.domElement.style.outline = "none"; // remove default outline
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
@@ -51,10 +63,16 @@ export const createMinecraftInstance = async ({
   let syncying = false;
 
   const syncPlayer = async () => {
+    if (minecraft.getUI().state.isPaused) {
+      setTimeout(syncPlayer, 1000);
+      return;
+    }
+
     if (disposed || syncying) {
       console.log("Skipping syncPlayer because disposed or syncying");
       return;
     }
+
     try {
       syncying = true;
       await requestWorker(
@@ -92,26 +110,30 @@ export const createMinecraftInstance = async ({
     }
   });
 
-  const disposeMinecraft = () => {
+  const dispose = () => {
+    sendEventToWorker({ type: "stopActiveWorld", payload: {} });
+    window.removeEventListener("resize", onResize);
     unsubscribeFromWorkerEvents();
     renderer.dispose();
     scene.clear();
-    renderer.domElement.remove();
     disposed = true;
   };
 
-  const minecraft: MinecraftInstance = {
+  const game: GameInstance = {
     camera,
     controls: new FPSControls(camera, renderer.domElement, world, player),
     renderer,
     scene,
     paused: false,
     world,
+    frameCounter: {
+      frames: 0,
+      lastTime: 0,
+      fps: 0,
+    },
+    dispose,
     player,
   };
 
-  return {
-    minecraft,
-    disposeMinecraft,
-  };
+  return game;
 };

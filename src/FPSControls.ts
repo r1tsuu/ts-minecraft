@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { MinecraftInstance, World } from "./types.js";
+import type { PlayerData, World } from "./types.js";
 import { getBlockInWorld } from "./world.js";
 import { GRAVITY_ACCELERATION } from "./util.ts";
 
@@ -8,7 +8,7 @@ export class FPSControls {
   domElement: HTMLElement;
 
   world: World;
-  player: MinecraftInstance["player"];
+  player: PlayerData;
 
   // Reusable Box3 instances
   playerBox = new THREE.Box3();
@@ -20,7 +20,7 @@ export class FPSControls {
     camera: THREE.PerspectiveCamera,
     domElement: HTMLElement,
     world: World,
-    player: MinecraftInstance["player"]
+    player: PlayerData
   ) {
     this.camera = camera;
     this.domElement = domElement;

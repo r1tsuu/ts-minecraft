@@ -1,108 +1,134 @@
 import * as THREE from "three";
-
-import "./style.css";
 import { updateWorld } from "./world.js";
-import { initMenu, initUI } from "./initUI.js";
-import { createMinecraftInstance } from "./core.ts";
-import { createRaycaster } from "./raycast.ts";
-import { requestWorker, waitUntilWorkerEvent } from "./worker/workerClient.ts";
-import type { ActiveWorld } from "./worker/types.ts";
+import { createGameInstance } from "./core.ts";
+import { requestWorker } from "./worker/workerClient.ts";
+import { createUI } from "./ui/createUI.ts";
+import type { MinecraftInstance } from "./types.ts";
 import { initBlocks } from "./client.ts";
+import { createRaycaster } from "./raycast.ts";
 
-initMenu({ onSelectWorld: async () => {}, isLoading: true });
+initBlocks();
 
-await initBlocks();
-await waitUntilWorkerEvent("workerInitialized");
-
-const startGame = async (activeWorld: ActiveWorld) => {
-  let stopped = false;
-
-  const clock = new THREE.Clock();
-
-  const { minecraft, disposeMinecraft } = await createMinecraftInstance({
-    activeWorld,
-  });
-
-  const { updateUI, destroyUI } = initUI({
-    minecraft,
-    onExitToMainMenu: async () => {
-      stopped = true;
-      await requestWorker(
-        {
-          type: "stopActiveWorld",
-          payload: {},
-        },
-        "activeWorldStopped"
-      );
-    },
-  });
-
-  const raycaster = createRaycaster({
-    camera: minecraft.camera,
-    world: minecraft.world,
-    scene: minecraft.scene,
-    player: minecraft.player,
-  });
-
-  let updatePromise: Promise<void> | null = null;
-
-  let lastPaused = false;
-
-  const loop = async () => {
-    if (stopped) {
-      disposeMinecraft();
-      destroyUI();
-
-      initMenu({
-        isLoading: false,
-        onSelectWorld: startGame,
-      });
-
-      return;
+const minecraft: MinecraftInstance = {
+  game: null,
+  ui: null,
+  getGame: () => {
+    if (!minecraft.game) {
+      throw new Error("Game instance is not initialized");
     }
 
-    requestAnimationFrame(loop);
-
-    updateUI();
-
-    if (minecraft.paused) {
-      clock.stop();
-      lastPaused = true;
-      // Dispose controls to free up event listeners
-      minecraft.controls.dispose();
-      return;
+    return minecraft.game;
+  },
+  getUI: () => {
+    if (!minecraft.ui) {
+      throw new Error("UI instance is not initialized");
     }
 
-    if (lastPaused) {
-      clock.start();
-      lastPaused = false;
-    }
-
-    const delta = clock.getDelta();
-
-    minecraft.renderer.render(minecraft.scene, minecraft.camera);
-
-    if (!document.pointerLockElement) {
-      await minecraft.renderer.domElement.requestPointerLock();
-    }
-
-    minecraft.controls.update(delta);
-
-    if (!updatePromise) {
-      updatePromise = updateWorld(
-        minecraft.world,
-        minecraft.camera.position
-      ).then(() => {
-        raycaster.update();
-        updatePromise = null;
-      });
-    }
-  };
-
-  loop();
+    return minecraft.ui;
+  },
 };
 
-initMenu({
-  isLoading: false,
-  onSelectWorld: startGame,
+const ui = createUI({
+  onCreateWorld: async (name: string, seed: string) => {
+    const response = await requestWorker(
+      {
+        type: "createWorld",
+        payload: {
+          name,
+          seed,
+        },
+      },
+      "worldCreated"
+    );
+
+    return response.payload;
+  },
+  onDeleteWorld: async (worldID: number) => {
+    await requestWorker(
+      {
+        type: "deleteWorld",
+        payload: {
+          worldID,
+        },
+      },
+      "worldDeleted"
+    );
+  },
+  onWorldPlay: async (worldID: number) => {
+    const { payload: activeWorld } = await requestWorker(
+      {
+        type: "initializeWorld",
+        payload: {
+          worldID,
+        },
+      },
+      "worldInitialized"
+    );
+
+    const game = await createGameInstance({
+      activeWorld,
+      minecraft,
+    });
+
+    minecraft.game = game;
+
+    const raycaster = createRaycaster({
+      camera: game.camera,
+      world: game.world,
+      scene: game.scene,
+      player: game.player,
+    });
+
+    const clock = new THREE.Clock();
+    let requestingPointerLock = false;
+    let clockStopped = false;
+
+    const loop = async () => {
+      if (!minecraft.game) return;
+
+      if (minecraft.getUI().state.isPaused) {
+        clock.stop();
+        clockStopped = true;
+        requestAnimationFrame(loop);
+        return;
+      } else if (clockStopped) {
+        clock.start();
+        clockStopped = false;
+      }
+
+      const delta = clock.getDelta();
+      game.frameCounter.lastTime += delta;
+      game.frameCounter.frames++;
+
+      if (game.frameCounter.lastTime >= 1) {
+        game.frameCounter.fps = game.frameCounter.frames;
+        game.frameCounter.frames = 0;
+        game.frameCounter.lastTime = 0;
+      }
+
+      game.renderer.render(game.scene, game.camera);
+
+      if (!document.pointerLockElement && !requestingPointerLock) {
+        requestingPointerLock = true;
+        await game.renderer.domElement.requestPointerLock();
+      }
+
+      game.controls.update(delta);
+
+      updateWorld(game.world, game.camera.position);
+      raycaster.update();
+      requestAnimationFrame(loop);
+    };
+
+    loop();
+  },
+  minecraft,
+  onExitWorld: async () => {
+    if (minecraft.game) {
+      minecraft.game.dispose();
+      minecraft.game = null;
+    }
+  },
 });
+
+minecraft.ui = ui;

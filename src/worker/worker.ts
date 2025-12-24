@@ -168,7 +168,7 @@ const getInitialPlayerPosition = ({
 
   return rawVector3(
     latestBlock.x,
-    Math.floor(latestBlock.y) + 2,
+    Math.floor(latestBlock.y) + 7,
     latestBlock.z
   );
 };

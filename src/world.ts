@@ -102,10 +102,7 @@ export const getBlockInWorld = (
 
 const chunkKey = (x: number, z: number) => `${x},${z}`;
 
-export const updateWorld = async (
-  world: World,
-  cameraPosition: THREE.Vector3
-) => {
+export const updateWorld = (world: World, cameraPosition: THREE.Vector3) => {
   const playerChunkX = Math.floor(cameraPosition.x / CHUNK_SIZE);
   const playerChunkZ = Math.floor(cameraPosition.z / CHUNK_SIZE);
 

@@ -1,8 +1,40 @@
+@import "tailwindcss";
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme {
+  /* Text & Background */
+  --color-text: #ffffff;
+  --color-background: #000000;
+
+  /* Primary / Secondary highlights */
+  --color-primary: #8b8b8b;
+  --color-secondary: #5b5b5b;
+
+  /* Buttons and Inputs */
+  --color-button-bg: rgba(0, 0, 0, 0.7);
+  --color-button-hover-bg: rgba(255, 255, 255, 0.3);
+  --color-button-text-shadow: rgba(0, 0, 0, 0.5);
+  --color-input-bg: rgba(0, 0, 0, 0.5);
+  --color-input-focus-bg: rgba(255, 255, 255, 0.1);
+
+  /* Overlay */
+  --color-overlay-bg: rgba(0, 0, 0, 0.7);
+
+  /* Crosshair */
+  --color-crosshair: #ffffff;
+
+  /* Font (not a color, but kept here for completeness) */
+  --font-press-start: "Press Start 2P", "Courier New", monospace;
+}
+
 :root {
   /* Text & Background */
   --color-text: #ffffff;
   --color-background: #000000;
-  
+
   /* Primary / Secondary highlights */
   --color-primary: #8b8b8b;
   --color-secondary: #5b5b5b;
@@ -26,7 +58,7 @@
   --crosshair-color: white;
 
   /* Font */
-  --font: 'Press Start 2P', 'Courier New', monospace;
+  --font-primary: "Press Start 2P", "Courier New", monospace;
 }
 
 /* Scrollbar */
@@ -36,14 +68,22 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--scrollbar-thumb-start), var(--scrollbar-thumb-end));
+  background: linear-gradient(
+    180deg,
+    var(--scrollbar-thumb-start),
+    var(--scrollbar-thumb-end)
+  );
   border-radius: 10px;
   border: 1px solid transparent;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, var(--scrollbar-thumb-end), var(--scrollbar-thumb-start));
+  background: linear-gradient(
+    180deg,
+    var(--scrollbar-thumb-end),
+    var(--scrollbar-thumb-start)
+  );
 }
 
 ::-webkit-scrollbar-track {
@@ -57,236 +97,31 @@
 }
 
 /* HTML & Body */
-html, body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  width: 100%;
-  height: 100%;
+html,
+body {
   color: var(--color-text);
-  font-family: var(--font);
-  background-color: var(--color-background);
-  image-rendering: pixelated;
-  image-rendering: -moz-crisp-edges;
-  image-rendering: crisp-edges;
 }
 
-a {
-  text-decoration: none;
-  color: inherit;
-  padding: 0;
-  margin: 0;
-  font: inherit;
+[data-condition] {
+  display: none;
 }
 
-button {
-  border: none;
-  background: none;
-  padding: 0;
-  margin: 0;
-  font: inherit;
+[data-active-page] {
+  display: none;
 }
 
-/* Menu Overlay */
-.menu_overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+.main [data-condition-passed="true"].flex {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background-repeat: no-repeat;
-  background-size: cover;
-  font-family: var(--font);
-  gap: 10px;
-  z-index: 10;
-  padding: 20px;
 }
 
-.menu_wrapper {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: stretch;
-  gap: 20px;
+.main [data-condition-passed="true"] {
+  display: block;
 }
 
-.menu_wrapper button,
-.menu_wrapper a {
-  width: auto;
+.main [data-condition-passed="true"].block {
+  display: block;
 }
 
-
-.menu_title {
-  font-size: 48px;
-  text-shadow: 3px 3px 0px rgba(0, 0, 0, 0.8);
-  letter-spacing: 2px;
-}
-
-.game_button {
-  padding: 10px 20px;
-  font-size: 24px;
-  background-color: var(--button-bg);
-  border: 2px solid #5b5b5b;
-  border-bottom: 4px solid #2b2b2b;
-  border-right: 2px solid #2b2b2b;
-  color: var(--color-text);
-  cursor: pointer;
-  font-family: var(--font);
-  transition: all 0.1s;
-  text-shadow: var(--button-text-shadow);
-  box-shadow: 0 4px 0 #1a1a1a;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.game_button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-  box-shadow: none;
-  transform: none;
-}
-
-.game_button:not(:disabled):hover {
-  background-color: var(--button-hover-bg);
-  border-color: #7b7b7b;
-  transform: translateY(1px);
-  box-shadow: 0 3px 0 #1a1a1a;
-}
-
-.game_button:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 #1a1a1a;
-}
-
-.game_input {
-  color: var(--color-text);
-  padding: 10px 20px;
-  font-size: 24px;
-  border: 2px solid var(--color-primary);
-  font-family: var(--font);
-  background-color: var(--input-bg);
-  transition: border 0.3s, background-color 0.3s;
-}
-
-.game_input:focus {
-  outline: none;
-  border: 2px solid var(--color-secondary);
-  background-color: var(--input-focus-bg);
-}
-
-.worlds_list {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  gap: 10px;
-  max-height: 50vh;
-  overflow-y: auto;
-
-}
-
-.no_worlds_text {
-  font-size: 18px;
-  font-family: var(--font);
-  margin-bottom: 10px;
-}
-
-.world_item_wrapper, .create_world_wrapper {
-  display: flex;
-  flex-direction: column;
-  background-color: var(--overlay-bg);
-  padding: 10px;
-  gap: 5px;
-  border: 1px solid var(--color-primary);
-}
-
-.pause_menu_overlay {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background-color: var(--overlay-bg);
-  font-family: var(--font);
-  gap: 10px;
-  padding: 20px;
-  z-index: 10;
-}
-
-.pause_menu_overlay button {
-  width: 100%
-}
-
-.pause_menu_title {
-  font-size: 36px;
-}
-
-canvas {
-  position: fixed;
-  width: 100vw;
-  height: 100vh;
-  cursor: none;
-}
-
-.ui_wrapper {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  max-width: fit-content;
-}
-
-.crosshair {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  width: 20px;
-  height: 20px;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.crosshair::before,
-.crosshair::after {
-  content: "";
-  position: absolute;
-  background: var(--crosshair-color);
-}
-
-.crosshair::before {
-  width: 2px;
-  height: 20px;
-  left: 50%;
-  top: 0;
-  transform: translateX(-50%);
-}
-
-.crosshair::after {
-  width: 20px;
-  height: 2px;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.ui_element {
-  background-color: var(--overlay-bg);
-  padding: 5px;
-  font-family: var(--font);
-  width: fit-content;
-}
-
-button.ui_element {
-  cursor: pointer;
+.main [data-condition-passed="true"].inline {
+  display: inline;
 }
