@@ -1,4 +1,4 @@
-import type { BlockInWorld, Chunk, RawVector3, World } from "./types.ts";
+import type { BlockInWorld, RawVector3, World } from "./types.ts";
 
 export const CHUNK_SIZE = 16;
 
@@ -14,37 +14,6 @@ export const getBlockKey = (x: number, y: number, z: number): string => {
 
 export const getBlockIndex = (x: number, y: number, z: number): number => {
   return x + CHUNK_SIZE * (z + CHUNK_SIZE * y);
-};
-
-export const getChunksCoordinatesInRadius = ({
-  centerChunkX,
-  centerChunkZ,
-  chunkRadius,
-}: {
-  centerChunkX: number;
-  centerChunkZ: number;
-  chunkRadius: number;
-}): {
-  chunkX: number;
-  chunkZ: number;
-}[] => {
-  const chunks: { chunkX: number; chunkZ: number }[] = [];
-
-  for (let dx = -chunkRadius; dx <= chunkRadius; dx++) {
-    for (let dz = -chunkRadius; dz <= chunkRadius; dz++) {
-      const distanceSquared = dx * dx + dz * dz;
-      if (distanceSquared <= chunkRadius * chunkRadius) {
-        chunks.push({
-          chunkX: centerChunkX + dx,
-          chunkZ: centerChunkZ + dz,
-        });
-      }
-    }
-  }
-
-  console.log("Chunks in radius:", chunks);
-
-  return chunks;
 };
 
 export const findByXZ = <T extends { x: number; z: number }>(
@@ -127,4 +96,35 @@ export const rawVector3 = (x: number, y: number, z: number): RawVector3 => {
 
 export const zeroRawVector3 = (): RawVector3 => {
   return { x: 0, y: 0, z: 0 };
+};
+
+export const getChunksCoordinatesInRadius = ({
+  centerChunkX,
+  centerChunkZ,
+  chunkRadius,
+}: {
+  centerChunkX: number;
+  centerChunkZ: number;
+  chunkRadius: number;
+}): {
+  chunkX: number;
+  chunkZ: number;
+}[] => {
+  const chunks: { chunkX: number; chunkZ: number }[] = [];
+
+  for (let dx = -chunkRadius; dx <= chunkRadius; dx++) {
+    for (let dz = -chunkRadius; dz <= chunkRadius; dz++) {
+      const distanceSquared = dx * dx + dz * dz;
+      if (distanceSquared <= chunkRadius * chunkRadius) {
+        chunks.push({
+          chunkX: centerChunkX + dx,
+          chunkZ: centerChunkZ + dz,
+        });
+      }
+    }
+  }
+
+  console.log("Chunks in radius:", chunks);
+
+  return chunks;
 };

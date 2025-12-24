@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import type { PlayerData, World } from "./types.js";
-import { getBlockInWorld } from "./world.js";
 import { GRAVITY_ACCELERATION } from "./util.ts";
 
 export class FPSControls {
@@ -148,7 +147,7 @@ export class FPSControls {
     for (let x = minX; x <= maxX; x++) {
       for (let y = minY; y <= maxY; y++) {
         for (let z = minZ; z <= maxZ; z++) {
-          if (getBlockInWorld(x, y, z, this.world)) {
+          if (this.world.getBlock(x, y, z)) {
             // Block exists, create its bounding box
             this.blockBox.setFromCenterAndSize(
               new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5),

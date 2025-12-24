@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import type { PlayerData, World } from "./types.ts";
-import { getBlockInWorld } from "./world.ts";
 
 const FAR = 5;
 
@@ -52,7 +51,7 @@ export const createRaycaster = ({
           const worldY = Math.floor(player.position.y + y);
           const worldZ = Math.floor(player.position.z + z);
 
-          if (!getBlockInWorld(worldX, worldY, worldZ, world)) continue;
+          if (!world.getBlock(worldX, worldY, worldZ)) continue;
 
           matrix.setPosition(worldX, worldY, worldZ);
           raycastingMesh.setMatrixAt(index, matrix);

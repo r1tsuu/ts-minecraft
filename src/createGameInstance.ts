@@ -1,18 +1,18 @@
 import * as THREE from "three";
 import type { GameInstance, MinecraftInstance, PlayerData } from "./types.ts";
-import { createWorld } from "./world.ts";
+import { createWorld } from "./createWorld.ts";
 import { FPSControls } from "./FPSControls.ts";
 import {
   listenToWorkerEvents,
   requestWorker,
   sendEventToWorker,
 } from "./worker/workerClient.ts";
-import { syncServerChunksOnClient } from "./util.ts";
 import type { ActiveWorld } from "./worker/types.ts";
 import {
   rawVector3ToThreeVector3,
   threeVector3ToRawVector3,
 } from "./client.ts";
+import { createRaycaster } from "./createRaycaster.ts";
 
 export const createGameInstance = async ({
   activeWorld,
@@ -48,8 +48,6 @@ export const createGameInstance = async ({
   camera.position.set(0, 40, 0);
   camera.lookAt(30, 35, 30);
 
-  const world = createWorld({ scene, activeWorld });
-
   const player: PlayerData = {
     ...activeWorld.world.playerData,
     position: rawVector3ToThreeVector3(activeWorld.world.playerData.position),
@@ -62,9 +60,13 @@ export const createGameInstance = async ({
   let disposed = false;
   let syncying = false;
 
+  const world = createWorld({ scene, activeWorld, player });
+
+  let lastTimeout: null | number = null;
+
   const syncPlayer = async () => {
     if (minecraft.getUI().state.isPaused) {
-      setTimeout(syncPlayer, 1000);
+      lastTimeout = setTimeout(syncPlayer, 1000);
       return;
     }
 
@@ -91,31 +93,23 @@ export const createGameInstance = async ({
       );
     } finally {
       syncying = false;
-      setTimeout(syncPlayer, 1000);
+      lastTimeout = setTimeout(syncPlayer, 1000);
     }
   };
 
-  setTimeout(syncPlayer, 1000);
-
-  const unsubscribeFromWorkerEvents = listenToWorkerEvents((event) => {
-    switch (event.type) {
-      case "chunksGenerated": {
-        const { chunks } = event.payload;
-        const now = Date.now();
-        syncServerChunksOnClient(chunks, world);
-        console.log("Processing chunks took", Date.now() - now, "ms");
-        world.requestingChunksState = "idle";
-        break;
-      }
-    }
-  });
+  lastTimeout = setTimeout(syncPlayer, 1000);
 
   const dispose = () => {
     sendEventToWorker({ type: "stopActiveWorld", payload: {} });
     window.removeEventListener("resize", onResize);
-    unsubscribeFromWorkerEvents();
+    world.dispose();
     renderer.dispose();
     scene.clear();
+
+    if (lastTimeout) {
+      clearTimeout(lastTimeout);
+    }
+
     disposed = true;
   };
 
@@ -133,6 +127,12 @@ export const createGameInstance = async ({
     },
     dispose,
     player,
+    raycaster: createRaycaster({
+      camera,
+      world,
+      scene,
+      player,
+    }),
   };
 
   return game;

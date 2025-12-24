@@ -1,11 +1,9 @@
 import * as THREE from "three";
-import { updateWorld } from "./world.js";
 import { createGameInstance } from "./createGameInstance.ts";
 import { requestWorker } from "./worker/workerClient.ts";
 import { createUIInstance } from "./ui/createUIInstance.ts";
 import type { MinecraftInstance } from "./types.ts";
 import { initBlocks } from "./client.ts";
-import { createRaycaster } from "./raycast.ts";
 
 initBlocks();
 
@@ -65,18 +63,9 @@ const ui = createUIInstance({
       "worldInitialized"
     );
 
-    const game = await createGameInstance({
+    minecraft.game = await createGameInstance({
       activeWorld,
       minecraft,
-    });
-
-    minecraft.game = game;
-
-    const raycaster = createRaycaster({
-      camera: game.camera,
-      world: game.world,
-      scene: game.scene,
-      player: game.player,
     });
 
     const clock = new THREE.Clock();
@@ -97,26 +86,29 @@ const ui = createUIInstance({
       }
 
       const delta = clock.getDelta();
-      game.frameCounter.lastTime += delta;
-      game.frameCounter.frames++;
+      minecraft.game.frameCounter.lastTime += delta;
+      minecraft.game.frameCounter.frames++;
 
-      if (game.frameCounter.lastTime >= 1) {
-        game.frameCounter.fps = game.frameCounter.frames;
-        game.frameCounter.frames = 0;
-        game.frameCounter.lastTime = 0;
+      if (minecraft.game.frameCounter.lastTime >= 1) {
+        minecraft.game.frameCounter.fps = minecraft.game.frameCounter.frames;
+        minecraft.game.frameCounter.frames = 0;
+        minecraft.game.frameCounter.lastTime = 0;
       }
 
-      game.renderer.render(game.scene, game.camera);
+      minecraft.game.renderer.render(
+        minecraft.game.scene,
+        minecraft.game.camera
+      );
 
       if (!document.pointerLockElement && !requestingPointerLock) {
         requestingPointerLock = true;
-        await game.renderer.domElement.requestPointerLock();
+        await minecraft.game.renderer.domElement.requestPointerLock();
       }
 
-      game.controls.update(delta);
+      minecraft.game.controls.update(delta);
+      minecraft.game.world.update();
+      minecraft.game.raycaster.update();
 
-      updateWorld(game.world, game.camera.position);
-      raycaster.update();
       requestAnimationFrame(loop);
     };
 

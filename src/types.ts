@@ -38,6 +38,17 @@ export type World = {
   blockMeshesCount: Map<number, number>;
   blocksMeshesFreeIndexes: Map<number, number[]>;
   requestingChunksState: "idle" | "requesting";
+  getBlock: (x: number, y: number, z: number) => BlockType | null;
+  update: () => void;
+  syncChunksFromServer: (
+    chunks: {
+      chunkX: number;
+      chunkZ: number;
+      id: number;
+      blocks: BlockInWorld[];
+    }[]
+  ) => void;
+  dispose: () => void;
 };
 
 export type PlayerData = {
@@ -69,6 +80,9 @@ export type GameInstance = {
     frames: number;
     lastTime: number;
     fps: number;
+  };
+  raycaster: {
+    update: () => void;
   };
   dispose: () => void;
 };
