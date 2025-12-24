@@ -2,11 +2,7 @@ import * as THREE from "three";
 import type { GameInstance, MinecraftInstance, PlayerData } from "./types.ts";
 import { createWorld } from "./createWorld.ts";
 import { FPSControls } from "./FPSControls.ts";
-import {
-  listenToWorkerEvents,
-  requestWorker,
-  sendEventToWorker,
-} from "./worker/workerClient.ts";
+import { requestWorker, sendEventToWorker } from "./worker/workerClient.ts";
 import type { ActiveWorld } from "./worker/types.ts";
 import {
   rawVector3ToThreeVector3,

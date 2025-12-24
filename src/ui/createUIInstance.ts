@@ -146,7 +146,7 @@ export const createUIInstance = ({
     document.removeEventListener("pointerlockchange", onPointerLockChange);
   });
 
-  setInterval(() => {
+  const gameInterval = setInterval(() => {
     if (minecraft.game) {
       setState(
         {
@@ -255,6 +255,8 @@ export const createUIInstance = ({
       for (const unsubscribe of subscriptions) {
         unsubscribe();
       }
+
+      clearInterval(gameInterval);
     },
   };
 };
