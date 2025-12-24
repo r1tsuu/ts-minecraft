@@ -3,6 +3,7 @@
 // This does not run in the browser.
 
 import { renderToHtml } from "jsxte";
+import { tv } from "tailwind-variants";
 import {
   uiActionKey,
   uiActivePageKey,
@@ -10,62 +11,174 @@ import {
   uiStateKey,
 } from "../state.ts";
 
-const cn = (...classes: string[]) => {
-  return classes.filter(Boolean).join(" ");
-};
+// Reusable component variants using tailwind-variants
+const button = tv({
+  base: `
+    px-8 py-3
+    text-xl
+    font-bold
+    border-2 border-b-4 border-r-3
+    cursor-pointer 
+    transition-all duration-100 
+    flex justify-center items-center
+    text-shadow-[1px_1px_2px_rgba(0,0,0,0.8)]
+    disabled:cursor-not-allowed 
+    disabled:opacity-50 
+    disabled:shadow-none 
+    disabled:translate-y-0
+    min-w-50
+    active:translate-y-0.5
+    select-none
+  `,
+  variants: {
+    variant: {
+      primary: `
+        bg-primary
+        border-primary-dark
+        border-b-primary-darker
+        border-r-primary-darker
+        shadow-[0_4px_0_var(--color-primary-darker)]
+        hover:bg-primary-light
+        hover:border-primary-medium
+        hover:translate-y-px 
+        hover:shadow-[0_3px_0_var(--color-primary-darker)]
+        active:shadow-[0_2px_0_var(--color-primary-darker)]
+      `,
+      secondary: `
+        bg-secondary
+        border-secondary-dark
+        border-b-secondary-darker
+        border-r-secondary-darker
+        shadow-[0_4px_0_var(--color-secondary-darker)]
+        hover:bg-secondary-light
+        hover:border-secondary-medium
+        hover:translate-y-px 
+        hover:shadow-[0_3px_0_var(--color-secondary-darker)]
+        active:shadow-[0_2px_0_var(--color-secondary-darker)]
+      `,
+      success: `
+        bg-success
+        border-success-dark
+        border-b-success-darker
+        border-r-success-darker
+        shadow-[0_3px_0_var(--color-success-darker)]
+        hover:bg-success-light
+        hover:border-success-medium
+        active:shadow-[0_2px_0_var(--color-success-darker)]
+      `,
+      danger: `
+        bg-danger
+        border-danger-dark
+        border-b-danger-darker
+        border-r-danger-darker
+        shadow-[0_3px_0_var(--color-danger-darker)]
+        hover:bg-danger-light
+        hover:border-danger-medium
+        active:shadow-[0_2px_0_var(--color-danger-darker)]
+      `,
+    },
+    size: {
+      md: "px-6 py-2.5 text-lg",
+      lg: "px-8 py-3 text-xl",
+    },
+  },
+  defaultVariants: {
+    variant: "primary",
+    size: "lg",
+  },
+});
 
-const button = cn(`
-  px-8 py-3
-  text-xl
-  bg-button-bg
-  border-2 border-gray-600 
-  border-b-4 border-b-gray-900 
-  border-r-2 border-r-gray-900 
-  cursor-pointer 
-  transition-all duration-100 
-  shadow-[0_4px_0_#1a1a1a] 
-  flex justify-center items-center
-  text-shadow-button-text-shadow
-  disabled:cursor-not-allowed 
-  disabled:opacity-60 
-  disabled:shadow-none 
-  disabled:translate-y-0
-  min-w-70
-  hover:bg-button-hover-bg
-  hover:border-gray-500 
-  hover:translate-y-px 
-  hover:shadow-[0_3px_0_#1a1a1a]
-  active:translate-y-0.5 
-  active:shadow-[0_2px_0_#1a1a1a]
-`);
+const input = tv({
+  base: `
+    px-5 py-2.5
+    text-xl
+    border-2
+    transition-all duration-200
+    focus:outline-none
+    min-w-50
+    text-shadow-[1px_1px_1px_rgba(0,0,0,0.5)]
+  `,
+  variants: {
+    variant: {
+      default: `
+        border-primary
+        bg-input-bg
+        text-accent
+        focus:border-primary-light
+        focus:bg-input-focus-bg
+        focus:shadow-[0_0_0_2px_var(--color-primary-focus)]
+        placeholder:text-accent-muted
+      `,
+    },
+  },
+  defaultVariants: {
+    variant: "default",
+  },
+});
 
-const input = cn(`
-  px-5 py-2.5
-  text-xl
-  border-2 border-primary
-  bg-input-bg
-  transition-colors duration-300
-  focus:outline-none
-  focus:border-secondary
-  focus:bg-input-focus-bg
-  min-w-70
-`);
+const card = tv({
+  base: `
+    bg-overlay-bg
+    border-2
+    transition-all duration-100
+  `,
+  variants: {
+    variant: {
+      default: `
+        border-primary
+        shadow-[0_3px_0_var(--color-primary-darker),0_0_20px_rgba(0,0,0,0.5)]
+        hover:shadow-[0_5px_0_var(--color-primary-darker),0_0_30px_rgba(0,0,0,0.6)]
+      `,
+      game: `
+        border-primary-dark
+        shadow-[0_2px_4px_rgba(0,0,0,0.8)]
+      `,
+    },
+    padding: {
+      sm: "p-3",
+      md: "p-5",
+      lg: "p-8",
+    },
+  },
+  defaultVariants: {
+    variant: "default",
+    padding: "md",
+  },
+});
 
-const gameUiElement = cn(`
-p-1.25 w-max bg-overlay-bg
-`);
+const title = tv({
+  base: `
+    font-bold
+    text-center
+    text-shadow-[3px_3px_0_#000,0_0_10px_var(--color-accent-glow)]
+    text-accent
+  `,
+  variants: {
+    size: {
+      lg: "text-5xl mb-6",
+      xl: "text-6xl mb-8",
+    },
+  },
+  defaultVariants: {
+    size: "lg",
+  },
+});
 
-const title = cn(`
-  text-5xl
-  mb-6
-  text-center
-  font-bold
-  text-shadow-[2px_2px_0_#000]
-`);
+const gameUIElement = tv({
+  base: `
+    p-2.5 
+    w-max 
+    bg-game-ui
+    border border-primary-dark
+    text-accent
+    text-shadow-[1px_1px_2px_rgba(0,0,0,0.9)]
+    backdrop-blur-sm
+  `,
+});
 
 const Main = () => {
   return (
-    <div class="font-press-start main overflow-hidden w-screen h-screen relative">
+    <div class="font-press-start main overflow-hidden w-screen h-screen relative bg-background">
       <canvas
         id="game_canvas"
         class="fixed top-0 left-0 w-full h-full"
@@ -81,6 +194,7 @@ const Main = () => {
         gap-2.5
         p-5
         z-10
+        backdrop-brightness-75
       "
       >
         <div
@@ -88,10 +202,10 @@ const Main = () => {
           id="menu_start"
           class="flex flex-col justify-center items-stretch gap-5"
         >
-          <h1 class={title}>Minecraft Clone</h1>
+          <h1 class={title({ size: "xl" })}>Minecraft Clone</h1>
           <button
             data-condition={uiConditionKey("showLoadingButton")}
-            class={button}
+            class={button({ variant: "primary" })}
             disabled
           >
             Loading...
@@ -99,11 +213,14 @@ const Main = () => {
           <button
             data-action={uiActionKey("startGame")}
             data-condition={uiConditionKey("showStartGameButton")}
-            class={button}
+            class={button({ variant: "success" })}
           >
             Start Game
           </button>
-          <a class={button} href="https://github.com/r1tsuu/ts-minecraft">
+          <a
+            class={button({ variant: "secondary" })}
+            href="https://github.com/r1tsuu/ts-minecraft"
+          >
             GitHub Repo
           </a>
         </div>
@@ -111,7 +228,7 @@ const Main = () => {
           data-active-page={uiActivePageKey("menuWorlds")}
           class="flex flex-col gap-6 max-w-4xl"
         >
-          <h1 class={title}>Select World</h1>
+          <h1 class={title()}>Select World</h1>
           <div
             id="worlds_list"
             data-items-variable={uiStateKey("worldList")}
@@ -120,63 +237,38 @@ const Main = () => {
           ></div>
           <template id="world_item_template">
             <div
-              class="
-    group
-    flex flex-col
-    bg-overlay-bg
-    p-3
-    gap-2
-    border-2 border-primary
-    shadow-[0_3px_0_#000]
-    transition-transform duration-100
-    hover:shadow-[0_5px_0_#000]
-  "
+              class={
+                card({ variant: "default", padding: "sm" }) +
+                " flex flex-col gap-3"
+              }
             >
               <div
                 data-variable={uiStateKey("worldList.i.name")}
                 class="
-    text-xl
-    font-bold
-    text-shadow-[2px_2px_0_#000]
-    truncate
-  "
+                  text-xl
+                  font-bold
+                  text-accent
+                  text-shadow-[2px_2px_0_#000]
+                  truncate
+                "
               />
               <div
                 data-variable={uiStateKey("worldList.i.seed")}
-                class="text-xs opacity-70"
+                class="text-xs text-accent-muted"
               />
               <div
                 data-variable={uiStateKey("worldList.i.createdAt")}
-                class="text-xs opacity-70"
+                class="text-xs text-accent-muted"
               />
               <button
                 data-action={uiActionKey("playWorld")}
-                class={`
- flex-1
-      px-4 py-2
-      text-lg
-      bg-green-700
-      border-2 border-green-900
-      border-b-4
-      shadow-[0_3px_0_#000]
-      hover:bg-green-600
-      active:translate-y-0.5
-                `}
+                class={button({ variant: "success", size: "md" })}
               >
                 Play
               </button>
               <button
                 data-action={uiActionKey("deleteWorld")}
-                class={`
-  px-4 py-2
-      text-lg
-      bg-red-700
-      border-2 border-red-900
-      border-b-4
-      shadow-[0_3px_0_#000]
-      hover:bg-red-600
-      active:translate-y-0.5
-                `}
+                class={button({ variant: "danger", size: "md" })}
               >
                 Delete
               </button>
@@ -184,26 +276,35 @@ const Main = () => {
           </template>
           <div
             data-condition={uiConditionKey("showWorldsNotFound")}
-            class="text-center text-lg"
+            class="text-center text-lg text-accent text-shadow-[1px_1px_2px_rgba(0,0,0,0.8)]"
           >
             <div>No worlds found.</div>
             <div>Create a new world to get started.</div>
           </div>
-          <div class="flex flex-col bg-overlay-bg p-5 gap-4 border border-primary">
-            <input name="worldName" class={input} placeholder="Name" />
-            <input name="worldSeed" class={input} placeholder="Seed" />
-            <button data-action="createWorld" class={button}>
+          <div class={card({ padding: "md" }) + " flex flex-col gap-4"}>
+            <input name="worldName" class={input()} placeholder="Name" />
+            <input name="worldSeed" class={input()} placeholder="Seed" />
+            <button
+              data-action="createWorld"
+              class={button({ variant: "success" })}
+            >
               Create New World
             </button>
-            <button data-action="backToStart" class={button}>
+            <button
+              data-action="backToStart"
+              class={button({ variant: "secondary" })}
+            >
               Back to Start Menu
             </button>
           </div>
         </div>
         <div data-active-page={uiActivePageKey("worldLoading")}>
-          <h1 class={title}>
+          <h1 class={title()}>
             Loading World:{" "}
-            <span data-variable={uiStateKey("loadingWorldName")} />
+            <span
+              data-variable={uiStateKey("loadingWorldName")}
+              class="text-success"
+            />
           </h1>
         </div>
       </div>
@@ -211,38 +312,45 @@ const Main = () => {
         class="absolute top-2.5 left-2.5 w-full h-full flex flex-col gap-1.25 z-10 max-w-fit"
         data-condition={uiConditionKey("showGameUI")}
       >
-        <div class={gameUiElement} id="fps">
-          FPS: <span data-variable={uiStateKey("fps")} />
+        <div class={gameUIElement()}>
+          FPS: <span data-variable={uiStateKey("fps")} class="text-success" />
         </div>
-        <div class={gameUiElement} id="position">
-          Position: <span data-variable={uiStateKey("position")} />
+        <div class={gameUIElement()}>
+          Position:{" "}
+          <span data-variable={uiStateKey("position")} class="text-secondary" />
         </div>
-        <div class={gameUiElement} id="rotation">
-          Rotation: <span data-variable={uiStateKey("rotation")} />
+        <div class={gameUIElement()}>
+          Rotation:{" "}
+          <span data-variable={uiStateKey("rotation")} class="text-secondary" />
         </div>
-        <div class={gameUiElement} data-variable={uiStateKey("pauseText")} />
+        <div class={gameUIElement()} data-variable={uiStateKey("pauseText")} />
 
         <div
           data-condition={uiConditionKey("showPauseMenu")}
-          class="h-full w-full fixed cursor-default top-0 left-0 bg-black/80 backdrop-blur-sm z-20"
+          class="h-full w-full fixed cursor-default top-0 left-0 bg-pause-overlay backdrop-blur-md z-20"
         >
           <div
-            class="
-          flex fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2
-          flex-col justify-center items-stretch
-          gap-6 p-12 z-30 bg-overlay-bg border-4 border-primary
-          shadow-[0_8px_0_#000,0_0_40px_rgba(0,0,0,0.5)]
-          min-w-100
-        "
+            class={
+              card({ variant: "default", padding: "lg" }) +
+              ` fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2
+              flex flex-col justify-center items-stretch
+              gap-6 z-30
+              border-4
+              shadow-[0_12px_0_var(--color-primary-darker),0_0_60px_rgba(0,0,0,0.8)]
+              min-w-100`
+            }
           >
-            <h1 class={cn(title, "mb-2 text-6xl")}>Game Paused</h1>
-            <div class="border-t-2 border-primary/30 my-2"></div>
-            <button data-action={uiActionKey("resumeGame")} class={button}>
+            <h1 class={title({ size: "xl" })}>Game Paused</h1>
+            <div class="border-t-2 border-primary-dark/50 my-2"></div>
+            <button
+              data-action={uiActionKey("resumeGame")}
+              class={button({ variant: "success" })}
+            >
               Resume Game
             </button>
             <button
               data-action={uiActionKey("backToMenu")}
-              class={cn(button, "bg-red-700 hover:bg-red-600 border-red-900")}
+              class={button({ variant: "danger" })}
             >
               Exit to Main Menu
             </button>
@@ -254,9 +362,9 @@ const Main = () => {
         class="fixed top-1/2 left-1/2 w-5 h-5 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10"
       >
         {/** <!-- Vertical line --> */}
-        <div class="absolute w-0.5 h-full left-1/2 -translate-x-1/2 bg-crosshair"></div>
+        <div class="absolute w-0.5 h-full left-1/2 -translate-x-1/2 bg-crosshair shadow-[0_0_4px_rgba(0,0,0,0.8)]"></div>
         {/** <!-- Horizontal line --> */}
-        <div class="absolute h-0.5 w-full top-1/2 -translate-y-1/2 bg-crosshair"></div>
+        <div class="absolute h-0.5 w-full top-1/2 -translate-y-1/2 bg-crosshair shadow-[0_0_4px_rgba(0,0,0,0.8)]"></div>
       </div>
     </div>
   );

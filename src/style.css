@@ -7,58 +7,66 @@
 @theme {
   /* Text & Background */
   --color-text: #ffffff;
-  --color-background: #000000;
+  --color-background: #1a1410;
 
-  /* Primary / Secondary highlights */
-  --color-primary: #8b8b8b;
-  --color-secondary: #5b5b5b;
+  /* Primary - Brown/Wood tones */
+  --color-primary: #8b4513;
+  --color-primary-light: #a0522d;
+  --color-primary-medium: #704214;
+  --color-primary-dark: #654321;
+  --color-primary-darker: #3d2812;
+  --color-primary-focus: rgba(139, 69, 19, 0.3);
+
+  /* Secondary - Forest Green */
+  --color-secondary: #4a7c59;
+  --color-secondary-light: #5c9a6d;
+  --color-secondary-medium: #3d6b47;
+  --color-secondary-dark: #2d5a3a;
+  --color-secondary-darker: #1a3d25;
+
+  /* Success - Grass Green */
+  --color-success: #5c8a3d;
+  --color-success-light: #6fa84d;
+  --color-success-medium: #4d6b35;
+  --color-success-dark: #3d5a28;
+  --color-success-darker: #2d4520;
+
+  /* Danger - Red/Lava */
+  --color-danger: #c73e1d;
+  --color-danger-light: #dc5230;
+  --color-danger-medium: #a03010;
+  --color-danger-dark: #8b2500;
+  --color-danger-darker: #5c1800;
+
+  /* Accent - Tan/Sand */
+  --color-accent: #d4a574;
+  --color-accent-muted: #8b7355;
+  --color-accent-glow: rgba(212, 165, 116, 0.3);
 
   /* Buttons and Inputs */
   --color-button-bg: rgba(0, 0, 0, 0.7);
   --color-button-hover-bg: rgba(255, 255, 255, 0.3);
   --color-button-text-shadow: rgba(0, 0, 0, 0.5);
-  --color-input-bg: rgba(0, 0, 0, 0.5);
-  --color-input-focus-bg: rgba(255, 255, 255, 0.1);
+  --color-input-bg: #2c2416;
+  --color-input-focus-bg: #3d3320;
 
   /* Overlay */
-  --color-overlay-bg: rgba(0, 0, 0, 0.7);
+  --color-overlay-bg: rgba(20, 20, 20, 0.95);
+  --color-game-ui: rgba(0, 0, 0, 0.75);
+  --color-pause-overlay: rgba(0, 0, 0, 0.85);
 
   /* Crosshair */
-  --color-crosshair: #ffffff;
+  --color-crosshair: rgba(255, 255, 255, 0.9);
 
   /* Font (not a color, but kept here for completeness) */
   --font-press-start: "Press Start 2P", "Courier New", monospace;
 }
 
 :root {
-  /* Text & Background */
-  --color-text: #ffffff;
-  --color-background: #000000;
-
-  /* Primary / Secondary highlights */
-  --color-primary: #8b8b8b;
-  --color-secondary: #5b5b5b;
-
   /* Scrollbar */
-  --scrollbar-thumb-start: #8b8b8b;
-  --scrollbar-thumb-end: #5b5b5b;
-  --scrollbar-track: #2b2b2b;
-
-  /* Buttons and Inputs */
-  --button-bg: rgba(0, 0, 0, 0.7);
-  --button-hover-bg: rgba(255, 255, 255, 0.3);
-  --button-text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
-  --input-bg: rgba(0, 0, 0, 0.5);
-  --input-focus-bg: rgba(255, 255, 255, 0.1);
-
-  /* Overlay */
-  --overlay-bg: rgba(0, 0, 0, 0.7);
-
-  /* Crosshair */
-  --crosshair-color: white;
-
-  /* Font */
-  --font-primary: "Press Start 2P", "Courier New", monospace;
+  --scrollbar-thumb-start: #8b4513;
+  --scrollbar-thumb-end: #654321;
+  --scrollbar-track: #2c2416;
 }
 
 /* Scrollbar */
