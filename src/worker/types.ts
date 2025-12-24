@@ -1,86 +1,86 @@
-import type { BlockInWorld } from "../types.ts";
-import type { DatabasePlayerData, DatabaseWorldData } from "./database.ts";
-
-export type Status = "SUCCESS" | "UNKNOWN_ERROR";
-
-export type BaseEvent<T extends string, Data> = {
-  type: T;
-  payload: Data;
-  uuid?: string;
-};
-
-export type BaseClientEvent<T extends string, Data> = BaseEvent<T, Data> & {
-  status: Status;
-};
+import type { BlockInWorld } from '../types.ts'
+import type { DatabasePlayerData, DatabaseWorldData } from './database.ts'
 
 export type ActiveWorld = {
-  world: DatabaseWorldData;
   loadedChunks: {
-    chunkX: number;
-    chunkZ: number;
-    id: number;
-    blocks: BlockInWorld[];
-  }[];
-};
+    blocks: BlockInWorld[]
+    chunkX: number
+    chunkZ: number
+    id: number
+  }[]
+  world: DatabaseWorldData
+}
+
+export type BaseClientEvent<T extends string, Data> = {
+  status: Status
+} & BaseEvent<T, Data>
+
+export type BaseEvent<T extends string, Data> = {
+  payload: Data
+  type: T
+  uuid?: string
+}
+
+export type MinecraftClientEvent =
+  | BaseClientEvent<'activeWorldStopped', {}>
+  | BaseClientEvent<
+      'chunksGenerated',
+      {
+        chunks: {
+          blocks: BlockInWorld[]
+          chunkX: number
+          chunkZ: number
+          id: number
+        }[]
+      }
+    >
+  | BaseClientEvent<
+      'listWorldsResponse',
+      {
+        worlds: {
+          createdAt: Date
+          id: number
+          name: string
+          seed: string
+        }[]
+      }
+    >
+  | BaseClientEvent<'playerSynced', {}>
+  | BaseClientEvent<'workerInitialized', {}>
+  | BaseClientEvent<
+      'worldCreated',
+      {
+        createdAt: Date
+        id: number
+        name: string
+        seed: string
+      }
+    >
+  | BaseClientEvent<'worldDeleted', { worldID: number }>
+  | BaseClientEvent<'worldInitialized', ActiveWorld>
 
 export type MinecraftWorkerEvent =
   | BaseEvent<
-      "requestChunks",
+      'createWorld',
       {
-        worldID: number;
-        chunksCoordinates: {
-          chunkX: number;
-          chunkZ: number;
-        }[];
+        name: string
+        seed: string
       }
     >
+  | BaseEvent<'deleteWorld', { worldID: number }>
+  | BaseEvent<'initializeWorld', { worldID: number }>
   | BaseEvent<
-      "createWorld",
+      'requestChunks',
       {
-        name: string;
-        seed: string;
+        chunksCoordinates: {
+          chunkX: number
+          chunkZ: number
+        }[]
+        worldID: number
       }
     >
-  | BaseEvent<"requestListWorlds", {}>
-  | BaseEvent<"deleteWorld", { worldID: number }>
-  | BaseEvent<"initializeWorld", { worldID: number }>
-  | BaseEvent<"syncPlayer", { playerData: DatabasePlayerData }>
-  | BaseEvent<"stopActiveWorld", {}>;
+  | BaseEvent<'requestListWorlds', {}>
+  | BaseEvent<'stopActiveWorld', {}>
+  | BaseEvent<'syncPlayer', { playerData: DatabasePlayerData }>
 
-export type MinecraftClientEvent =
-  | BaseClientEvent<
-      "chunksGenerated",
-      {
-        chunks: {
-          chunkX: number;
-          chunkZ: number;
-          id: number;
-          blocks: BlockInWorld[];
-        }[];
-      }
-    >
-  | BaseClientEvent<
-      "worldCreated",
-      {
-        name: string;
-        seed: string;
-        createdAt: Date;
-        id: number;
-      }
-    >
-  | BaseClientEvent<
-      "listWorldsResponse",
-      {
-        worlds: {
-          name: string;
-          seed: string;
-          createdAt: Date;
-          id: number;
-        }[];
-      }
-    >
-  | BaseClientEvent<"worldDeleted", { worldID: number }>
-  | BaseClientEvent<"worldInitialized", ActiveWorld>
-  | BaseClientEvent<"workerInitialized", {}>
-  | BaseClientEvent<"playerSynced", {}>
-  | BaseClientEvent<"activeWorldStopped", {}>;
+export type Status = 'SUCCESS' | 'UNKNOWN_ERROR'

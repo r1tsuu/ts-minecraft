@@ -1,143 +1,131 @@
-import * as THREE from "three";
-import type { GameInstance, MinecraftInstance, PlayerData } from "./types.ts";
-import { createWorld } from "./createWorld.ts";
-import { FPSControls } from "./FPSControls.ts";
-import { requestWorker, sendEventToWorker } from "./worker/workerClient.ts";
-import type { ActiveWorld } from "./worker/types.ts";
-import {
-  rawVector3ToThreeVector3,
-  threeVector3ToRawVector3,
-} from "./client.ts";
-import { createRaycaster } from "./createRaycaster.ts";
+import * as THREE from 'three'
+
+import type { GameInstance, MinecraftInstance, PlayerData } from './types.ts'
+import type { ActiveWorld } from './worker/types.ts'
+
+import { rawVector3ToThreeVector3, threeVector3ToRawVector3 } from './client.ts'
+import { createRaycaster } from './createRaycaster.ts'
+import { createWorld } from './createWorld.ts'
+import { FPSControls } from './FPSControls.ts'
+import { requestWorker, sendEventToWorker } from './worker/workerClient.ts'
 
 export const createGameInstance = async ({
   activeWorld,
   minecraft,
 }: {
-  minecraft: MinecraftInstance;
-  activeWorld: ActiveWorld;
+  activeWorld: ActiveWorld
+  minecraft: MinecraftInstance
 }): Promise<GameInstance> => {
-  const scene = new THREE.Scene();
-  const canvas = document.querySelector("#game_canvas") as HTMLCanvasElement;
+  const scene = new THREE.Scene()
+  const canvas = document.querySelector('#game_canvas') as HTMLCanvasElement
   const renderer = new THREE.WebGLRenderer({
-    canvas,
     antialias: false,
-    powerPreference: "high-performance",
-  });
-  renderer.setSize(window.innerWidth, window.innerHeight);
+    canvas,
+    powerPreference: 'high-performance',
+  })
+  renderer.setSize(window.innerWidth, window.innerHeight)
 
   const onResize = () => {
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  };
-  window.addEventListener("resize", onResize);
+    renderer.setSize(window.innerWidth, window.innerHeight)
+  }
+  window.addEventListener('resize', onResize)
 
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
-  const camera = new THREE.PerspectiveCamera(
-    75,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000
-  );
+  renderer.outputColorSpace = THREE.SRGBColorSpace
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1.0
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
 
-  camera.position.set(0, 40, 0);
-  camera.lookAt(30, 35, 30);
+  camera.position.set(0, 40, 0)
+  camera.lookAt(30, 35, 30)
 
   const player: PlayerData = {
     ...activeWorld.world.playerData,
+    direction: rawVector3ToThreeVector3(activeWorld.world.playerData.direction),
     position: rawVector3ToThreeVector3(activeWorld.world.playerData.position),
     velocity: rawVector3ToThreeVector3(activeWorld.world.playerData.velocity),
-    direction: rawVector3ToThreeVector3(activeWorld.world.playerData.direction),
-  };
+  }
 
-  camera.position.copy(player.position);
-  camera.rotation.set(player.pitch, player.yaw, 0, "YXZ");
-  let disposed = false;
-  let syncying = false;
+  camera.position.copy(player.position)
+  camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
+  let disposed = false
+  let syncying = false
 
-  const world = createWorld({ scene, activeWorld, player });
+  const world = createWorld({ activeWorld, player, scene })
 
-  let lastTimeout: null | number = null;
+  let lastTimeout: null | number = null
 
   const syncPlayer = async () => {
     if (minecraft.getUI().state.isPaused) {
-      lastTimeout = setTimeout(syncPlayer, 1000);
-      return;
+      lastTimeout = setTimeout(syncPlayer, 1000)
+      return
     }
 
     if (disposed || syncying) {
-      console.log("Skipping syncPlayer because disposed or syncying");
-      return;
+      console.log('Skipping syncPlayer because disposed or syncying')
+      return
     }
 
     try {
-      syncying = true;
+      syncying = true
       await requestWorker(
         {
-          type: "syncPlayer",
           payload: {
             playerData: {
               ...player,
+              direction: threeVector3ToRawVector3(player.direction),
               position: threeVector3ToRawVector3(player.position),
               velocity: threeVector3ToRawVector3(player.velocity),
-              direction: threeVector3ToRawVector3(player.direction),
             },
           },
+          type: 'syncPlayer',
         },
-        "playerSynced"
-      );
+        'playerSynced',
+      )
     } finally {
-      syncying = false;
-      lastTimeout = setTimeout(syncPlayer, 1000);
+      syncying = false
+      lastTimeout = setTimeout(syncPlayer, 1000)
     }
-  };
+  }
 
-  lastTimeout = setTimeout(syncPlayer, 1000);
+  lastTimeout = setTimeout(syncPlayer, 1000)
 
   const dispose = () => {
-    sendEventToWorker({ type: "stopActiveWorld", payload: {} });
-    window.removeEventListener("resize", onResize);
-    world.dispose();
-    renderer.dispose();
-    scene.clear();
+    sendEventToWorker({ payload: {}, type: 'stopActiveWorld' })
+    window.removeEventListener('resize', onResize)
+    world.dispose()
+    renderer.dispose()
+    scene.clear()
 
     if (lastTimeout) {
-      clearTimeout(lastTimeout);
+      clearTimeout(lastTimeout)
     }
 
-    disposed = true;
-  };
+    disposed = true
+  }
 
   const game: GameInstance = {
     camera,
-    controls: new FPSControls(
-      camera,
-      renderer.domElement,
-      world,
-      player,
-      minecraft.getUI()
-    ),
-    renderer,
-    scene,
-    paused: false,
-    world,
+    controls: new FPSControls(camera, renderer.domElement, world, player, minecraft.getUI()),
+    dispose,
     frameCounter: {
-      lastFrames: 0,
-      totalFrames: 0,
-      lastTime: 0,
       fps: 0,
+      lastFrames: 0,
+      lastTime: 0,
+      totalFrames: 0,
       totalTime: 0,
     },
-    dispose,
+    paused: false,
     player,
     raycaster: createRaycaster({
       camera,
-      world,
-      scene,
       player,
+      scene,
+      world,
     }),
-  };
+    renderer,
+    scene,
+    world,
+  }
 
-  return game;
-};
+  return game
+}

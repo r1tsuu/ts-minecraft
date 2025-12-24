@@ -1,159 +1,148 @@
-import type { MinecraftInstance, UIInstance } from "../types.ts";
-import {
-  listenToWorkerEvents,
-  sendEventToWorker,
-} from "../worker/workerClient.ts";
-import { synchronize } from "./synchronize.ts";
-import type { UIActions, UICondition, UIState } from "./state.ts";
-import { MathUtils } from "three";
+import { MathUtils } from 'three'
+
+import type { MinecraftInstance, UIInstance } from '../types.ts'
+import type { UIActions, UICondition, UIState } from './state.ts'
+
+import { listenToWorkerEvents, sendEventToWorker } from '../worker/workerClient.ts'
+import { synchronize } from './synchronize.ts'
 
 export const createUI = ({
-  onWorldPlay,
-  onDeleteWorld,
-  onCreateWorld,
   minecraft,
+  onCreateWorld,
+  onDeleteWorld,
   onExitWorld,
+  onWorldPlay,
 }: {
-  minecraft: MinecraftInstance;
+  minecraft: MinecraftInstance
   onCreateWorld: (
     name: string,
-    seed: string
+    seed: string,
   ) => Promise<{
-    id: number;
-    name: string;
-    seed: string;
-    createdAt: Date;
-  }>;
-  onDeleteWorld: (id: number) => Promise<void>;
-  onWorldPlay: (id: number) => Promise<void>;
-  onExitWorld: () => Promise<void>;
+    createdAt: Date
+    id: number
+    name: string
+    seed: string
+  }>
+  onDeleteWorld: (id: number) => Promise<void>
+  onExitWorld: () => Promise<void>
+  onWorldPlay: (id: number) => Promise<void>
 }): UIInstance => {
   const state: UIState = {
+    activePage: 'start',
+    fps: 'Loading...',
     initializedGameUI: false,
-    fps: "Loading...",
-    positionX: "",
-    positionY: "",
-    positionZ: "",
-    rotationYaw: "",
-    rotationPitch: "",
-    pauseText: "Press Escape to Pause",
     isInitialized: false,
-    activePage: "start",
     isPaused: false,
+    loadingWorldName: '',
+    pauseText: 'Press Escape to Pause',
+    positionX: '',
+    positionY: '',
+    positionZ: '',
+    rotationPitch: '',
+    rotationYaw: '',
     worldList: [],
-    loadingWorldName: "",
-  };
+  }
 
-  const setState = (
-    newState: Partial<UIState>,
-    affectedQuerySelectors?: string[] | string
-  ) => {
-    Object.assign(state, newState);
-    synchronize(state, actions, conditions, affectedQuerySelectors);
-  };
+  const setState = (newState: Partial<UIState>, affectedQuerySelectors?: string | string[]) => {
+    Object.assign(state, newState)
+    synchronize(state, actions, conditions, affectedQuerySelectors)
+  }
 
   const getButtonFromEvent = (event: MouseEvent): HTMLButtonElement => {
-    return event.currentTarget as HTMLButtonElement;
-  };
+    return event.currentTarget as HTMLButtonElement
+  }
 
   const getIndexFromEvent = (event: MouseEvent): number => {
-    const button = getButtonFromEvent(event);
-    const indexAttr = button.getAttribute("data-index");
-    const index = indexAttr ? parseInt(indexAttr, 10) : null;
+    const button = getButtonFromEvent(event)
+    const indexAttr = button.getAttribute('data-index')
+    const index = indexAttr ? parseInt(indexAttr, 10) : null
 
     if (index !== null && !isNaN(index)) {
-      return index;
+      return index
     }
 
-    throw new Error("Invalid index attribute");
-  };
+    throw new Error('Invalid index attribute')
+  }
 
-  const worldNameInput = document.querySelector(
-    'input[name="worldName"]'
-  ) as HTMLInputElement;
-  const worldSeedInput = document.querySelector(
-    'input[name="worldSeed"]'
-  ) as HTMLInputElement;
+  const worldNameInput = document.querySelector('input[name="worldName"]') as HTMLInputElement
+  const worldSeedInput = document.querySelector('input[name="worldSeed"]') as HTMLInputElement
 
-  const subscriptions: (() => void)[] = [];
+  const subscriptions: (() => void)[] = []
 
   subscriptions.push(
     listenToWorkerEvents((event) => {
       switch (event.type) {
-        case "workerInitialized": {
-          sendEventToWorker({ type: "requestListWorlds", payload: {} });
-          break;
-        }
-        case "listWorldsResponse": {
+        case 'listWorldsResponse': {
           setState({
+            isInitialized: true,
             worldList: event.payload.worlds.map((world) => ({
+              createdAt: new Date(world.createdAt).toLocaleString(),
               id: world.id,
               name: world.name,
               seed: world.seed,
-              createdAt: new Date(world.createdAt).toLocaleString(),
             })),
-            isInitialized: true,
-          });
-          break;
+          })
+          break
+        }
+        case 'workerInitialized': {
+          sendEventToWorker({ payload: {}, type: 'requestListWorlds' })
+          break
         }
       }
-    })
-  );
+    }),
+  )
 
-  const resumeButton = document.querySelector<HTMLButtonElement>(
-    '[data-action="resumeGame"]'
-  )!;
+  const resumeButton = document.querySelector<HTMLButtonElement>('[data-action="resumeGame"]')!
 
   const onPointerLockChange = () => {
-    if (!minecraft.game) return;
+    if (!minecraft.game) return
 
-    const isLocked =
-      document.pointerLockElement === minecraft.game.renderer.domElement;
+    const isLocked = document.pointerLockElement === minecraft.game.renderer.domElement
 
     if (!isLocked && !state.isPaused && minecraft.game) {
-      resumeButton.disabled = true;
+      resumeButton.disabled = true
       setTimeout(() => {
-        resumeButton.disabled = false;
-      }, 1000); // prevent immediate re-clicking
+        resumeButton.disabled = false
+      }, 1000) // prevent immediate re-clicking
 
-      minecraft.game.player.isMovingBackward = false;
-      minecraft.game.player.isMovingForward = false;
-      minecraft.game.player.isMovingLeft = false;
-      minecraft.game.player.isMovingRight = false;
+      minecraft.game.player.isMovingBackward = false
+      minecraft.game.player.isMovingForward = false
+      minecraft.game.player.isMovingLeft = false
+      minecraft.game.player.isMovingRight = false
 
       setState({
         isPaused: true,
-        pauseText: "Click to Resume",
-      });
-      return;
+        pauseText: 'Click to Resume',
+      })
+      return
     }
-  };
+  }
 
   const resumeGame = async () => {
-    if (!minecraft.game) return;
-    if (!state.isPaused) return;
+    if (!minecraft.game) return
+    if (!state.isPaused) return
 
     try {
-      await minecraft.game.renderer.domElement.requestPointerLock();
+      await minecraft.game.renderer.domElement.requestPointerLock()
       setState({
         isPaused: false,
-        pauseText: "Press Escape to Pause",
-      });
+        pauseText: 'Press Escape to Pause',
+      })
     } catch (e) {
-      console.warn("Pointer lock request failed", e);
+      console.warn('Pointer lock request failed', e)
     }
-  };
+  }
 
-  document.addEventListener("pointerlockchange", onPointerLockChange);
+  document.addEventListener('pointerlockchange', onPointerLockChange)
 
   subscriptions.push(() => {
-    document.removeEventListener("pointerlockchange", onPointerLockChange);
-  });
+    document.removeEventListener('pointerlockchange', onPointerLockChange)
+  })
 
   const gameInterval = setInterval(() => {
     if (minecraft.game && !state.isPaused) {
       if (!state.initializedGameUI) {
-        setState({ initializedGameUI: true }); // Trigger UI to show game elements
+        setState({ initializedGameUI: true }) // Trigger UI to show game elements
       }
 
       setState(
@@ -162,124 +151,119 @@ export const createUI = ({
           positionX: minecraft.game.player.position.x.toFixed(),
           positionY: minecraft.game.player.position.y.toFixed(),
           positionZ: minecraft.game.player.position.z.toFixed(),
+          rotationPitch: MathUtils.radToDeg(minecraft.game.player.pitch).toFixed(),
           rotationYaw: MathUtils.radToDeg(minecraft.game.player.yaw).toFixed(),
-          rotationPitch: MathUtils.radToDeg(
-            minecraft.game.player.pitch
-          ).toFixed(),
         },
-        ["#fps", "#position", "#rotation"]
-      );
+        ['#fps', '#position', '#rotation'],
+      )
 
-      let performance: "bad" | "average" | "good";
+      let performance: 'average' | 'bad' | 'good'
 
       if (minecraft.game.frameCounter.fps < 30) {
-        performance = "bad";
+        performance = 'bad'
       } else if (minecraft.game.frameCounter.fps < 60) {
-        performance = "average";
+        performance = 'average'
       } else {
-        performance = "good";
+        performance = 'good'
       }
 
-      document
-        .getElementById("fps_value")!
-        .setAttribute("data-performance", performance);
+      document.getElementById('fps_value')!.setAttribute('data-performance', performance)
     }
-  }, 300);
+  }, 300)
 
   const actions: UIActions = {
-    startGame: () => {
-      worldNameInput.value = "New World";
-      worldSeedInput.value = crypto.randomUUID().slice(0, 8);
-      setState({ activePage: "menuWorlds" });
+    backToMenu: async () => {
+      console.log('Exiting world...')
+      await onExitWorld()
+      setState({
+        activePage: 'start',
+        fps: 'Loading...',
+        initializedGameUI: false,
+        isPaused: false,
+        positionX: '',
+        positionY: '',
+        positionZ: '',
+        rotationPitch: '',
+        rotationYaw: '',
+      })
     },
-    playWorld: async ({ event }) => {
-      const index = getIndexFromEvent(event);
-      const world = state.worldList[index];
-      setState({
-        activePage: "worldLoading",
-        loadingWorldName: world.name,
-      });
-      await onWorldPlay(world.id);
-      setState({
-        activePage: "game",
-        loadingWorldName: " ",
-      });
-    },
-    deleteWorld: async ({ event }) => {
-      const index = getIndexFromEvent(event);
-      const world = state.worldList[index];
-      onDeleteWorld(world.id);
-      setState({
-        worldList: state.worldList.filter((w) => w.id !== world.id),
-      });
+    backToStart: () => {
+      setState({ activePage: 'start' })
     },
     createWorld: async ({ event }) => {
-      const button = getButtonFromEvent(event);
+      const button = getButtonFromEvent(event)
 
-      const name = worldNameInput.value.trim() || "New World";
-      const seed = worldSeedInput.value.trim() || crypto.randomUUID();
-      button.disabled = true;
-      const world = await onCreateWorld(name, seed);
+      const name = worldNameInput.value.trim() || 'New World'
+      const seed = worldSeedInput.value.trim() || crypto.randomUUID()
+      button.disabled = true
+      const world = await onCreateWorld(name, seed)
       setState({
         worldList: [
           ...state.worldList,
           {
+            createdAt: new Date(world.createdAt).toLocaleString(),
             id: world.id,
             name: world.name,
             seed: world.seed,
-            createdAt: new Date(world.createdAt).toLocaleString(),
           },
         ],
-      });
-      button.disabled = false;
-      worldNameInput.value = "New World";
-      worldSeedInput.value = crypto.randomUUID().slice(0, 8);
+      })
+      button.disabled = false
+      worldNameInput.value = 'New World'
+      worldSeedInput.value = crypto.randomUUID().slice(0, 8)
     },
-    backToStart: () => {
-      setState({ activePage: "start" });
-    },
-    backToMenu: async () => {
-      console.log("Exiting world...");
-      await onExitWorld();
+    deleteWorld: async ({ event }) => {
+      const index = getIndexFromEvent(event)
+      const world = state.worldList[index]
+      onDeleteWorld(world.id)
       setState({
-        activePage: "start",
-        rotationPitch: "",
-        rotationYaw: "",
-        positionX: "",
-        positionY: "",
-        positionZ: "",
-        fps: "Loading...",
-        isPaused: false,
-        initializedGameUI: false,
-      });
+        worldList: state.worldList.filter((w) => w.id !== world.id),
+      })
+    },
+    playWorld: async ({ event }) => {
+      const index = getIndexFromEvent(event)
+      const world = state.worldList[index]
+      setState({
+        activePage: 'worldLoading',
+        loadingWorldName: world.name,
+      })
+      await onWorldPlay(world.id)
+      setState({
+        activePage: 'game',
+        loadingWorldName: ' ',
+      })
     },
     resumeGame: async () => {
-      await resumeGame();
+      await resumeGame()
     },
-  };
+    startGame: () => {
+      worldNameInput.value = 'New World'
+      worldSeedInput.value = crypto.randomUUID().slice(0, 8)
+      setState({ activePage: 'menuWorlds' })
+    },
+  }
 
   const conditions: UICondition = {
-    showOverlay: () =>
-      ["start", "menuWorlds", "worldLoading"].includes(state.activePage),
-    showWorldsNotFound: () => state.worldList.length === 0,
-    showLoadingButton: () => state.isInitialized === false,
-    showStartGameButton: () => state.isInitialized === true,
-    showGameUI: () => minecraft.game !== null,
-    showPauseMenu: () => state.isPaused,
     showCrosshair: () => minecraft.game !== null && !state.isPaused,
-  };
+    showGameUI: () => minecraft.game !== null,
+    showLoadingButton: () => state.isInitialized === false,
+    showOverlay: () => ['menuWorlds', 'start', 'worldLoading'].includes(state.activePage),
+    showPauseMenu: () => state.isPaused,
+    showStartGameButton: () => state.isInitialized === true,
+    showWorldsNotFound: () => state.worldList.length === 0,
+  }
 
-  synchronize(state, actions, conditions);
+  synchronize(state, actions, conditions)
 
   return {
-    setState,
-    state,
     destroy: () => {
       for (const unsubscribe of subscriptions) {
-        unsubscribe();
+        unsubscribe()
       }
 
-      clearInterval(gameInterval);
+      clearInterval(gameInterval)
     },
-  };
-};
+    setState,
+    state,
+  }
+}

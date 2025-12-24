@@ -2,14 +2,10 @@
 // It uses jsxte to convert the JSX code into HTML string.
 // This does not run in the browser.
 
-import { renderToHtml } from "jsxte";
-import { tv } from "tailwind-variants";
-import {
-  uiActionKey,
-  uiActivePageKey,
-  uiConditionKey,
-  uiStateKey,
-} from "../state.ts";
+import { renderToHtml } from 'jsxte'
+import { tv } from 'tailwind-variants'
+
+import { uiActionKey, uiActivePageKey, uiConditionKey, uiStateKey } from '../state.ts'
 
 // Reusable component variants using tailwind-variants
 const button = tv({
@@ -30,8 +26,26 @@ const button = tv({
     active:translate-y-0.5
     select-none
   `,
+  defaultVariants: {
+    size: 'lg',
+    variant: 'primary',
+  },
   variants: {
+    size: {
+      lg: 'px-8 py-3 text-xl',
+      md: 'px-6 py-2.5 text-lg',
+    },
     variant: {
+      danger: `
+        bg-danger
+        border-danger-dark
+        border-b-danger-darker
+        border-r-danger-darker
+        shadow-[0_3px_0_var(--color-danger-darker)]
+        hover:bg-danger-light
+        hover:border-danger-medium
+        active:shadow-[0_2px_0_var(--color-danger-darker)]
+      `,
       primary: `
         bg-primary
         border-primary-dark
@@ -66,27 +80,9 @@ const button = tv({
         hover:border-success-medium
         active:shadow-[0_2px_0_var(--color-success-darker)]
       `,
-      danger: `
-        bg-danger
-        border-danger-dark
-        border-b-danger-darker
-        border-r-danger-darker
-        shadow-[0_3px_0_var(--color-danger-darker)]
-        hover:bg-danger-light
-        hover:border-danger-medium
-        active:shadow-[0_2px_0_var(--color-danger-darker)]
-      `,
-    },
-    size: {
-      md: "px-6 py-2.5 text-lg",
-      lg: "px-8 py-3 text-xl",
     },
   },
-  defaultVariants: {
-    variant: "primary",
-    size: "lg",
-  },
-});
+})
 
 const input = tv({
   base: `
@@ -98,6 +94,9 @@ const input = tv({
     min-w-50
     text-shadow-[1px_1px_1px_rgba(0,0,0,0.5)]
   `,
+  defaultVariants: {
+    variant: 'default',
+  },
   variants: {
     variant: {
       default: `
@@ -111,10 +110,7 @@ const input = tv({
       `,
     },
   },
-  defaultVariants: {
-    variant: "default",
-  },
-});
+})
 
 const card = tv({
   base: `
@@ -122,7 +118,16 @@ const card = tv({
     border-2
     transition-all duration-100
   `,
+  defaultVariants: {
+    padding: 'md',
+    variant: 'default',
+  },
   variants: {
+    padding: {
+      lg: 'p-8',
+      md: 'p-5',
+      sm: 'p-3',
+    },
     variant: {
       default: `
         border-primary
@@ -134,17 +139,8 @@ const card = tv({
         shadow-[0_2px_4px_rgba(0,0,0,0.8)]
       `,
     },
-    padding: {
-      sm: "p-3",
-      md: "p-5",
-      lg: "p-8",
-    },
   },
-  defaultVariants: {
-    variant: "default",
-    padding: "md",
-  },
-});
+})
 
 const title = tv({
   base: `
@@ -153,16 +149,16 @@ const title = tv({
     text-shadow-[3px_3px_0_#000,0_0_10px_var(--color-accent-glow)]
     text-accent
   `,
+  defaultVariants: {
+    size: 'lg',
+  },
   variants: {
     size: {
-      lg: "text-5xl mb-6",
-      xl: "text-6xl mb-8",
+      lg: 'text-5xl mb-6',
+      xl: 'text-6xl mb-8',
     },
   },
-  defaultVariants: {
-    size: "lg",
-  },
-});
+})
 
 const gameUIElement = tv({
   base: `
@@ -174,18 +170,17 @@ const gameUIElement = tv({
     text-shadow-[1px_1px_2px_rgba(0,0,0,0.9)]
     backdrop-blur-sm
   `,
-});
+})
 
 const Main = () => {
   return (
     <div class="font-press-start main overflow-hidden w-screen h-screen relative bg-background">
       <canvas
-        id="game_canvas"
         class="fixed top-0 left-0 w-full h-full"
-        data-condition={uiConditionKey("showGameUI")}
+        data-condition={uiConditionKey('showGameUI')}
+        id="game_canvas"
       />
       <div
-        data-condition={uiConditionKey("showOverlay")}
         class="
         fixed top-0 left-0 w-screen h-screen
         flex flex-col justify-center items-center
@@ -196,54 +191,43 @@ const Main = () => {
         z-10
         backdrop-brightness-75
       "
+        data-condition={uiConditionKey('showOverlay')}
       >
         <div
-          data-active-page={uiActivePageKey("start")}
-          id="menu_start"
           class="flex flex-col justify-center items-stretch gap-5"
+          data-active-page={uiActivePageKey('start')}
+          id="menu_start"
         >
-          <h1 class={title({ size: "xl" })}>Minecraft Clone</h1>
+          <h1 class={title({ size: 'xl' })}>Minecraft Clone</h1>
           <button
-            data-condition={uiConditionKey("showLoadingButton")}
-            class={button({ variant: "primary" })}
+            class={button({ variant: 'primary' })}
+            data-condition={uiConditionKey('showLoadingButton')}
             disabled
           >
             Loading...
           </button>
           <button
-            data-action={uiActionKey("startGame")}
-            data-condition={uiConditionKey("showStartGameButton")}
-            class={button({ variant: "success" })}
+            class={button({ variant: 'success' })}
+            data-action={uiActionKey('startGame')}
+            data-condition={uiConditionKey('showStartGameButton')}
           >
             Start Game
           </button>
-          <a
-            class={button({ variant: "secondary" })}
-            href="https://github.com/r1tsuu/ts-minecraft"
-          >
+          <a class={button({ variant: 'secondary' })} href="https://github.com/r1tsuu/ts-minecraft">
             GitHub Repo
           </a>
         </div>
-        <div
-          data-active-page={uiActivePageKey("menuWorlds")}
-          class="flex flex-col gap-6 max-w-4xl"
-        >
+        <div class="flex flex-col gap-6 max-w-4xl" data-active-page={uiActivePageKey('menuWorlds')}>
           <h1 class={title()}>Select World</h1>
           <div
-            id="worlds_list"
-            data-items-variable={uiStateKey("worldList")}
-            data-items-template="world_item_template"
             class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto"
+            data-items-template="world_item_template"
+            data-items-variable={uiStateKey('worldList')}
+            id="worlds_list"
           ></div>
           <template id="world_item_template">
-            <div
-              class={
-                card({ variant: "default", padding: "sm" }) +
-                " flex flex-col gap-3"
-              }
-            >
+            <div class={card({ padding: 'sm', variant: 'default' }) + ' flex flex-col gap-3'}>
               <div
-                data-variable={uiStateKey("worldList.i.name")}
                 class="
                   text-xl
                   font-bold
@@ -251,114 +235,85 @@ const Main = () => {
                   text-shadow-[2px_2px_0_#000]
                   truncate
                 "
+                data-variable={uiStateKey('worldList.i.name')}
               />
               <div
-                data-variable={uiStateKey("worldList.i.seed")}
                 class="text-xs text-accent-muted"
+                data-variable={uiStateKey('worldList.i.seed')}
               />
               <div
-                data-variable={uiStateKey("worldList.i.createdAt")}
                 class="text-xs text-accent-muted"
+                data-variable={uiStateKey('worldList.i.createdAt')}
               />
               <button
-                data-action={uiActionKey("playWorld")}
-                class={button({ variant: "success", size: "md" })}
+                class={button({ size: 'md', variant: 'success' })}
+                data-action={uiActionKey('playWorld')}
               >
                 Play
               </button>
               <button
-                data-action={uiActionKey("deleteWorld")}
-                class={button({ variant: "danger", size: "md" })}
+                class={button({ size: 'md', variant: 'danger' })}
+                data-action={uiActionKey('deleteWorld')}
               >
                 Delete
               </button>
             </div>
           </template>
           <div
-            data-condition={uiConditionKey("showWorldsNotFound")}
             class="text-center text-lg text-accent text-shadow-[1px_1px_2px_rgba(0,0,0,0.8)]"
+            data-condition={uiConditionKey('showWorldsNotFound')}
           >
             <div>No worlds found.</div>
             <div>Create a new world to get started.</div>
           </div>
-          <div class={card({ padding: "md" }) + " flex flex-col gap-4"}>
-            <input name="worldName" class={input()} placeholder="Name" />
-            <input name="worldSeed" class={input()} placeholder="Seed" />
-            <button
-              data-action="createWorld"
-              class={button({ variant: "success" })}
-            >
+          <div class={card({ padding: 'md' }) + ' flex flex-col gap-4'}>
+            <input class={input()} name="worldName" placeholder="Name" />
+            <input class={input()} name="worldSeed" placeholder="Seed" />
+            <button class={button({ variant: 'success' })} data-action="createWorld">
               Create New World
             </button>
-            <button
-              data-action="backToStart"
-              class={button({ variant: "secondary" })}
-            >
+            <button class={button({ variant: 'secondary' })} data-action="backToStart">
               Back to Start Menu
             </button>
           </div>
         </div>
-        <div data-active-page={uiActivePageKey("worldLoading")}>
+        <div data-active-page={uiActivePageKey('worldLoading')}>
           <h1 class={title()}>
-            Loading World:{" "}
-            <span
-              data-variable={uiStateKey("loadingWorldName")}
-              class="text-success"
-            />
+            Loading World:{' '}
+            <span class="text-success" data-variable={uiStateKey('loadingWorldName')} />
           </h1>
         </div>
       </div>
       <div
         class="absolute top-2.5 left-2.5 w-full h-full flex flex-col gap-1.25 z-10 max-w-fit"
-        data-condition={uiConditionKey("showGameUI")}
+        data-condition={uiConditionKey('showGameUI')}
       >
-        <div id="fps" class={gameUIElement()}>
-          FPS:{" "}
+        <div class={gameUIElement()} id="fps">
+          FPS:{' '}
           <span
-            data-variable={uiStateKey("fps")}
-            id="fps_value"
             class="data-[performance=good]:text-success data-[performance=average]:text-warning data-[performance=bad]:text-danger"
+            data-variable={uiStateKey('fps')}
+            id="fps_value"
           />
         </div>
-        <div id="position" class={gameUIElement()}>
-          Position: X:{" "}
-          <span
-            data-variable={uiStateKey("positionX")}
-            class="text-secondary"
-          />{" "}
-          Y:{" "}
-          <span
-            data-variable={uiStateKey("positionY")}
-            class="text-secondary"
-          />{" "}
-          Z:{" "}
-          <span
-            data-variable={uiStateKey("positionZ")}
-            class="text-secondary"
-          />
+        <div class={gameUIElement()} id="position">
+          Position: X: <span class="text-secondary" data-variable={uiStateKey('positionX')} /> Y:{' '}
+          <span class="text-secondary" data-variable={uiStateKey('positionY')} /> Z:{' '}
+          <span class="text-secondary" data-variable={uiStateKey('positionZ')} />
         </div>
-        <div id="rotation" class={gameUIElement()}>
-          Rotation: Yaw:{" "}
-          <span
-            data-variable={uiStateKey("rotationYaw")}
-            class="text-secondary"
-          />
-          ° Pitch:{" "}
-          <span
-            data-variable={uiStateKey("rotationPitch")}
-            class="text-secondary"
-          />
-          °
+        <div class={gameUIElement()} id="rotation">
+          Rotation: Yaw: <span class="text-secondary" data-variable={uiStateKey('rotationYaw')} />°
+          Pitch: <span class="text-secondary" data-variable={uiStateKey('rotationPitch')} />°
         </div>
-        <div class={gameUIElement()} data-variable={uiStateKey("pauseText")} />
+        <div class={gameUIElement()} data-variable={uiStateKey('pauseText')} />
 
         <div
-          data-condition={uiConditionKey("showPauseMenu")}
           class="h-full w-full fixed cursor-default top-0 left-0 bg-pause-overlay backdrop-blur-md z-20"
+          data-condition={uiConditionKey('showPauseMenu')}
         >
           <div
             class={
-              card({ variant: "default", padding: "lg" }) +
+              card({ padding: 'lg', variant: 'default' }) +
               ` fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2
               flex flex-col justify-center items-stretch
               gap-6 z-30
@@ -367,26 +322,20 @@ const Main = () => {
               min-w-100`
             }
           >
-            <h1 class={title({ size: "xl" })}>Game Paused</h1>
+            <h1 class={title({ size: 'xl' })}>Game Paused</h1>
             <div class="border-t-2 border-primary-dark/50 my-2"></div>
-            <button
-              data-action={uiActionKey("resumeGame")}
-              class={button({ variant: "success" })}
-            >
+            <button class={button({ variant: 'success' })} data-action={uiActionKey('resumeGame')}>
               Resume Game
             </button>
-            <button
-              data-action={uiActionKey("backToMenu")}
-              class={button({ variant: "danger" })}
-            >
+            <button class={button({ variant: 'danger' })} data-action={uiActionKey('backToMenu')}>
               Exit to Main Menu
             </button>
           </div>
         </div>
       </div>
       <div
-        data-condition={uiConditionKey("showCrosshair")}
         class="fixed top-1/2 left-1/2 w-5 h-5 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10"
+        data-condition={uiConditionKey('showCrosshair')}
       >
         {/** <!-- Vertical line --> */}
         <div class="absolute w-0.5 h-full left-1/2 -translate-x-1/2 bg-crosshair shadow-[0_0_4px_rgba(0,0,0,0.8)]"></div>
@@ -394,9 +343,9 @@ const Main = () => {
         <div class="absolute h-0.5 w-full top-1/2 -translate-y-1/2 bg-crosshair shadow-[0_0_4px_rgba(0,0,0,0.8)]"></div>
       </div>
     </div>
-  );
-};
+  )
+}
 
 export const renderTemplate = () => {
-  return renderToHtml(<Main />);
-};
+  return renderToHtml(<Main />)
+}

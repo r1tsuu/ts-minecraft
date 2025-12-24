@@ -1,26 +1,25 @@
-import tailwindcss from "@tailwindcss/vite";
-import { defineConfig, loadEnv } from "vite";
-import { normalizePath } from "vite";
-import path from "path";
+import tailwindcss from '@tailwindcss/vite'
+import { defineConfig, loadEnv } from 'vite'
+
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "");
+  const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    base: env.GH_PAGES === "true" ? "/ts-minecraft" : "/",
-    worker: { format: "es" },
+    base: env.GH_PAGES === 'true' ? '/ts-minecraft' : '/',
+    optimizeDeps: {
+      exclude: ['@electric-sql/pglite'],
+    },
     plugins: [
       {
-        name: "buildIndexHtml",
-        enforce: "pre",
+        enforce: 'pre',
+        name: 'buildIndexHtml',
         async transformIndexHtml(html) {
-          const { renderTemplate } = await import("./src/ui/template/main.js");
-          return html.replace("<!--main-->", renderTemplate());
+          const { renderTemplate } = await import('./src/ui/template/main.js')
+          return html.replace('<!--main-->', renderTemplate())
         },
       },
       tailwindcss(),
     ],
-    optimizeDeps: {
-      exclude: ["@electric-sql/pglite"],
-    },
-  };
-});
+    worker: { format: 'es' },
+  }
+})

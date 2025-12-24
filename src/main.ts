@@ -1,129 +1,127 @@
-import * as THREE from "three";
-import { createGameInstance } from "./createGameInstance.ts";
-import { requestWorker } from "./worker/workerClient.ts";
-import { createUI } from "./ui/createUI.ts";
-import type { MinecraftInstance } from "./types.ts";
-import { initBlocks } from "./client.ts";
+import * as THREE from 'three'
 
-initBlocks();
+import type { MinecraftInstance } from './types.ts'
+
+import { initBlocks } from './client.ts'
+import { createGameInstance } from './createGameInstance.ts'
+import { createUI } from './ui/createUI.ts'
+import { requestWorker } from './worker/workerClient.ts'
+
+initBlocks()
 
 const minecraft: MinecraftInstance = {
   game: null,
-  ui: null,
   getGame: () => {
     if (!minecraft.game) {
-      throw new Error("Game instance is not initialized");
+      throw new Error('Game instance is not initialized')
     }
 
-    return minecraft.game;
+    return minecraft.game
   },
   getUI: () => {
     if (!minecraft.ui) {
-      throw new Error("UI instance is not initialized");
+      throw new Error('UI instance is not initialized')
     }
 
-    return minecraft.ui;
+    return minecraft.ui
   },
-};
+  ui: null,
+}
 
 const ui = createUI({
+  minecraft,
   onCreateWorld: async (name: string, seed: string) => {
     const response = await requestWorker(
       {
-        type: "createWorld",
         payload: {
           name,
           seed,
         },
+        type: 'createWorld',
       },
-      "worldCreated"
-    );
+      'worldCreated',
+    )
 
-    return response.payload;
+    return response.payload
   },
   onDeleteWorld: async (worldID: number) => {
     await requestWorker(
       {
-        type: "deleteWorld",
         payload: {
           worldID,
         },
+        type: 'deleteWorld',
       },
-      "worldDeleted"
-    );
+      'worldDeleted',
+    )
+  },
+  onExitWorld: async () => {
+    if (minecraft.game) {
+      minecraft.game.dispose()
+      minecraft.game = null
+    }
   },
   onWorldPlay: async (worldID: number) => {
     const { payload: activeWorld } = await requestWorker(
       {
-        type: "initializeWorld",
         payload: {
           worldID,
         },
+        type: 'initializeWorld',
       },
-      "worldInitialized"
-    );
+      'worldInitialized',
+    )
 
     minecraft.game = await createGameInstance({
       activeWorld,
       minecraft,
-    });
+    })
 
-    const clock = new THREE.Clock();
-    let requestingPointerLock = false;
-    let clockStopped = false;
+    const clock = new THREE.Clock()
+    let requestingPointerLock = false
+    let clockStopped = false
 
     const loop = async () => {
-      if (!minecraft.game) return;
+      if (!minecraft.game) return
 
       if (minecraft.getUI().state.isPaused) {
-        clock.stop();
-        clockStopped = true;
-        requestAnimationFrame(loop);
-        return;
+        clock.stop()
+        clockStopped = true
+        requestAnimationFrame(loop)
+        return
       } else if (clockStopped) {
-        clock.start();
-        clockStopped = false;
+        clock.start()
+        clockStopped = false
       }
 
-      const delta = clock.getDelta();
-      minecraft.game.frameCounter.lastTime += delta;
-      minecraft.game.frameCounter.totalTime += delta;
-      minecraft.game.frameCounter.lastFrames++;
-      minecraft.game.frameCounter.totalFrames++;
+      const delta = clock.getDelta()
+      minecraft.game.frameCounter.lastTime += delta
+      minecraft.game.frameCounter.totalTime += delta
+      minecraft.game.frameCounter.lastFrames++
+      minecraft.game.frameCounter.totalFrames++
 
       if (minecraft.game.frameCounter.lastTime >= 1) {
-        minecraft.game.frameCounter.fps =
-          minecraft.game.frameCounter.lastFrames;
-        minecraft.game.frameCounter.lastFrames = 0;
-        minecraft.game.frameCounter.lastTime = 0;
+        minecraft.game.frameCounter.fps = minecraft.game.frameCounter.lastFrames
+        minecraft.game.frameCounter.lastFrames = 0
+        minecraft.game.frameCounter.lastTime = 0
       }
 
-      minecraft.game.renderer.render(
-        minecraft.game.scene,
-        minecraft.game.camera
-      );
+      minecraft.game.renderer.render(minecraft.game.scene, minecraft.game.camera)
 
       if (!document.pointerLockElement && !requestingPointerLock) {
-        requestingPointerLock = true;
-        await minecraft.game.renderer.domElement.requestPointerLock();
+        requestingPointerLock = true
+        await minecraft.game.renderer.domElement.requestPointerLock()
       }
 
-      minecraft.game.controls.update(delta);
-      minecraft.game.world.update();
-      minecraft.game.raycaster.update();
+      minecraft.game.controls.update(delta)
+      minecraft.game.world.update()
+      minecraft.game.raycaster.update()
 
-      requestAnimationFrame(loop);
-    };
-
-    loop();
-  },
-  minecraft,
-  onExitWorld: async () => {
-    if (minecraft.game) {
-      minecraft.game.dispose();
-      minecraft.game = null;
+      requestAnimationFrame(loop)
     }
-  },
-});
 
-minecraft.ui = ui;
+    loop()
+  },
+})
+
+minecraft.ui = ui

@@ -1,8 +1,8 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @layer theme, base, components, utilities;
-@import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/preflight.css" layer(base);
-@import "tailwindcss/utilities.css" layer(utilities);
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/preflight.css' layer(base);
+@import 'tailwindcss/utilities.css' layer(utilities);
 
 @theme {
   /* Text & Background */
@@ -65,7 +65,7 @@
   --color-crosshair: rgba(255, 255, 255, 0.9);
 
   /* Font (not a color, but kept here for completeness) */
-  --font-press-start: "Press Start 2P", "Courier New", monospace;
+  --font-press-start: 'Press Start 2P', 'Courier New', monospace;
 }
 
 :root {
@@ -82,22 +82,14 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(
-    180deg,
-    var(--scrollbar-thumb-start),
-    var(--scrollbar-thumb-end)
-  );
+  background: linear-gradient(180deg, var(--scrollbar-thumb-start), var(--scrollbar-thumb-end));
   border-radius: 10px;
   border: 1px solid transparent;
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(
-    180deg,
-    var(--scrollbar-thumb-end),
-    var(--scrollbar-thumb-start)
-  );
+  background: linear-gradient(180deg, var(--scrollbar-thumb-end), var(--scrollbar-thumb-start));
 }
 
 ::-webkit-scrollbar-track {
@@ -124,18 +116,18 @@ body {
   display: none;
 }
 
-.main [data-condition-passed="true"].flex {
+.main [data-condition-passed='true'].flex {
   display: flex;
 }
 
-.main [data-condition-passed="true"] {
+.main [data-condition-passed='true'] {
   display: block;
 }
 
-.main [data-condition-passed="true"].block {
+.main [data-condition-passed='true'].block {
   display: block;
 }
 
-.main [data-condition-passed="true"].inline {
+.main [data-condition-passed='true'].inline {
   display: inline;
 }
