@@ -5,9 +5,8 @@ import {
 } from "../worker/workerClient.ts";
 import { synchronize } from "./synchronize.ts";
 import type { UIActions, UICondition, UIState } from "./state.ts";
-import { min } from "three/tsl";
 
-export const createUI = ({
+export const createUIInstance = ({
   onWorldPlay,
   onDeleteWorld,
   onCreateWorld,

@@ -6,7 +6,7 @@ import {
   listenToWorkerEvents,
   requestWorker,
   sendEventToWorker,
-} from "./worker/workerClient.js";
+} from "./worker/workerClient.ts";
 import { syncServerChunksOnClient } from "./util.ts";
 import type { ActiveWorld } from "./worker/types.ts";
 import {
@@ -34,7 +34,7 @@ export const createGameInstance = async ({
     renderer.setSize(window.innerWidth, window.innerHeight);
   };
   window.addEventListener("resize", onResize);
-  renderer.domElement.style.outline = "none"; // remove default outline
+
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
