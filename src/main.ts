@@ -87,11 +87,14 @@ const ui = createUI({
 
       const delta = clock.getDelta();
       minecraft.game.frameCounter.lastTime += delta;
-      minecraft.game.frameCounter.frames++;
+      minecraft.game.frameCounter.totalTime += delta;
+      minecraft.game.frameCounter.lastFrames++;
+      minecraft.game.frameCounter.totalFrames++;
 
       if (minecraft.game.frameCounter.lastTime >= 1) {
-        minecraft.game.frameCounter.fps = minecraft.game.frameCounter.frames;
-        minecraft.game.frameCounter.frames = 0;
+        minecraft.game.frameCounter.fps =
+          minecraft.game.frameCounter.lastFrames;
+        minecraft.game.frameCounter.lastFrames = 0;
         minecraft.game.frameCounter.lastTime = 0;
       }
 

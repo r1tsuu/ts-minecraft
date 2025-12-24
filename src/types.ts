@@ -77,8 +77,10 @@ export type GameInstance = {
   controls: FPSControls;
   player: PlayerData;
   frameCounter: {
-    frames: number;
+    lastFrames: number;
+    totalFrames: number;
     lastTime: number;
+    totalTime: number;
     fps: number;
   };
   raycaster: {

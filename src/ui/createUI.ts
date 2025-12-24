@@ -158,7 +158,7 @@ export const createUI = ({
 
       setState(
         {
-          fps: minecraft.game.frameCounter.fps.toFixed(2),
+          fps: minecraft.game.frameCounter.fps.toFixed(0),
           positionX: minecraft.game.player.position.x.toFixed(),
           positionY: minecraft.game.player.position.y.toFixed(),
           positionZ: minecraft.game.player.position.z.toFixed(),

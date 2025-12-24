@@ -123,9 +123,11 @@ export const createGameInstance = async ({
     paused: false,
     world,
     frameCounter: {
-      frames: 0,
+      lastFrames: 0,
+      totalFrames: 0,
       lastTime: 0,
       fps: 0,
+      totalTime: 0,
     },
     dispose,
     player,
