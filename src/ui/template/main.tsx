@@ -312,14 +312,19 @@ const Main = () => {
         class="absolute top-2.5 left-2.5 w-full h-full flex flex-col gap-1.25 z-10 max-w-fit"
         data-condition={uiConditionKey("showGameUI")}
       >
-        <div class={gameUIElement()}>
-          FPS: <span data-variable={uiStateKey("fps")} class="text-success" />
+        <div id="fps" class={gameUIElement()}>
+          FPS:{" "}
+          <span
+            data-variable={uiStateKey("fps")}
+            id="fps_value"
+            class="data-[performance=good]:text-success data-[performance=average]:text-warning data-[performance=bad]:text-danger"
+          />
         </div>
-        <div class={gameUIElement()}>
+        <div id="position" class={gameUIElement()}>
           Position:{" "}
           <span data-variable={uiStateKey("position")} class="text-secondary" />
         </div>
-        <div class={gameUIElement()}>
+        <div id="rotation" class={gameUIElement()}>
           Rotation:{" "}
           <span data-variable={uiStateKey("rotation")} class="text-secondary" />
         </div>

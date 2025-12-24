@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { PlayerData, World } from "./types.js";
+import type { PlayerData, UIInstance, World } from "./types.js";
 import { GRAVITY_ACCELERATION } from "./util.ts";
 
 export class FPSControls {
@@ -7,6 +7,7 @@ export class FPSControls {
   domElement: HTMLElement;
 
   world: World;
+  ui: UIInstance;
   player: PlayerData;
 
   // Reusable Box3 instances
@@ -19,12 +20,14 @@ export class FPSControls {
     camera: THREE.PerspectiveCamera,
     domElement: HTMLElement,
     world: World,
-    player: PlayerData
+    player: PlayerData,
+    ui: UIInstance
   ) {
     this.camera = camera;
     this.domElement = domElement;
     this.world = world;
     this.player = player;
+    this.ui = ui;
 
     this.initPointerLock();
     this.initKeyboard();
@@ -49,6 +52,7 @@ export class FPSControls {
 
   initMouse() {
     const onMouseMove = (e: MouseEvent) => {
+      if (this.ui.state.isPaused) return;
       // if (document.pointerLockElement !== this.domElement) return;
 
       const sensitivity = 0.002;
@@ -70,6 +74,7 @@ export class FPSControls {
 
   initKeyboard() {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (this.ui.state.isPaused) return;
       switch (e.code) {
         case "KeyW":
           this.player.isMovingForward = true;
@@ -97,6 +102,7 @@ export class FPSControls {
     });
 
     const onKeyUp = (e: KeyboardEvent) => {
+      if (this.ui.state.isPaused) return;
       switch (e.code) {
         case "KeyW":
           this.player.isMovingForward = false;

@@ -38,6 +38,12 @@
   --color-danger-dark: #8b2500;
   --color-danger-darker: #5c1800;
 
+  --color-warning: #d9a22a;
+  --color-warning-light: #e6b934;
+  --color-warning-medium: #b38620;
+  --color-warning-dark: #8b6618;
+  --color-warning-darker: #5c4510;
+
   /* Accent - Tan/Sand */
   --color-accent: #d4a574;
   --color-accent-muted: #8b7355;

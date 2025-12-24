@@ -5,6 +5,7 @@ import {
 } from "../worker/workerClient.ts";
 import { synchronize } from "./synchronize.ts";
 import type { UIActions, UICondition, UIState } from "./state.ts";
+import { MathUtils } from "three";
 
 export const createUIInstance = ({
   onWorldPlay,
@@ -152,17 +153,33 @@ export const createUIInstance = ({
         {
           fps: minecraft.game.frameCounter.fps.toFixed(2),
           position: `X: ${minecraft.game.player.position.x.toFixed(
-            2
+            0
           )}, Y: ${minecraft.game.player.position.y.toFixed(
-            2
-          )}, Z: ${minecraft.game.player.position.z.toFixed(2)}`,
-          rotation: `Yaw: ${minecraft.game.player.yaw.toFixed(
-            2
-          )}, Pitch: ${minecraft.game.player.pitch.toFixed(2)}`,
+            0
+          )}, Z: ${minecraft.game.player.position.z.toFixed(0)}`,
+          rotation: `Yaw: ${MathUtils.radToDeg(
+            minecraft.game.player.yaw
+          ).toFixed(0)}°, Pitch: ${MathUtils.radToDeg(
+            minecraft.game.player.pitch
+          ).toFixed(0)}°`,
           initializedGameUI: true,
         },
         state.initializedGameUI ? ["#fps", "#position", "#rotation"] : undefined
       );
+
+      let performance: "bad" | "average" | "good";
+
+      if (minecraft.game.frameCounter.fps < 30) {
+        performance = "bad";
+      } else if (minecraft.game.frameCounter.fps < 60) {
+        performance = "average";
+      } else {
+        performance = "good";
+      }
+
+      document
+        .getElementById("fps_value")!
+        .setAttribute("data-performance", performance);
     }
   }, 300);
 

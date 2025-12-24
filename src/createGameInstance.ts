@@ -111,7 +111,13 @@ export const createGameInstance = async ({
 
   const game: GameInstance = {
     camera,
-    controls: new FPSControls(camera, renderer.domElement, world, player),
+    controls: new FPSControls(
+      camera,
+      renderer.domElement,
+      world,
+      player,
+      minecraft.getUI()
+    ),
     renderer,
     scene,
     paused: false,
