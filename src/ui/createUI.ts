@@ -7,7 +7,7 @@ import { synchronize } from "./synchronize.ts";
 import type { UIActions, UICondition, UIState } from "./state.ts";
 import { MathUtils } from "three";
 
-export const createUIInstance = ({
+export const createUI = ({
   onWorldPlay,
   onDeleteWorld,
   onCreateWorld,
@@ -148,7 +148,7 @@ export const createUIInstance = ({
   });
 
   const gameInterval = setInterval(() => {
-    if (minecraft.game) {
+    if (minecraft.game && !state.isPaused) {
       setState(
         {
           fps: minecraft.game.frameCounter.fps.toFixed(2),

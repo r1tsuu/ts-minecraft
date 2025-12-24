@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { createGameInstance } from "./createGameInstance.ts";
 import { requestWorker } from "./worker/workerClient.ts";
-import { createUIInstance } from "./ui/createUIInstance.ts";
+import { createUI } from "./ui/createUI.ts";
 import type { MinecraftInstance } from "./types.ts";
 import { initBlocks } from "./client.ts";
 
@@ -26,7 +26,7 @@ const minecraft: MinecraftInstance = {
   },
 };
 
-const ui = createUIInstance({
+const ui = createUI({
   onCreateWorld: async (name: string, seed: string) => {
     const response = await requestWorker(
       {
