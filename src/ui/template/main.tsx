@@ -224,20 +224,26 @@ const Main = () => {
 
         <div
           data-condition={uiConditionKey("showPauseMenu")}
-          class="h-full w-full fixed cursor-default top-0 left-0"
+          class="h-full w-full fixed cursor-default top-0 left-0 bg-black/80 backdrop-blur-sm z-20"
         >
           <div
             class="
           flex fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2
           flex-col justify-center items-stretch
-          gap-5 p-8 z-10 bg-overlay-bg border-2 border-primary
+          gap-6 p-12 z-30 bg-overlay-bg border-4 border-primary
+          shadow-[0_8px_0_#000,0_0_40px_rgba(0,0,0,0.5)]
+          min-w-100
         "
           >
-            <h1 class={title}>Paused</h1>
+            <h1 class={cn(title, "mb-2 text-6xl")}>Game Paused</h1>
+            <div class="border-t-2 border-primary/30 my-2"></div>
             <button data-action={uiActionKey("resumeGame")} class={button}>
-              Resume
+              Resume Game
             </button>
-            <button data-action={uiActionKey("backToMenu")} class={button}>
+            <button
+              data-action={uiActionKey("backToMenu")}
+              class={cn(button, "bg-red-700 hover:bg-red-600 border-red-900")}
+            >
               Back to Menu
             </button>
           </div>
