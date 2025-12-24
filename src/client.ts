@@ -19,7 +19,7 @@ export const threeVector3ToRawVector3 = (vector: THREE.Vector3): RawVector3 => {
 
 const textureLoader = new THREE.TextureLoader();
 
-export const initBlocks = async () => {
+export const initBlocks = () => {
   const dirtTexture = textureLoader.load(dirtTextureImg);
   const grassTexture = textureLoader.load(grassBlockSideTextureImg);
   const grassTopTexture = textureLoader.load(grassBlockTopTextureImg);

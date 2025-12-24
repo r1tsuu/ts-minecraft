@@ -18,9 +18,13 @@
   "packageManager": "pnpm@9.15.6+sha512.139cab068fdf0b751268179ac5f909b5be72afb4a75c513d1905d151befc8977b593d3cf8671ed83d4d6637c5c94b98ffbce108125de4a5a27a31233601a99de",
   "dependencies": {
     "@electric-sql/pglite": "^0.3.14",
+    "@tailwindcss/vite": "4.1.18",
+    "jsxte": "^3.3.1",
     "kysely": "^0.28.9",
     "kysely-pglite-dialect": "^1.2.0",
     "seedrandom": "^3.0.5",
+    "tailwind-variants": "^3.2.2",
+    "tailwindcss": "4.1.18",
     "three": "^0.182.0"
   }
 }

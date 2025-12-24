@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { FPSControls } from "./FPSControls.ts";
+import type { UIState } from "./ui/state.ts";
 
 export const BLOCK_NAMES = ["dirt", "grass", "stone"] as const;
 
@@ -56,7 +57,7 @@ export type PlayerData = {
   jumpStrength: number;
 };
 
-export type MinecraftInstance = {
+export type GameInstance = {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
@@ -64,6 +65,28 @@ export type MinecraftInstance = {
   paused: boolean;
   controls: FPSControls;
   player: PlayerData;
+  frameCounter: {
+    frames: number;
+    lastTime: number;
+    fps: number;
+  };
+  dispose: () => void;
+};
+
+export type UIInstance = {
+  state: UIState;
+  setState: (
+    newState: Partial<UIState>,
+    affectedQuerySelectors?: string[] | string
+  ) => void;
+  destroy: () => void;
+};
+
+export type MinecraftInstance = {
+  game: GameInstance | null;
+  ui: UIInstance | null;
+  getGame: () => GameInstance;
+  getUI: () => UIInstance;
 };
 
 export type RawVector3 = {
