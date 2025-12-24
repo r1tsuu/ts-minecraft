@@ -1,0 +1,6 @@
+{
+  "tailwindCSS.classFunctions": [
+    "cn",
+    "tv"
+  ]
+}
