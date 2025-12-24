@@ -2,8 +2,11 @@ type ActiveUIPage = "start" | "menuWorlds" | "game" | "worldLoading";
 
 export type UIState = {
   fps: string;
-  position: string;
-  rotation: string;
+  positionX: string;
+  positionY: string;
+  positionZ: string;
+  rotationYaw: string;
+  rotationPitch: string;
   pauseText: string;
   initializedGameUI: boolean;
   worldList: {

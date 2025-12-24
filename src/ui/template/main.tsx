@@ -321,12 +321,34 @@ const Main = () => {
           />
         </div>
         <div id="position" class={gameUIElement()}>
-          Position:{" "}
-          <span data-variable={uiStateKey("position")} class="text-secondary" />
+          Position: X:{" "}
+          <span
+            data-variable={uiStateKey("positionX")}
+            class="text-secondary"
+          />{" "}
+          Y:{" "}
+          <span
+            data-variable={uiStateKey("positionY")}
+            class="text-secondary"
+          />{" "}
+          Z:{" "}
+          <span
+            data-variable={uiStateKey("positionZ")}
+            class="text-secondary"
+          />
         </div>
         <div id="rotation" class={gameUIElement()}>
-          Rotation:{" "}
-          <span data-variable={uiStateKey("rotation")} class="text-secondary" />
+          Rotation: Yaw:{" "}
+          <span
+            data-variable={uiStateKey("rotationYaw")}
+            class="text-secondary"
+          />
+          ° Pitch:{" "}
+          <span
+            data-variable={uiStateKey("rotationPitch")}
+            class="text-secondary"
+          />
+          °
         </div>
         <div class={gameUIElement()} data-variable={uiStateKey("pauseText")} />
 

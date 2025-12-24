@@ -31,8 +31,11 @@ export const createUI = ({
   const state: UIState = {
     initializedGameUI: false,
     fps: "Loading...",
-    position: "Loading...",
-    rotation: "Loading...",
+    positionX: "",
+    positionY: "",
+    positionZ: "",
+    rotationYaw: "",
+    rotationPitch: "",
     pauseText: "Press Escape to Pause",
     isInitialized: false,
     activePage: "start",
@@ -97,9 +100,9 @@ export const createUI = ({
     })
   );
 
-  const resumeButton = document.querySelector(
+  const resumeButton = document.querySelector<HTMLButtonElement>(
     '[data-action="resumeGame"]'
-  ) as HTMLButtonElement;
+  )!;
 
   const onPointerLockChange = () => {
     if (!minecraft.game) return;
@@ -149,22 +152,22 @@ export const createUI = ({
 
   const gameInterval = setInterval(() => {
     if (minecraft.game && !state.isPaused) {
+      if (!state.initializedGameUI) {
+        setState({ initializedGameUI: true }); // Trigger UI to show game elements
+      }
+
       setState(
         {
           fps: minecraft.game.frameCounter.fps.toFixed(2),
-          position: `X: ${minecraft.game.player.position.x.toFixed(
-            0
-          )}, Y: ${minecraft.game.player.position.y.toFixed(
-            0
-          )}, Z: ${minecraft.game.player.position.z.toFixed(0)}`,
-          rotation: `Yaw: ${MathUtils.radToDeg(
-            minecraft.game.player.yaw
-          ).toFixed(0)}°, Pitch: ${MathUtils.radToDeg(
+          positionX: minecraft.game.player.position.x.toFixed(),
+          positionY: minecraft.game.player.position.y.toFixed(),
+          positionZ: minecraft.game.player.position.z.toFixed(),
+          rotationYaw: MathUtils.radToDeg(minecraft.game.player.yaw).toFixed(),
+          rotationPitch: MathUtils.radToDeg(
             minecraft.game.player.pitch
-          ).toFixed(0)}°`,
-          initializedGameUI: true,
+          ).toFixed(),
         },
-        state.initializedGameUI ? ["#fps", "#position", "#rotation"] : undefined
+        ["#fps", "#position", "#rotation"]
       );
 
       let performance: "bad" | "average" | "good";
@@ -240,8 +243,11 @@ export const createUI = ({
       await onExitWorld();
       setState({
         activePage: "start",
-        position: "Loading...",
-        rotation: "Loading...",
+        rotationPitch: "",
+        rotationYaw: "",
+        positionX: "",
+        positionY: "",
+        positionZ: "",
         fps: "Loading...",
         isPaused: false,
         initializedGameUI: false,
