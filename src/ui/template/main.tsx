@@ -244,7 +244,7 @@ const Main = () => {
               data-action={uiActionKey("backToMenu")}
               class={cn(button, "bg-red-700 hover:bg-red-600 border-red-900")}
             >
-              Back to Menu
+              Exit to Main Menu
             </button>
           </div>
         </div>
