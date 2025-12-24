@@ -1,4 +1,4 @@
-import type { MinecraftClientEvent, MinecraftWorkerEvent } from './types.ts'
+import type { MinecraftWorkerEvent } from './types.ts'
 
 import MinecraftWorker from './worker.js?worker'
 

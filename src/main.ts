@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import type { MinecraftInstance } from './types.ts'
 
 import { initBlocks } from './client.ts'
+import { createEventQueue } from './clientEventQueue.ts'
 import { createGameInstance } from './createGameInstance.ts'
 import { createUI } from './ui/createUI.ts'
 import { requestWorker } from './worker/workerClient.ts'
@@ -10,6 +11,7 @@ import { requestWorker } from './worker/workerClient.ts'
 initBlocks()
 
 const minecraft: MinecraftInstance = {
+  eventQueue: createEventQueue(),
   game: null,
   getGame: () => {
     if (!minecraft.game) {

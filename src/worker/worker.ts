@@ -1,7 +1,8 @@
 import { SimplexNoise } from 'three/addons/math/SimplexNoise.js'
 
+import type { QueueEvent } from '../clientEventQueue.ts'
 import type { BlockInWorld, RawVector3 } from '../types.js'
-import type { ActiveWorld, MinecraftClientEvent, MinecraftWorkerEvent } from './types.ts'
+import type { ActiveWorld, MinecraftWorkerEvent } from './types.ts'
 
 import { getBlockIdByName, initBlocksWorker } from '../block.js'
 import {
@@ -166,8 +167,10 @@ const getInitialPlayerPosition = ({
   return rawVector3(latestBlock.x, Math.floor(latestBlock.y) + 7, latestBlock.z)
 }
 
-const sendEventToClient = (event: MinecraftClientEvent) => {
-  postMessage(event)
+const sendEventToClient = (event: Omit<QueueEvent, 'cancel' | 'canceled' | 'from'>) => {
+  const e = event as QueueEvent
+  e.from = 'server'
+  postMessage(e)
 }
 
 onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
@@ -196,8 +199,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
 
         sendEventToClient({
           payload: world,
-          status: 'SUCCESS',
-          type: 'worldCreated',
+          type: 'WORLD_CREATED_ON_SERVER',
           uuid: msg.data.uuid,
         })
 
@@ -213,8 +215,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
 
         sendEventToClient({
           payload: { worldID },
-          status: 'SUCCESS',
-          type: 'worldDeleted',
+          type: 'WORLD_DELETED_FROM_SERVER',
           uuid: msg.data.uuid,
         })
         break
@@ -300,8 +301,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
 
         sendEventToClient({
           payload: activeWorld,
-          status: 'SUCCESS',
-          type: 'worldInitialized',
+          type: 'WORLD_INITIALIZED_ON_SERVER',
           uuid: msg.data.uuid,
         })
 
@@ -319,8 +319,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
 
           sendEventToClient({
             payload: { chunks },
-            status: 'SUCCESS',
-            type: 'chunksGenerated',
+            type: 'RECEIVED_CHUNKS_FROM_SERVER',
             uuid: msg.data.uuid,
           })
         }
@@ -343,8 +342,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
 
         sendEventToClient({
           payload: {},
-          status: 'SUCCESS',
-          type: 'playerSynced',
+          type: 'SERVER_PLAYER_SYNCED',
           uuid: msg.data.uuid,
         })
 
@@ -356,8 +354,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
           payload: {
             worlds,
           },
-          status: 'SUCCESS',
-          type: 'listWorldsResponse',
+          type: 'RECEIVED_LIST_WORLDS_FROM_SERVER',
           uuid: msg.data.uuid,
         })
         break
@@ -368,8 +365,7 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
 
         sendEventToClient({
           payload: {},
-          status: 'SUCCESS',
-          type: 'activeWorldStopped',
+          type: 'SERVER_ACTIVE_WORLD_STOPPED',
           uuid: msg.data.uuid,
         })
         break
@@ -382,6 +378,5 @@ onmessage = async (msg: MessageEvent<MinecraftWorkerEvent>) => {
 
 sendEventToClient({
   payload: {},
-  status: 'SUCCESS',
-  type: 'workerInitialized',
+  type: 'SERVER_INITIALIZED',
 })

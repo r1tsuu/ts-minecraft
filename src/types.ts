@@ -54,6 +54,7 @@ export type GameInstance = {
 }
 
 export type MinecraftInstance = {
+  eventQueue: EventQueue
   game: GameInstance | null
   getGame: () => GameInstance
   getUI: () => UIInstance
@@ -88,6 +89,8 @@ export type UIInstance = {
   setState: (newState: Partial<UIState>, affectedQuerySelectors?: string | string[]) => void
   state: UIState
 }
+
+export type UUID = ReturnType<Crypto['randomUUID']>
 
 export type World = {
   blockMeshes: Map<number, THREE.InstancedMesh>

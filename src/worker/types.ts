@@ -1,5 +1,5 @@
 import type { BlockInWorld } from '../types.ts'
-import type { DatabasePlayerData, DatabaseWorldData } from './database.ts'
+import type { DatabasePlayerData } from './database.ts'
 
 export type ActiveWorld = {
   loadedChunks: {
@@ -8,7 +8,7 @@ export type ActiveWorld = {
     chunkZ: number
     id: number
   }[]
-  world: DatabaseWorldData
+  players: DatabasePlayerData[]
 }
 
 export type BaseClientEvent<T extends string, Data> = {
@@ -20,44 +20,6 @@ export type BaseEvent<T extends string, Data> = {
   type: T
   uuid?: string
 }
-
-export type MinecraftClientEvent =
-  | BaseClientEvent<'activeWorldStopped', {}>
-  | BaseClientEvent<
-      'chunksGenerated',
-      {
-        chunks: {
-          blocks: BlockInWorld[]
-          chunkX: number
-          chunkZ: number
-          id: number
-        }[]
-      }
-    >
-  | BaseClientEvent<
-      'listWorldsResponse',
-      {
-        worlds: {
-          createdAt: Date
-          id: number
-          name: string
-          seed: string
-        }[]
-      }
-    >
-  | BaseClientEvent<'playerSynced', {}>
-  | BaseClientEvent<'workerInitialized', {}>
-  | BaseClientEvent<
-      'worldCreated',
-      {
-        createdAt: Date
-        id: number
-        name: string
-        seed: string
-      }
-    >
-  | BaseClientEvent<'worldDeleted', { worldID: number }>
-  | BaseClientEvent<'worldInitialized', ActiveWorld>
 
 export type MinecraftWorkerEvent =
   | BaseEvent<
