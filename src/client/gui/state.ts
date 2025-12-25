@@ -1,7 +1,7 @@
 import type { UUID } from '../../types.ts'
 
-export type UIState = {
-  activePage: ActiveUIPage
+export type GUIState = {
+  activePage: ActiveGUIPage
   fps: string
   initializedGameUI: boolean
   isInitialized: boolean
@@ -21,7 +21,7 @@ export type UIState = {
   }[]
 }
 
-type ActiveUIPage = 'game' | 'menuWorlds' | 'start' | 'worldLoading'
+type ActiveGUIPage = 'game' | 'menuWorlds' | 'start' | 'worldLoading'
 
 // Helper type to get nested keys with "i" for arrays
 type NestedKeys<T, Prefix extends string = ''> = {
@@ -35,21 +35,21 @@ type NestedKeys<T, Prefix extends string = ''> = {
         `${Prefix}${K}`
 }[keyof T]
 
-export const uiStateKey = <K extends NestedKeys<UIState>>(key: K) => key
+export const stateKey = <K extends NestedKeys<GUIState>>(key: K) => key
 
-export const uiActivePageKey = (page: ActiveUIPage) => page
+export const activePageKey = (page: ActiveGUIPage) => page
 
-export type UIActions = {
-  backToMenu: UIAction
-  backToStart: UIAction
-  createWorld: UIAction
-  deleteWorld: UIAction
-  playWorld: UIAction
-  resumeGame: UIAction
-  startGame: UIAction
+export type GUIActions = {
+  backToMenu: GUIAction
+  backToStart: GUIAction
+  createWorld: GUIAction
+  deleteWorld: GUIAction
+  playWorld: GUIAction
+  resumeGame: GUIAction
+  startGame: GUIAction
 }
 
-export type UICondition = {
+export type GUIConditions = {
   showCrosshair: () => boolean
   showGameUI: () => boolean
   showLoadingButton: () => boolean
@@ -59,8 +59,8 @@ export type UICondition = {
   showWorldsNotFound: () => boolean
 }
 
-type UIAction = (args: { event: MouseEvent }) => Promise<void> | void
+type GUIAction = (args: { event: MouseEvent }) => Promise<void> | void
 
-export const uiActionKey = (type: keyof UIActions) => type
+export const actionKey = (type: keyof GUIActions) => type
 
-export const uiConditionKey = (type: keyof UICondition) => type
+export const conditionKey = (type: keyof GUIConditions) => type

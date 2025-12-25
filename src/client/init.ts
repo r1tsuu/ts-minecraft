@@ -1,19 +1,21 @@
 import type { MinecraftClient } from '../types.ts'
 
-import { createConfig } from '../config/createConfig.ts'
+import { createConfig } from '../config.ts'
 import { createMinecraftEventQueue, type MinecraftEventQueueEvent } from '../queue/minecraft.ts'
-import { createGameContext } from './createGameContext.ts'
-import { initGameLoop } from './initGameLoop.ts'
+import { createClientBlockRegistry } from './blocks.ts'
+import { createGameContext } from './gameContext.ts'
+import { initGameLoop } from './gameLoop.ts'
+import { initGUI } from './gui/init.ts'
 import { createLocalStorageManager } from './localStorageManager.ts'
 import SinglePlayerWorker from './singlePlayerWorker.ts?worker'
-import { createUI } from './ui/createUI.ts'
 
-export const createMinecraftClient = () => {
+export const initMinecraftClient = () => {
   const eventQueue = createMinecraftEventQueue('CLIENT')
 
   const config = createConfig()
 
   const minecraft: MinecraftClient = {
+    blocksRegistry: createClientBlockRegistry(),
     config,
     eventQueue,
     gameContext: null,
@@ -24,22 +26,22 @@ export const createMinecraftClient = () => {
 
       return minecraft.gameContext
     },
-    getUIContext: () => {
-      if (!minecraft.uiContext) {
+    getGUI: () => {
+      if (!minecraft.gui) {
         throw new Error('UI instance is not initialized')
       }
 
-      return minecraft.uiContext
+      return minecraft.gui
     },
+    gui: null,
     localStorageManager: createLocalStorageManager(),
-    uiContext: null,
   }
 
-  const ui = createUI({
+  const ui = initGUI({
     minecraft,
   })
 
-  minecraft.uiContext = ui
+  minecraft.gui = ui
 
   minecraft.eventQueue.on('JOIN_WORLD', async (event) => {
     const singlePlayerWorker = new SinglePlayerWorker()

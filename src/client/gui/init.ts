@@ -1,12 +1,12 @@
 import { MathUtils } from 'three'
 
-import type { MinecraftClient, UIContext } from '../../types.ts'
-import type { UIActions, UICondition, UIState } from './state.ts'
+import type { GUI, MinecraftClient } from '../../types.ts'
+import type { GUIActions, GUIConditions, GUIState as GUIState } from './state.ts'
 
 import { synchronize } from './synchronize.ts'
 
-export const createUI = ({ minecraft }: { minecraft: MinecraftClient }): UIContext => {
-  const state: UIState = {
+export const initGUI = ({ minecraft }: { minecraft: MinecraftClient }): GUI => {
+  const state: GUIState = {
     activePage: 'start',
     fps: 'Loading...',
     initializedGameUI: false,
@@ -22,7 +22,7 @@ export const createUI = ({ minecraft }: { minecraft: MinecraftClient }): UIConte
     worldList: [],
   }
 
-  const setState = (newState: Partial<UIState>, affectedQuerySelectors?: string | string[]) => {
+  const setState = (newState: Partial<GUIState>, affectedQuerySelectors?: string | string[]) => {
     Object.assign(state, newState)
     synchronize(state, actions, conditions, affectedQuerySelectors)
   }
@@ -127,7 +127,7 @@ export const createUI = ({ minecraft }: { minecraft: MinecraftClient }): UIConte
     }
   }, 300)
 
-  const actions: UIActions = {
+  const actions: GUIActions = {
     backToMenu: async () => {
       console.log('Exiting world...')
       await minecraft.eventQueue.emitAndWaitResponse('EXIT_WORLD', {}, 'EXITED_WORLD')
@@ -205,7 +205,7 @@ export const createUI = ({ minecraft }: { minecraft: MinecraftClient }): UIConte
     },
   }
 
-  const conditions: UICondition = {
+  const conditions: GUIConditions = {
     showCrosshair: () => minecraft.gameContext !== null && !state.isPaused,
     showGameUI: () => minecraft.gameContext !== null,
     showLoadingButton: () => state.isInitialized === false,

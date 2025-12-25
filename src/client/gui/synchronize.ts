@@ -1,4 +1,4 @@
-import type { UIActions, UICondition, UIState } from './state.ts'
+import type { GUIActions, GUIConditions, GUIState } from './state.ts'
 
 const bindStateToDOM = (
   container: HTMLElement,
@@ -36,9 +36,9 @@ const bindStateToDOM = (
 }
 
 export const synchronize = (
-  state: UIState,
-  actions: UIActions,
-  conditions: UICondition,
+  state: GUIState,
+  actions: GUIActions,
+  conditions: GUIConditions,
   /**
    * Optional list of query selectors to limit the synchronization scope
    * Useful for performance optimization when only specific parts of the UI need updating
@@ -64,7 +64,7 @@ export const synchronize = (
   }
 
   for (const key in actions) {
-    const actionFn = actions[key as keyof UIActions]
+    const actionFn = actions[key as keyof GUIActions]
 
     for (const container of containers) {
       container.querySelectorAll<HTMLButtonElement>(`[data-action="${key}"]`).forEach((el) => {
@@ -75,7 +75,7 @@ export const synchronize = (
     }
 
     for (const key in conditions) {
-      const conditionFn = conditions[key as keyof UICondition]
+      const conditionFn = conditions[key as keyof GUIConditions]
       const result = conditionFn()
 
       for (const container of containers) {

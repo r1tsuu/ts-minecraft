@@ -1,7 +1,7 @@
 import type { BlockInWorld } from '../types.ts'
 
 import { type BlocksRegistry, createBlocksRegistry } from '../blocks/registry.ts'
-import { createConfig, type SharedConfig } from '../config/createConfig.ts'
+import { createConfig, type SharedConfig } from '../config.ts'
 import { createMinecraftEventQueue, type MinecraftEventQueue } from '../queue/minecraft.ts'
 import {
   findByXYZ,

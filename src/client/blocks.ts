@@ -1,9 +1,11 @@
 import * as THREE from 'three'
 
+import { type BlockName, createBlocksRegistry } from '../blocks/registry.ts'
 import dirtTextureImg from '../static/dirt.png?no-inline'
 import grassBlockSideTextureImg from '../static/grass_block_side.png?no-inline'
 import grassBlockTopTextureImg from '../static/grass_block_top.png?no-inline'
-import { type BlockName, createBlocksRegistry } from './registry.ts'
+
+export type ClientBlockRegisty = ReturnType<typeof createClientBlockRegistry>
 
 type BlockClientData = {
   material: THREE.Material | THREE.Material[]

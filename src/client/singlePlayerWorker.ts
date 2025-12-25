@@ -1,9 +1,6 @@
 import type { MinecraftEventQueueEvent } from '../queue/minecraft.ts'
 
-import {
-  createMinecraftServer,
-  type MinecraftServerInstance,
-} from '../server/createMinecraftServer.ts'
+import { createMinecraftServer, type MinecraftServerInstance } from '../server/create.ts'
 
 let localServer: MinecraftServerInstance | null = null
 

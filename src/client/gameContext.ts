@@ -4,9 +4,9 @@ import type { DatabaseChunkData, DatabasePlayerData } from '../server/worldDatab
 import type { ClientPlayerData, GameContext, MinecraftClient } from '../types.ts'
 
 import { rawVector3ToThreeVector3, threeVector3ToRawVector3 } from '../client.ts'
-import { createRaycaster } from './createRaycaster.ts'
-import { createWorld } from './createWorld.ts'
 import { FPSControls } from './FPSControls.ts'
+import { createRaycaster } from './raycaster.ts'
+import { createWorld } from './world.ts'
 
 export const createGameContext = async ({
   initialChunksFromServer,
@@ -62,6 +62,7 @@ export const createGameContext = async ({
   let syncying = false
 
   const world = createWorld({
+    blockRegistry: minecraft.blocksRegistry,
     clientPlayer,
     eventQueue: minecraft.eventQueue,
     initialChunksFromServer,
@@ -71,7 +72,7 @@ export const createGameContext = async ({
   let lastTimeout: null | number = null
 
   const syncPlayer = async () => {
-    if (minecraft.getUIContext().state.isPaused) {
+    if (minecraft.getGUI().state.isPaused) {
       lastTimeout = setTimeout(syncPlayer, 1000)
       return
     }
@@ -122,13 +123,7 @@ export const createGameContext = async ({
 
   const game: GameContext = {
     camera,
-    controls: new FPSControls(
-      camera,
-      renderer.domElement,
-      world,
-      clientPlayer,
-      minecraft.getUIContext(),
-    ),
+    controls: new FPSControls(camera, renderer.domElement, world, clientPlayer, minecraft.getGUI()),
     dispose,
     frameCounter: {
       fps: 0,

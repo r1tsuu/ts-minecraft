@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-import type { ClientPlayerData, UIContext, World } from '../types.js'
+import type { ClientPlayerData, GUI, World } from '../types.js'
 
 import { GRAVITY_ACCELERATION } from '../util.ts'
 
@@ -14,7 +14,7 @@ export class FPSControls {
 
   // Reusable Box3 instances
   playerBox = new THREE.Box3()
-  ui: UIContext
+  ui: GUI
 
   world: World
 
@@ -23,7 +23,7 @@ export class FPSControls {
     domElement: HTMLElement,
     world: World,
     player: ClientPlayerData,
-    ui: UIContext,
+    ui: GUI,
   ) {
     this.camera = camera
     this.domElement = domElement

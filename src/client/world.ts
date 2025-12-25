@@ -2,17 +2,19 @@ import * as THREE from 'three'
 
 import type { MinecraftEventQueue } from '../queue/minecraft.ts'
 import type { DatabaseChunkData } from '../server/worldDatabase.ts'
-import type { BlockInWorld, BlockType, ClientPlayerData, World } from '../types.ts'
+import type { BlockInWorld, ClientPlayerData, World } from '../types.ts'
+import type { ClientBlockRegisty } from './blocks.ts'
 
-import { blockRegistry, getBlockById } from '../block.ts'
 import { CHUNK_SIZE, getBlockIndex, getBlockKey, RENDER_DISTANCE, WORLD_HEIGHT } from '../util.ts'
 
 export const createWorld = ({
+  blockRegistry,
   clientPlayer,
   eventQueue,
   initialChunksFromServer,
   scene,
 }: {
+  blockRegistry: ClientBlockRegisty
   clientPlayer: ClientPlayerData
   eventQueue: MinecraftEventQueue
   initialChunksFromServer: DatabaseChunkData[]
@@ -40,7 +42,7 @@ export const createWorld = ({
 
   const geometry = new THREE.BoxGeometry()
 
-  for (const [id, block] of blockRegistry) {
+  for (const [id, block] of blockRegistry.clientRegistry) {
     const mesh = new THREE.InstancedMesh(geometry, block.material, MAX_COUNT)
     mesh.frustumCulled = false
     scene.add(mesh)
@@ -49,7 +51,7 @@ export const createWorld = ({
     blocksMeshesFreeIndexes.set(id, [])
   }
 
-  const getBlock = (x: number, y: number, z: number): BlockType | null => {
+  const getBlock = (x: number, y: number, z: number): null | number => {
     const chunkX = Math.floor(x / CHUNK_SIZE)
     const chunkZ = Math.floor(z / CHUNK_SIZE)
     const key = chunkKey(chunkX, chunkZ)
@@ -71,7 +73,7 @@ export const createWorld = ({
       return null
     }
 
-    return getBlockById(block)
+    return block
   }
 
   const update = () => {

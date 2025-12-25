@@ -1,9 +1,10 @@
 import * as THREE from 'three'
 
+import type { ClientBlockRegisty } from './client/blocks.ts'
 import type { FPSControls } from './client/FPSControls.ts'
+import type { GUIState } from './client/gui/state.ts'
 import type { LocalStorageManager } from './client/localStorageManager.ts'
-import type { UIState } from './client/ui/state.ts'
-import type { SharedConfig } from './config/createConfig.ts'
+import type { SharedConfig } from './config.ts'
 import type { MinecraftEventQueue } from './queue/minecraft.ts'
 import type { DatabaseChunkData } from './server/worldDatabase.ts'
 
@@ -20,11 +21,6 @@ export type BlockInWorld = {
 }
 
 export type BlockName = (typeof BLOCK_NAMES)[number]
-
-export type BlockType = {
-  material: THREE.Material | THREE.Material[]
-  name: BlockName
-}
 
 export type Chunk = {
   blocks: Map<string, BlockInWorld>
@@ -74,26 +70,27 @@ export type GameContext = {
   world: World
 }
 
+export type GUI = {
+  destroy: () => void
+  setState: (newState: Partial<GUIState>, affectedQuerySelectors?: string | string[]) => void
+  state: GUIState
+}
+
 export type MinecraftClient = {
+  blocksRegistry: ClientBlockRegisty
   config: SharedConfig
   eventQueue: MinecraftEventQueue
   gameContext: GameContext | null
   getGameContext: () => GameContext
-  getUIContext: () => UIContext
+  getGUI: () => GUI
+  gui: GUI | null
   localStorageManager: LocalStorageManager
-  uiContext: null | UIContext
 }
 
 export type RawVector3 = {
   x: number
   y: number
   z: number
-}
-
-export type UIContext = {
-  destroy: () => void
-  setState: (newState: Partial<UIState>, affectedQuerySelectors?: string | string[]) => void
-  state: UIState
 }
 
 export type UUID = `${string}-${string}-${string}-${string}-${string}`
@@ -104,7 +101,7 @@ export type World = {
   blocksMeshesFreeIndexes: Map<number, number[]>
   chunks: Map<string, Chunk>
   dispose: () => void
-  getBlock: (x: number, y: number, z: number) => BlockType | null
+  getBlock: (x: number, y: number, z: number) => null | number
   requestingChunksState: 'idle' | 'requesting'
   syncChunksFromServer: (chunks: DatabaseChunkData[]) => void
   update: () => void

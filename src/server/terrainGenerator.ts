@@ -1,7 +1,7 @@
 import { SimplexNoise } from 'three/examples/jsm/Addons.js'
 
 import type { BlocksRegistry } from '../blocks/registry.ts'
-import type { SharedConfig } from '../config/createConfig.ts'
+import type { SharedConfig } from '../config.ts'
 import type { DatabaseChunkData } from './worldDatabase.ts'
 
 export type TerrainGenerator = ReturnType<typeof createTerrainGenerator>

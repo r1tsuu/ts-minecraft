@@ -10,7 +10,7 @@ export const initGameLoop = (minecraft: MinecraftClient) => {
   const loop = async () => {
     if (!minecraft.gameContext) return
 
-    if (minecraft.getUIContext().state.isPaused) {
+    if (minecraft.getGUI().state.isPaused) {
       clock.stop()
       clockStopped = true
       requestAnimationFrame(loop)
