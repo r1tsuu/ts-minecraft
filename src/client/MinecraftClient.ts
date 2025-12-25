@@ -20,7 +20,7 @@ export class MinecraftClient {
   localStorageManager: LocalStorageManager
 
   constructor() {
-    this.eventQueue = new MinecraftEventQueue('CLIENT')
+    this.eventQueue = new MinecraftEventQueue('Client')
 
     this.config = createConfig()
     this.blocksRegistry = createClientBlockRegistry()
@@ -28,7 +28,7 @@ export class MinecraftClient {
 
     this.gui = new GUI(this)
 
-    this.setupEventListeners()
+    this.eventQueue.registerHandlers(this)
   }
 
   dispose(): void {
@@ -42,9 +42,7 @@ export class MinecraftClient {
       this.gui = null
     }
 
-    for (const dispose of this.dispositions) {
-      dispose()
-    }
+    MinecraftEventQueue.unregisterHandlers(this)
   }
 
   getGameSession(): GameSession {
@@ -63,14 +61,16 @@ export class MinecraftClient {
     return this.gui
   }
 
-  private onExitWorld(): void {
+  @MinecraftEventQueue.Handler('Client.ExitWorld')
+  protected onExitWorld(): void {
     if (this.gameSession) {
       this.gameSession.dispose()
       this.gameSession = null
     }
   }
 
-  private async onJoinWorld(event: MinecraftEvent<'Client.JoinWorld'>): Promise<void> {
+  @MinecraftEventQueue.Handler('Client.JoinWorld')
+  protected async onJoinWorld(event: MinecraftEvent<'Client.JoinWorld'>): Promise<void> {
     if (this.gameSession) {
       console.warn(`Received ${event.type} but already in a world.`)
       return
@@ -85,7 +85,7 @@ export class MinecraftClient {
     })
 
     singlePlayerWorker.onmessage = (message: MessageEvent<AnyMinecraftEvent>) => {
-      if (message.data.metadata.environment === 'SERVER') {
+      if (message.data.metadata.environment === 'Server') {
         this.eventQueue.emit(message.data.type, message.data.payload, message.data.eventUUID, {
           environment: message.data.metadata.environment,
           isForwarded: true,
@@ -129,13 +129,8 @@ export class MinecraftClient {
     this.eventQueue.respond(event, 'Client.JoinedWorld', {})
   }
 
-  private setupEventListeners(): void {
-    this.dispositions.push(this.eventQueue.on('Client.JoinWorld', this.onJoinWorld.bind(this)))
-    this.dispositions.push(this.eventQueue.on('Client.ExitWorld', this.onExitWorld.bind(this)))
-  }
-
   private shouldForwardEventToServer(event: AnyMinecraftEvent): boolean {
-    if (event.metadata.environment === 'SERVER') {
+    if (event.metadata.environment === 'Server') {
       return false
     }
 

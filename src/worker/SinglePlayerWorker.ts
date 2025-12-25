@@ -3,10 +3,10 @@ import { MinecraftServer } from '../server/MinecraftServer.ts'
 
 let localServer: MinecraftServer | null = null
 
-const eventQueue = new MinecraftEventQueue('SERVER')
+const eventQueue = new MinecraftEventQueue('Server')
 
 const shouldForwardEventToClient = (event: AnyMinecraftEvent) => {
-  if (event.metadata.environment === 'CLIENT') {
+  if (event.metadata.environment === 'Client') {
     return false
   }
 

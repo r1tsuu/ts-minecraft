@@ -6,6 +6,8 @@ import type { UUID } from '../types.ts'
 
 import { type AnyEvent, Event } from './Event.ts'
 
+const EVENT_HANDLERS_KEY = Symbol('EVENT_HANDLERS')
+
 const WILDCARD = '*'
 
 type EventHandler<
@@ -15,6 +17,11 @@ type EventHandler<
 > = (
   event: Event<Exclude<K, WildcardKey>, K extends keyof Events ? Events[K] : any, Meta>,
 ) => Promise<void> | void
+
+interface EventHandlerMetadata {
+  eventType: string
+  methodName: string
+}
 
 type EventKey<Events extends Record<string, unknown>> = keyof Events & string
 
@@ -34,6 +41,42 @@ export class EventQueue<
       listeners: ((event: any) => Promise<void> | void)[]
     }
   >()
+
+  static Handler<T extends string>(eventType: T) {
+    return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+      console.log(
+        `Registering event handler for ${eventType} on ${target.constructor.name}.${propertyKey}`,
+      )
+      // Store metadata about this event handler
+      if (!target.constructor[EVENT_HANDLERS_KEY]) {
+        target.constructor[EVENT_HANDLERS_KEY] = []
+      }
+
+      target.constructor[EVENT_HANDLERS_KEY].push({
+        eventType,
+        methodName: propertyKey,
+      })
+
+      // Return the original method (binding happens at initialization)
+      return descriptor
+    }
+  }
+
+  /**
+   * Unregisters all event handlers for an instance
+   * Call this in the dispose() method
+   *
+   * @param instance - The class instance to unregister handlers for
+   */
+  static unregisterHandlers<T extends Record<string, any>>(instance: T): void {
+    const unsubscribers = (instance as any)[EVENT_HANDLERS_KEY] || []
+
+    for (const unsubscribe of unsubscribers) {
+      unsubscribe()
+    }
+
+    ;(instance as any)[EVENT_HANDLERS_KEY] = []
+  }
 
   addBeforeEmitHook(hook: (event: AnyEvent<Events, Meta>) => Promise<void> | void): void {
     this.beforeEmitHooks.push(hook)
@@ -111,6 +154,38 @@ export class EventQueue<
 
   registerEventType(type: string): void {
     this.eventTypesRegistry.set(type, {})
+  }
+
+  /**
+   * Registers all event handlers decorated with @EventQueue.Handler
+   * Call this in the constructor after initializing the eventQueue
+   *
+   * @param instance - The class instance to register handlers for
+   * @returns Array of unsubscribe functions
+   */
+  registerHandlers(instance: Record<string, any>): Array<() => void> {
+    const constructor = instance.constructor as any
+    const handlers: EventHandlerMetadata[] = constructor[EVENT_HANDLERS_KEY] || []
+    const unsubscribers: Array<() => void> = []
+
+    for (const handler of handlers) {
+      const method = (instance as any)[handler.methodName]
+
+      if (typeof method !== 'function') {
+        console.warn(`Event handler ${handler.methodName} is not a function on ${constructor.name}`)
+        continue
+      }
+
+      // Bind the method and register it
+      const boundMethod = method.bind(instance)
+      const unsubscribe = this.on(handler.eventType, boundMethod)
+      unsubscribers.push(unsubscribe)
+    }
+
+    // Store unsubscribers for disposal
+    ;(instance as any)[EVENT_HANDLERS_KEY] = unsubscribers
+
+    return unsubscribers
   }
 
   removeBeforeEmitHook(hook: (event: AnyEvent<Events, Meta>) => Promise<void> | void): void {

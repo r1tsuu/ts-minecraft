@@ -1,10 +1,10 @@
 import * as THREE from 'three'
 
-import type { MinecraftEvent, MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import type { DatabaseChunkData } from '../server/WorldDatabase.ts'
 import type { BlockInWorld, Chunk, ClientPlayerData } from '../types.ts'
 import type { ClientBlockRegisty } from './blocks.ts'
 
+import { MinecraftEvent, MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import { CHUNK_SIZE, getBlockIndex, getBlockKey, RENDER_DISTANCE, WORLD_HEIGHT } from '../util.ts'
 
 const chunkKey = (x: number, z: number) => `${x},${z}`
@@ -15,7 +15,6 @@ export class World {
   blocksMeshesFreeIndexes = new Map<number, number[]>()
   chunks = new Map<string, Chunk>()
   requestingChunksState: 'idle' | 'requesting' = 'idle'
-  private dispositions: Function[] = []
 
   constructor(
     private readonly clientPlayer: ClientPlayerData,
@@ -57,15 +56,11 @@ export class World {
       this.blocksMeshesFreeIndexes.set(id, [])
     }
 
-    this.setupEventListeners()
+    this.eventQueue.registerHandlers(this)
     this.syncChunksFromServer(initialChunksFromServer)
   }
 
   dispose(): void {
-    for (const unsubscribe of this.dispositions) {
-      unsubscribe()
-    }
-
     for (const mesh of this.blockMeshes.values()) {
       mesh.geometry.dispose()
       if (Array.isArray(mesh.material)) {
@@ -82,6 +77,7 @@ export class World {
     this.blockMeshesCount.clear()
     this.blocksMeshesFreeIndexes.clear()
     this.chunks.clear()
+    MinecraftEventQueue.unregisterHandlers(this)
   }
 
   getBlock(x: number, y: number, z: number): null | number {
@@ -221,15 +217,10 @@ export class World {
     }
   }
 
-  private onResponseChunksLoad(event: MinecraftEvent<'Server.ResponseChunksLoad'>): void {
+  @MinecraftEventQueue.Handler('Server.ResponseChunksLoad')
+  protected onResponseChunksLoad(event: MinecraftEvent<'Server.ResponseChunksLoad'>): void {
     this.syncChunksFromServer(event.payload.chunks)
     this.requestingChunksState = 'idle'
-  }
-
-  private setupEventListeners(): void {
-    this.dispositions.push(
-      this.eventQueue.on('Server.ResponseChunksLoad', this.onResponseChunksLoad.bind(this)),
-    )
   }
 
   private syncChunksFromServer(chunks: DatabaseChunkData[]): void {

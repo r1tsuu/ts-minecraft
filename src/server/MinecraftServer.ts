@@ -2,7 +2,7 @@ import type { BlockInWorld, ChunkCoordinates } from '../types.ts'
 
 import { BlocksRegistry } from '../blocks/BlocksRegistry.ts'
 import { createConfig, type SharedConfig } from '../config.ts'
-import { type MinecraftEvent, type MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
+import { type MinecraftEvent, MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import {
   findByXYZ,
   findChunkByXZ,
@@ -25,9 +25,6 @@ export class MinecraftServer {
   loadedChunks: DatabaseChunkData[] = []
 
   terrainGenerator: TerrainGenerator
-  private dispositions: Function[] = []
-
-  // let serverTickTimeout: null | number = null
 
   private constructor(
     private readonly database: WorldDatabase,
@@ -56,41 +53,11 @@ export class MinecraftServer {
   }
 
   async dispose(): Promise<void> {
-    for (const dispose of this.dispositions) {
-      dispose()
-    }
+    MinecraftEventQueue.unregisterHandlers(this)
   }
 
-  private async initialize(): Promise<void> {
-    const spawnChunksCoordinates = getChunksCoordinatesInRadius({
-      centerChunkX: 0,
-      centerChunkZ: 0,
-      chunkRadius: this.config.spawnChunkRadius,
-    })
-
-    // Setup initial world state if this is the first server start
-    if (!this.meta.lastLoadedAt) {
-      for (const coordinates of spawnChunksCoordinates) {
-        const chunk = this.terrainGenerator.generateChunk(coordinates.chunkX, coordinates.chunkZ)
-        this.loadedChunks.push(chunk)
-      }
-
-      await this.database.createChunks(this.loadedChunks)
-    } else {
-      const chunks = await this.database.fetchChunksByUUIDs(
-        this.meta.loadedChunks.map((chunk) => chunk.uuid),
-      )
-      this.loadedChunks.push(...chunks)
-    }
-
-    this.meta.lastLoadedAt = new Date()
-
-    await this.syncMeta()
-
-    this.setupEventHandlers()
-  }
-
-  private async onRequestChunksLoad(
+  @MinecraftEventQueue.Handler('Client.RequestChunksLoad')
+  protected async onRequestChunksLoad(
     event: MinecraftEvent<'Client.RequestChunksLoad'>,
   ): Promise<void> {
     const response: DatabaseChunkData[] = []
@@ -138,7 +105,8 @@ export class MinecraftServer {
     })
   }
 
-  private async onRequestPlayerJoin(event: MinecraftEvent<'Client.RequestPlayerJoin'>) {
+  @MinecraftEventQueue.Handler('Client.RequestPlayerJoin')
+  protected async onRequestPlayerJoin(event: MinecraftEvent<'Client.RequestPlayerJoin'>) {
     let playerData = this.players.find((player) => player.uuid === event.payload.playerUUID)
 
     if (!playerData) {
@@ -180,7 +148,8 @@ export class MinecraftServer {
     })
   }
 
-  private async onRequestSyncPlayer(
+  @MinecraftEventQueue.Handler('Client.RequestSyncPlayer')
+  protected async onRequestSyncPlayer(
     event: MinecraftEvent<'Client.RequestSyncPlayer'>,
   ): Promise<void> {
     const player = this.players.find((p) => p.uuid === event.payload.playerData.uuid)
@@ -193,16 +162,33 @@ export class MinecraftServer {
     await this.eventQueue.respond(event, 'Server.ResponseSyncPlayer', {})
   }
 
-  private setupEventHandlers(): void {
-    this.dispositions.push(
-      this.eventQueue.on('Client.RequestPlayerJoin', this.onRequestPlayerJoin.bind(this)),
-    )
-    this.dispositions.push(
-      this.eventQueue.on('Client.RequestChunksLoad', this.onRequestChunksLoad.bind(this)),
-    )
-    this.dispositions.push(
-      this.eventQueue.on('Client.RequestSyncPlayer', this.onRequestSyncPlayer.bind(this)),
-    )
+  private async initialize(): Promise<void> {
+    const spawnChunksCoordinates = getChunksCoordinatesInRadius({
+      centerChunkX: 0,
+      centerChunkZ: 0,
+      chunkRadius: this.config.spawnChunkRadius,
+    })
+
+    // Setup initial world state if this is the first server start
+    if (!this.meta.lastLoadedAt) {
+      for (const coordinates of spawnChunksCoordinates) {
+        const chunk = this.terrainGenerator.generateChunk(coordinates.chunkX, coordinates.chunkZ)
+        this.loadedChunks.push(chunk)
+      }
+
+      await this.database.createChunks(this.loadedChunks)
+    } else {
+      const chunks = await this.database.fetchChunksByUUIDs(
+        this.meta.loadedChunks.map((chunk) => chunk.uuid),
+      )
+      this.loadedChunks.push(...chunks)
+    }
+
+    this.meta.lastLoadedAt = new Date()
+
+    await this.syncMeta()
+
+    this.eventQueue.registerHandlers(this)
   }
 
   private async syncMeta(): Promise<void> {

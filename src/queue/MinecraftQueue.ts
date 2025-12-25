@@ -10,8 +10,10 @@ import { EventQueue } from './EventQueue.ts'
 
 export type AnyMinecraftEvent = AnyEvent<MinecraftEventsData, MinecraftEventMetadata>
 
+export type MinecraftEventType = keyof MinecraftEventsData
+
 type MinecraftEventMetadata = {
-  environment: 'CLIENT' | 'SERVER'
+  environment: 'Client' | 'Server'
   isForwarded: boolean
 }
 
@@ -49,8 +51,6 @@ type MinecraftEventsData = {
   'SinglePlayerWorker.WorkerReady': {}
 }
 
-type MinecraftEventType = keyof MinecraftEventsData
-
 export class MinecraftEvent<T extends ({} & string) | MinecraftEventType> extends Event<
   T,
   T extends keyof MinecraftEventsData ? MinecraftEventsData[T] : any,
@@ -58,7 +58,7 @@ export class MinecraftEvent<T extends ({} & string) | MinecraftEventType> extend
 > {}
 
 export class MinecraftEventQueue extends EventQueue<MinecraftEventsData, MinecraftEventMetadata> {
-  constructor(environment: 'CLIENT' | 'SERVER') {
+  constructor(environment: 'Client' | 'Server') {
     super()
 
     const coreEvents: {
@@ -87,9 +87,21 @@ export class MinecraftEventQueue extends EventQueue<MinecraftEventsData, Minecra
       event.metadata.environment = event.metadata.environment ?? environment
       event.metadata.isForwarded = event.metadata.isForwarded ?? false
     })
+  }
 
-    // this.on('*', (event) => {
-    //   console.log(`[MinecraftEventQueue][${environment}] Event emitted:`, event)
-    // })
+  /**
+   * Decorator to mark a method as an event handler for Minecraft events.
+   * @example
+   * ```ts
+   * class MyClass {
+   *   @MinecraftEventQueue.Handler('Client.JoinWorld')
+   *   onJoinWorld(event: MinecraftEvent<'Client.JoinWorld'>) {
+   *     console.log('Player joined world with UUID:', event.payload.worldUUID)
+   *   }
+   * }
+   * ```
+   */
+  static Handler<T extends '*' | ({} & string) | MinecraftEventType>(eventType: T) {
+    return EventQueue.Handler<T>(eventType)
   }
 }
