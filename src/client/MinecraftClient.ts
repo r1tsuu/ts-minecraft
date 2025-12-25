@@ -1,10 +1,9 @@
 import { createConfig, type SharedConfig } from '../config.ts'
 import {
   type AnyMinecraftEvent,
-  createMinecraftEventQueue,
   type MinecraftEvent,
-  type MinecraftEventQueue,
-} from '../queue/minecraft.ts'
+  MinecraftEventQueue,
+} from '../queue/MinecraftQueue.ts'
 import SinglePlayerWorker from '../worker/SinglePlayerWorker.ts?worker'
 import { type ClientBlockRegisty, createClientBlockRegistry } from './blocks.ts'
 import { GameSession } from './GameSession.ts'
@@ -21,9 +20,7 @@ export class MinecraftClient {
   localStorageManager: LocalStorageManager
 
   constructor() {
-    this.eventQueue = createMinecraftEventQueue({
-      environment: 'CLIENT',
-    })
+    this.eventQueue = new MinecraftEventQueue('CLIENT')
 
     this.config = createConfig()
     this.blocksRegistry = createClientBlockRegistry()
@@ -83,20 +80,16 @@ export class MinecraftClient {
 
     const unsubscribe = this.eventQueue.on('*', (event) => {
       if (this.shouldForwardEventToServer(event)) {
-        singlePlayerWorker.postMessage(event.serialize())
+        singlePlayerWorker.postMessage(event.intoRaw())
       }
     })
 
     singlePlayerWorker.onmessage = (message: MessageEvent<AnyMinecraftEvent>) => {
-      if (message.data.from === 'SERVER') {
-        this.eventQueue.emit(
-          message.data.type,
-          message.data.payload,
-          message.data.eventUUID,
-          message.data.timestamp,
-          message.data.from,
-          true,
-        )
+      if (message.data.metadata.environment === 'SERVER') {
+        this.eventQueue.emit(message.data.type, message.data.payload, message.data.eventUUID, {
+          environment: message.data.metadata.environment,
+          isForwarded: true,
+        })
       }
     }
 
@@ -121,6 +114,8 @@ export class MinecraftClient {
       'RESPONSE_PLAYER_JOIN',
     )
 
+    console.log('Player join response:', playerJoinResponse)
+
     const gameSession = new GameSession(this, singlePlayerWorker, {
       initialChunksFromServer: serverStartedResponse.payload.loadedChunks,
       player: playerJoinResponse.payload.playerData,
@@ -131,7 +126,7 @@ export class MinecraftClient {
     gameSession.addOnDisposeCallback(unsubscribe)
     gameSession.startGameLoop()
 
-    event.respond('JOINED_WORLD', {})
+    this.eventQueue.respond(event, 'JOINED_WORLD', {})
   }
 
   private setupEventListeners(): void {
@@ -140,7 +135,7 @@ export class MinecraftClient {
   }
 
   private shouldForwardEventToServer(event: AnyMinecraftEvent): boolean {
-    if (event.from === 'SERVER') {
+    if (event.metadata.environment === 'SERVER') {
       return false
     }
 

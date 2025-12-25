@@ -1,14 +1,12 @@
-import { type AnyMinecraftEvent, createMinecraftEventQueue } from '../queue/minecraft.ts'
+import { type AnyMinecraftEvent, MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import { MinecraftServer } from '../server/MinecraftServer.ts'
 
 let localServer: MinecraftServer | null = null
 
-const eventQueue = createMinecraftEventQueue({
-  environment: 'SERVER',
-})
+const eventQueue = new MinecraftEventQueue('SERVER')
 
 const shouldForwardEventToClient = (event: AnyMinecraftEvent) => {
-  if (event.from === 'CLIENT') {
+  if (event.metadata.environment === 'CLIENT') {
     return false
   }
 
@@ -25,7 +23,7 @@ const shouldForwardEventToClient = (event: AnyMinecraftEvent) => {
 
 eventQueue.on('*', (event) => {
   if (shouldForwardEventToClient(event)) {
-    postMessage(event.serialize())
+    postMessage(event.intoRaw())
   }
 })
 
@@ -38,10 +36,14 @@ onmessage = async (message: MessageEvent<AnyMinecraftEvent>) => {
 
     console.log(`Starting local server...`, message)
 
-    localServer = await MinecraftServer.create(
-      eventQueue,
+    localServer = await MinecraftServer.create(eventQueue, message.data.payload.worldDatabaseName)
+
+    eventQueue.emit(
+      'SERVER_STARTED',
+      {
+        loadedChunks: localServer.loadedChunks,
+      },
       message.data.eventUUID,
-      message.data.payload.worldDatabaseName,
     )
 
     console.log('Local server started.', localServer)
@@ -50,14 +52,10 @@ onmessage = async (message: MessageEvent<AnyMinecraftEvent>) => {
   }
 
   if (localServer !== null) {
-    eventQueue.emit(
-      message.data.type,
-      message.data.payload,
-      message.data.eventUUID,
-      message.data.timestamp,
-      message.data.from,
-      true,
-    )
+    eventQueue.emit(message.data.type, message.data.payload, message.data.eventUUID, {
+      environment: message.data.metadata.environment,
+      isForwarded: true,
+    })
   } else {
     console.warn('Received event but local server is not started yet:', message.data)
   }

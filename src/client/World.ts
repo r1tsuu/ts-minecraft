@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-import type { MinecraftEvent, MinecraftEventQueue } from '../queue/minecraft.ts'
+import type { MinecraftEvent, MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import type { DatabaseChunkData } from '../server/WorldDatabase.ts'
 import type { BlockInWorld, Chunk, ClientPlayerData } from '../types.ts'
 import type { ClientBlockRegisty } from './blocks.ts'
@@ -77,6 +77,7 @@ export class World {
       }
       this.scene.remove(mesh)
     }
+
     this.blockMeshes.clear()
     this.blockMeshesCount.clear()
     this.blocksMeshesFreeIndexes.clear()

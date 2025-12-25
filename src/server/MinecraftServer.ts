@@ -1,8 +1,8 @@
-import type { BlockInWorld, ChunkCoordinates, UUID } from '../types.ts'
+import type { BlockInWorld, ChunkCoordinates } from '../types.ts'
 
 import { BlocksRegistry } from '../blocks/BlocksRegistry.ts'
 import { createConfig, type SharedConfig } from '../config.ts'
-import { type MinecraftEvent, type MinecraftEventQueue } from '../queue/minecraft.ts'
+import { type MinecraftEvent, type MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import {
   findByXYZ,
   findChunkByXZ,
@@ -42,7 +42,6 @@ export class MinecraftServer {
 
   static async create(
     eventQueue: MinecraftEventQueue,
-    serverStartedEventUUID: UUID,
     worldDatabaseName: string,
   ): Promise<MinecraftServer> {
     const database = await WorldDatabase.create(worldDatabaseName)
@@ -51,7 +50,7 @@ export class MinecraftServer {
 
     const server = new MinecraftServer(database, eventQueue, meta, players)
 
-    await server.initialize(serverStartedEventUUID)
+    await server.initialize()
 
     return server
   }
@@ -62,7 +61,7 @@ export class MinecraftServer {
     }
   }
 
-  private async initialize(serverStartedEventUUID: UUID): Promise<void> {
+  private async initialize(): Promise<void> {
     const spawnChunksCoordinates = getChunksCoordinatesInRadius({
       centerChunkX: 0,
       centerChunkZ: 0,
@@ -87,14 +86,6 @@ export class MinecraftServer {
     this.meta.lastLoadedAt = new Date()
 
     await this.syncMeta()
-
-    this.eventQueue.emit(
-      'SERVER_STARTED',
-      {
-        loadedChunks: this.loadedChunks,
-      },
-      serverStartedEventUUID,
-    )
 
     this.setupEventHandlers()
   }
@@ -140,7 +131,7 @@ export class MinecraftServer {
 
     await this.syncMeta()
 
-    event.respond('RESPONSE_CHUNKS_LOAD', {
+    await this.eventQueue.respond(event, 'RESPONSE_CHUNKS_LOAD', {
       chunks: response,
     })
   }
@@ -182,7 +173,7 @@ export class MinecraftServer {
       this.players.push(playerData)
     }
 
-    event.respond('RESPONSE_PLAYER_JOIN', {
+    this.eventQueue.respond(event, 'RESPONSE_PLAYER_JOIN', {
       playerData,
     })
   }
@@ -195,7 +186,7 @@ export class MinecraftServer {
       await this.database.updatePlayer(player)
     }
 
-    await event.respond('RESPONSE_SYNC_PLAYER', {})
+    await this.eventQueue.respond(event, 'RESPONSE_SYNC_PLAYER', {})
   }
 
   private setupEventHandlers(): void {
