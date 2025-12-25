@@ -36,15 +36,16 @@ export type DatabaseSchema = {
     canJump: boolean
     direction: JSONColumnType<RawVector3>
     jumpStrength: number
+    pitch: number
     position: JSONColumnType<RawVector3>
-    rotation: JSONColumnType<{ pitch: number; yaw: number }>
     uuid: UUID
     velocity: JSONColumnType<RawVector3>
+    yaw: number
   }
   worldMeta: {
-    _unique: string
+    databaseName: string
     lastLoadedAt: Date | null
-    loadedChunks: JSONColumnType<{ chunkX: number; chunkZ: number; id: UUID }[]>
+    loadedChunks: JSONColumnType<{ chunkX: number; chunkZ: number; uuid: UUID }[]>
     uuid: Generated<UUID>
   }
 }
@@ -134,6 +135,13 @@ export const getWorldDatabase = async ({ databaseName }: { databaseName: string 
       .createTable('players')
       .addColumn('uuid', 'uuid', (col) => col.primaryKey())
       .addColumn('data', 'jsonb', (col) => col.notNull())
+      .addColumn('canJump', 'boolean', (col) => col.notNull())
+      .addColumn('direction', 'jsonb', (col) => col.notNull())
+      .addColumn('jumpStrength', 'real', (col) => col.notNull())
+      .addColumn('pitch', 'real', (col) => col.notNull())
+      .addColumn('position', 'jsonb', (col) => col.notNull())
+      .addColumn('velocity', 'jsonb', (col) => col.notNull())
+      .addColumn('yaw', 'real', (col) => col.notNull())
       .execute()
 
     await db.schema
@@ -141,13 +149,13 @@ export const getWorldDatabase = async ({ databaseName }: { databaseName: string 
       .addColumn('uuid', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
       .addColumn('loadedChunks', 'jsonb', (col) => col.notNull())
       .addColumn('lastLoadedAt', 'timestamp')
-      .addColumn('_unique', 'text', (col) => col.unique().notNull())
+      .addColumn('databaseName', 'text', (col) => col.notNull().unique())
       .execute()
 
     await db
       .insertInto('worldMeta')
       .values({
-        _unique: 'only_instance',
+        databaseName,
         lastLoadedAt: null,
         loadedChunks: json([]),
       })
@@ -228,7 +236,6 @@ export const getWorldDatabase = async ({ databaseName }: { databaseName: string 
         ...data,
         direction: json(data.direction),
         position: json(data.position),
-        rotation: json(data.rotation),
         velocity: json(data.velocity),
       })
       .returning('uuid')
@@ -237,6 +244,21 @@ export const getWorldDatabase = async ({ databaseName }: { databaseName: string 
 
   const fetchPlayers = async (): Promise<DatabasePlayerData[]> => {
     return db.selectFrom('players').selectAll().execute()
+  }
+
+  const updatePlayer = async (player: DatabasePlayerData) => {
+    await db
+      .updateTable('players')
+      .set({
+        canJump: player.canJump,
+        direction: json(player.direction),
+        jumpStrength: player.jumpStrength,
+        pitch: player.pitch,
+        position: json(player.position),
+        velocity: json(player.velocity),
+      })
+      .where('uuid', '=', player.uuid)
+      .execute()
   }
 
   const updateWorldMeta = async (meta: Partial<DatabaseWorldMetaData>) => {
@@ -267,6 +289,7 @@ export const getWorldDatabase = async ({ databaseName }: { databaseName: string 
     fetchChunks,
     fetchPlayers,
     fetchWorldMeta,
+    updatePlayer,
     updateWorldMeta,
   }
 
