@@ -114,6 +114,7 @@ export const createEventQueue = <Events extends Record<string, Record<string, un
     type: K,
     payload: Events[K],
     id: string = crypto.randomUUID(),
+    timestamp: number = Date.now(),
   ) => {
     let canceled = false
 
@@ -127,7 +128,7 @@ export const createEventQueue = <Events extends Record<string, Record<string, un
       respond: async (responseType, responsePayload) => {
         await emit(responseType as EventKey, responsePayload as Events[EventKey], id)
       },
-      timestamp: Date.now(),
+      timestamp,
       type,
     }
 

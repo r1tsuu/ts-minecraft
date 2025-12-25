@@ -28,6 +28,9 @@ export const createMinecraftEventQueue = (environment: 'CLIENT' | 'SERVER') => {
     SERVER_TICK: {
       currentTick: number
     }
+    START_LOCAL_SERVER: {
+      worldDatabaseName: string
+    }
   }>({ environment })
 
   return queue

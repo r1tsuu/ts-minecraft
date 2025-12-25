@@ -2,11 +2,7 @@ import type { BlockInWorld } from '../types.ts'
 
 import { type BlocksRegistry, createBlocksRegistry } from '../blocks/registry.ts'
 import { createConfig, type SharedConfig } from '../config/createConfig.ts'
-import {
-  createMinecraftEventQueue,
-  type MinecraftEventQueue,
-  type MinecraftEventQueueEvent,
-} from '../queue/minecraft.ts'
+import { createMinecraftEventQueue, type MinecraftEventQueue } from '../queue/minecraft.ts'
 import {
   findByXYZ,
   findChunkByXZ,
@@ -27,6 +23,7 @@ export type MinecraftServerInstance = {
   config: SharedConfig
   currentTick: number
   database: Awaited<ReturnType<typeof getWorldDatabase>>
+  destroy: () => Promise<void>
   eventQueue: MinecraftEventQueue
   loadedChunks: DatabaseChunkData[]
   meta: DatabaseWorldMetaData
@@ -56,11 +53,19 @@ export const createMinecraftServer = async ({
 
   const blocksRegistry = createBlocksRegistry()
 
+  let serverTickTimeout: null | number = null
+
   const server: MinecraftServerInstance = {
     blocksRegistry,
     config,
     currentTick: 0,
     database,
+    destroy: async () => {
+      await database.destroy()
+      if (serverTickTimeout !== null) {
+        clearTimeout(serverTickTimeout)
+      }
+    },
     eventQueue,
     loadedChunks,
     meta,
@@ -210,10 +215,10 @@ export const createMinecraftServer = async ({
       currentTick: server.currentTick,
     })
 
-    setTimeout(serverTick, Math.max(0, config.tickDurationMs - delta))
+    serverTickTimeout = setTimeout(serverTick, Math.max(0, config.tickDurationMs - delta))
   }
 
-  setTimeout(serverTick, config.tickDurationMs)
+  serverTickTimeout = setTimeout(serverTick, config.tickDurationMs)
 
   return server
 }
