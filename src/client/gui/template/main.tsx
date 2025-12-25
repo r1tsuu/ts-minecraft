@@ -5,7 +5,7 @@
 import { renderToHtml } from 'jsxte'
 import { tv } from 'tailwind-variants'
 
-import { uiActionKey, uiActivePageKey, uiConditionKey, uiStateKey } from '../state.ts'
+import { actionKey, activePageKey, conditionKey, stateKey } from '../state.ts'
 
 // Reusable component variants using tailwind-variants
 const button = tv({
@@ -177,7 +177,7 @@ const Main = () => {
     <div class="font-press-start main overflow-hidden w-screen h-screen relative bg-background">
       <canvas
         class="fixed top-0 left-0 w-full h-full"
-        data-condition={uiConditionKey('showGameUI')}
+        data-condition={conditionKey('showGameUI')}
         id="game_canvas"
       />
       <div
@@ -191,38 +191,27 @@ const Main = () => {
         z-10
         backdrop-brightness-75
       "
-        data-condition={uiConditionKey('showOverlay')}
+        data-condition={conditionKey('showOverlay')}
       >
         <div
           class="flex flex-col justify-center items-stretch gap-5"
-          data-active-page={uiActivePageKey('start')}
+          data-active-page={activePageKey('start')}
           id="menu_start"
         >
           <h1 class={title({ size: 'xl' })}>Minecraft Clone</h1>
-          <button
-            class={button({ variant: 'primary' })}
-            data-condition={uiConditionKey('showLoadingButton')}
-            disabled
-          >
-            Loading...
-          </button>
-          <button
-            class={button({ variant: 'success' })}
-            data-action={uiActionKey('startGame')}
-            data-condition={uiConditionKey('showStartGameButton')}
-          >
+          <button class={button({ variant: 'success' })} data-action={actionKey('startGame')}>
             Start Game
           </button>
           <a class={button({ variant: 'secondary' })} href="https://github.com/r1tsuu/ts-minecraft">
             GitHub Repo
           </a>
         </div>
-        <div class="flex flex-col gap-6 max-w-4xl" data-active-page={uiActivePageKey('menuWorlds')}>
+        <div class="flex flex-col gap-6 max-w-4xl" data-active-page={activePageKey('menuWorlds')}>
           <h1 class={title()}>Select World</h1>
           <div
             class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto"
             data-items-template="world_item_template"
-            data-items-variable={uiStateKey('worldList')}
+            data-items-variable={stateKey('worldList')}
             id="worlds_list"
           ></div>
           <template id="world_item_template">
@@ -235,25 +224,22 @@ const Main = () => {
                   text-shadow-[2px_2px_0_#000]
                   truncate
                 "
-                data-variable={uiStateKey('worldList.i.name')}
+                data-variable={stateKey('worldList.i.name')}
               />
+              <div class="text-xs text-accent-muted" data-variable={stateKey('worldList.i.seed')} />
               <div
                 class="text-xs text-accent-muted"
-                data-variable={uiStateKey('worldList.i.seed')}
-              />
-              <div
-                class="text-xs text-accent-muted"
-                data-variable={uiStateKey('worldList.i.createdAt')}
+                data-variable={stateKey('worldList.i.createdAt')}
               />
               <button
                 class={button({ size: 'md', variant: 'success' })}
-                data-action={uiActionKey('playWorld')}
+                data-action={actionKey('playWorld')}
               >
                 Play
               </button>
               <button
                 class={button({ size: 'md', variant: 'danger' })}
-                data-action={uiActionKey('deleteWorld')}
+                data-action={actionKey('deleteWorld')}
               >
                 Delete
               </button>
@@ -261,7 +247,7 @@ const Main = () => {
           </template>
           <div
             class="text-center text-lg text-accent text-shadow-[1px_1px_2px_rgba(0,0,0,0.8)]"
-            data-condition={uiConditionKey('showWorldsNotFound')}
+            data-condition={conditionKey('showWorldsNotFound')}
           >
             <div>No worlds found.</div>
             <div>Create a new world to get started.</div>
@@ -277,39 +263,39 @@ const Main = () => {
             </button>
           </div>
         </div>
-        <div data-active-page={uiActivePageKey('worldLoading')}>
+        <div data-active-page={activePageKey('worldLoading')}>
           <h1 class={title()}>
             Loading World:{' '}
-            <span class="text-success" data-variable={uiStateKey('loadingWorldName')} />
+            <span class="text-success" data-variable={stateKey('loadingWorldName')} />
           </h1>
         </div>
       </div>
       <div
         class="absolute top-2.5 left-2.5 w-full h-full flex flex-col gap-1.25 z-10 max-w-fit"
-        data-condition={uiConditionKey('showGameUI')}
+        data-condition={conditionKey('showGameUI')}
       >
         <div class={gameUIElement()} id="fps">
           FPS:{' '}
           <span
             class="data-[performance=good]:text-success data-[performance=average]:text-warning data-[performance=bad]:text-danger"
-            data-variable={uiStateKey('fps')}
+            data-variable={stateKey('fps')}
             id="fps_value"
           />
         </div>
         <div class={gameUIElement()} id="position">
-          Position: X: <span class="text-secondary" data-variable={uiStateKey('positionX')} /> Y:{' '}
-          <span class="text-secondary" data-variable={uiStateKey('positionY')} /> Z:{' '}
-          <span class="text-secondary" data-variable={uiStateKey('positionZ')} />
+          Position: X: <span class="text-secondary" data-variable={stateKey('positionX')} /> Y:{' '}
+          <span class="text-secondary" data-variable={stateKey('positionY')} /> Z:{' '}
+          <span class="text-secondary" data-variable={stateKey('positionZ')} />
         </div>
         <div class={gameUIElement()} id="rotation">
-          Rotation: Yaw: <span class="text-secondary" data-variable={uiStateKey('rotationYaw')} />°
-          Pitch: <span class="text-secondary" data-variable={uiStateKey('rotationPitch')} />°
+          Rotation: Yaw: <span class="text-secondary" data-variable={stateKey('rotationYaw')} />°
+          Pitch: <span class="text-secondary" data-variable={stateKey('rotationPitch')} />°
         </div>
-        <div class={gameUIElement()} data-variable={uiStateKey('pauseText')} />
+        <div class={gameUIElement()} data-variable={stateKey('pauseText')} />
 
         <div
           class="h-full w-full fixed cursor-default top-0 left-0 bg-pause-overlay backdrop-blur-md z-20"
-          data-condition={uiConditionKey('showPauseMenu')}
+          data-condition={conditionKey('showPauseMenu')}
         >
           <div
             class={
@@ -324,10 +310,10 @@ const Main = () => {
           >
             <h1 class={title({ size: 'xl' })}>Game Paused</h1>
             <div class="border-t-2 border-primary-dark/50 my-2"></div>
-            <button class={button({ variant: 'success' })} data-action={uiActionKey('resumeGame')}>
+            <button class={button({ variant: 'success' })} data-action={actionKey('resumeGame')}>
               Resume Game
             </button>
-            <button class={button({ variant: 'danger' })} data-action={uiActionKey('backToMenu')}>
+            <button class={button({ variant: 'danger' })} data-action={actionKey('backToMenu')}>
               Exit to Main Menu
             </button>
           </div>
@@ -335,7 +321,7 @@ const Main = () => {
       </div>
       <div
         class="fixed top-1/2 left-1/2 w-5 h-5 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10"
-        data-condition={uiConditionKey('showCrosshair')}
+        data-condition={conditionKey('showCrosshair')}
       >
         {/** <!-- Vertical line --> */}
         <div class="absolute w-0.5 h-full left-1/2 -translate-x-1/2 bg-crosshair shadow-[0_0_4px_rgba(0,0,0,0.8)]"></div>

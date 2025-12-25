@@ -1,0 +1,165 @@
+import * as THREE from 'three'
+
+import type { DatabaseChunkData, DatabasePlayerData } from '../server/worldDatabase.ts'
+import type { ClientPlayerData, GameContext, MinecraftClient } from '../types.ts'
+
+import { FPSControls } from './FPSControls.ts'
+import { createRaycaster } from './raycaster.ts'
+import { rawVector3ToThreeVector3, threeVector3ToRawVector3 } from './utils.ts'
+import { createWorld } from './world.ts'
+
+export const createGameContext = async ({
+  initialChunksFromServer,
+  minecraft,
+  player,
+  singlePlayerWorker,
+}: {
+  initialChunksFromServer: DatabaseChunkData[]
+  minecraft: MinecraftClient
+  player: DatabasePlayerData
+  singlePlayerWorker: Worker
+}): Promise<GameContext> => {
+  const scene = new THREE.Scene()
+  const renderer = new THREE.WebGLRenderer({
+    antialias: false,
+    canvas: minecraft.getGUI().getCanvas(),
+    powerPreference: 'high-performance',
+  })
+  renderer.setSize(window.innerWidth, window.innerHeight)
+
+  const onResize = () => {
+    renderer.setSize(window.innerWidth, window.innerHeight)
+  }
+
+  const additionalOnDisposeCallbacks: Array<() => void> = []
+  window.addEventListener('resize', onResize)
+  additionalOnDisposeCallbacks.push(() => {
+    window.removeEventListener('resize', onResize)
+  })
+
+  renderer.outputColorSpace = THREE.SRGBColorSpace
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1.0
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
+
+  camera.position.set(0, 40, 0)
+  camera.lookAt(30, 35, 30)
+
+  const clientPlayer: ClientPlayerData = {
+    canJump: true,
+    direction: rawVector3ToThreeVector3(player.direction),
+    height: minecraft.config.playerHeight,
+    isMovingBackward: false,
+    isMovingForward: false,
+    isMovingLeft: false,
+    isMovingRight: false,
+    jumpStrength: minecraft.config.defaultPlayerJumpStrength,
+    pitch: player.pitch,
+    position: rawVector3ToThreeVector3(player.position),
+    speed: minecraft.config.defaultPlayerSpeed,
+    velocity: rawVector3ToThreeVector3(player.velocity),
+    width: minecraft.config.playerWidth,
+    yaw: player.yaw,
+  }
+
+  camera.position.copy(player.position)
+  camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
+  let disposed = false
+  let syncying = false
+
+  const world = createWorld({
+    blockRegistry: minecraft.blocksRegistry,
+    clientPlayer,
+    eventQueue: minecraft.eventQueue,
+    initialChunksFromServer,
+    scene,
+  })
+
+  let lastTimeout: null | number = null
+
+  const syncPlayer = async () => {
+    if (minecraft.getGUI().state.isPaused) {
+      lastTimeout = setTimeout(syncPlayer, 1000)
+      return
+    }
+
+    if (disposed || syncying) {
+      console.log('Skipping syncPlayer because disposed or syncying')
+      return
+    }
+
+    try {
+      syncying = true
+      await minecraft.eventQueue.emitAndWaitResponse(
+        'REQUEST_SYNC_PLAYER',
+        {
+          playerData: {
+            canJump: clientPlayer.canJump,
+            direction: threeVector3ToRawVector3(clientPlayer.direction),
+            jumpStrength: clientPlayer.jumpStrength,
+            pitch: clientPlayer.pitch,
+            position: threeVector3ToRawVector3(clientPlayer.position),
+            uuid: player.uuid,
+            velocity: threeVector3ToRawVector3(clientPlayer.velocity),
+            yaw: clientPlayer.yaw,
+          },
+        },
+        'RESPONSE_SYNC_PLAYER',
+      )
+    } finally {
+      syncying = false
+      lastTimeout = setTimeout(syncPlayer, 1000)
+    }
+  }
+
+  lastTimeout = setTimeout(syncPlayer, 1000)
+
+  const dispose = () => {
+    window.removeEventListener('resize', onResize)
+    world.dispose()
+    renderer.dispose()
+    scene.clear()
+
+    if (lastTimeout) {
+      clearTimeout(lastTimeout)
+    }
+
+    singlePlayerWorker.terminate()
+
+    for (const callback of additionalOnDisposeCallbacks) {
+      callback()
+    }
+
+    disposed = true
+  }
+
+  const gameContext: GameContext = {
+    addOnDisposeCallback: (callback) => {
+      additionalOnDisposeCallbacks.push(callback)
+    },
+    camera,
+    controls: new FPSControls(camera, renderer.domElement, world, clientPlayer, minecraft.getGUI()),
+    dispose,
+    frameCounter: {
+      fps: 0,
+      lastFrames: 0,
+      lastTime: 0,
+      totalFrames: 0,
+      totalTime: 0,
+    },
+    paused: false,
+    player: clientPlayer,
+    raycaster: createRaycaster({
+      camera,
+      player: clientPlayer,
+      scene,
+      world,
+    }),
+    renderer,
+    scene,
+    singlePlayerWorker,
+    world,
+  }
+
+  return gameContext
+}

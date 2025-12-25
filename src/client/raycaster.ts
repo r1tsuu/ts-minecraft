@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-import type { PlayerData, World } from './types.ts'
+import type { ClientPlayerData, World } from '../types.ts'
 
 const FAR = 5
 
@@ -11,7 +11,7 @@ export const createRaycaster = ({
   world,
 }: {
   camera: THREE.PerspectiveCamera
-  player: PlayerData
+  player: ClientPlayerData
   scene: THREE.Scene
   world: World
 }) => {
