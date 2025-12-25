@@ -3,7 +3,9 @@ import { createMinecraftServer, type MinecraftServerInstance } from '../server/c
 
 let localServer: MinecraftServerInstance | null = null
 
-const eventQueue = createMinecraftEventQueue('SERVER')
+const eventQueue = createMinecraftEventQueue({
+  environment: 'SERVER',
+})
 
 const clientEventForwardMatcher = (event: MinecraftEvent) => {
   if (event.from === 'CLIENT') {
@@ -38,6 +40,7 @@ onmessage = async (message: MessageEvent<MinecraftEvent>) => {
 
     localServer = await createMinecraftServer({
       eventQueue,
+      serverStartedEventUUID: message.data.eventUUID,
       worldDatabaseName: message.data.payload.worldDatabaseName,
     })
 
@@ -53,6 +56,7 @@ onmessage = async (message: MessageEvent<MinecraftEvent>) => {
       message.data.eventUUID,
       message.data.timestamp,
       message.data.from,
+      true,
     )
   } else {
     console.warn('Received event but local server is not started yet:', message.data)

@@ -10,7 +10,9 @@ import { createLocalStorageManager } from './localStorageManager.ts'
 import SinglePlayerWorker from './singlePlayerWorker.ts?worker'
 
 export const initMinecraftClient = () => {
-  const eventQueue = createMinecraftEventQueue('CLIENT')
+  const eventQueue = createMinecraftEventQueue({
+    environment: 'CLIENT',
+  })
 
   const config = createConfig()
 
@@ -75,7 +77,6 @@ export const initMinecraftClient = () => {
     })
 
     singlePlayerWorker.onmessage = (message: MessageEvent<MinecraftEvent>) => {
-      console.log('Client worker message received:', message.data)
       if (message.data.from === 'SERVER') {
         minecraft.eventQueue.emit(
           message.data.type,
@@ -83,11 +84,14 @@ export const initMinecraftClient = () => {
           message.data.eventUUID,
           message.data.timestamp,
           message.data.from,
+          true,
         )
       }
     }
 
+    console.log('Waiting for single player worker to be ready...')
     await minecraft.eventQueue.waitUntilOn('SINGLEPLAYER_WORKER_READY')
+    console.log('Single player worker is ready.')
     const serverStartedResponse = await minecraft.eventQueue.emitAndWaitResponse(
       'START_LOCAL_SERVER',
       {
@@ -118,13 +122,13 @@ export const initMinecraftClient = () => {
     gameContext.addOnDisposeCallback(unsubscribe)
 
     initGameLoop(minecraft)
+
+    event.respond('JOINED_WORLD', {})
   })
 
-  minecraft.eventQueue.on('EXIT_WORLD', (event) => {
+  minecraft.eventQueue.on('EXIT_WORLD', () => {
     minecraft.getGameContext().dispose()
     minecraft.gameContext = null
-
-    event.respond('EXITED_WORLD', {})
   })
 
   return minecraft

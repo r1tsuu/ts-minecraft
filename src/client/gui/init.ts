@@ -128,8 +128,7 @@ export const initGUI = ({ minecraft }: { minecraft: MinecraftClient }): GUI => {
 
   const actions: GUIActions = {
     backToMenu: async () => {
-      console.log('Exiting world...')
-      await minecraft.eventQueue.emitAndWaitResponse('EXIT_WORLD', {}, 'EXITED_WORLD')
+      minecraft.eventQueue.emit('EXIT_WORLD', {})
       setState({
         activePage: 'start',
         fps: 'Loading...',
@@ -182,6 +181,7 @@ export const initGUI = ({ minecraft }: { minecraft: MinecraftClient }): GUI => {
         activePage: 'worldLoading',
         loadingWorldName: world.name,
       })
+
       await minecraft.eventQueue.emitAndWaitResponse(
         'JOIN_WORLD',
         {
@@ -189,6 +189,9 @@ export const initGUI = ({ minecraft }: { minecraft: MinecraftClient }): GUI => {
         },
         'JOINED_WORLD',
       )
+
+      console.log('Joined world:', world.name)
+
       setState({
         activePage: 'game',
         loadingWorldName: ' ',
@@ -228,7 +231,7 @@ export const initGUI = ({ minecraft }: { minecraft: MinecraftClient }): GUI => {
 
       clearInterval(gameInterval)
     },
-    getCanvas: () => document.getElementById('gameCanvas') as HTMLCanvasElement,
+    getCanvas: () => document.getElementById('game_canvas') as HTMLCanvasElement,
     setState,
     state,
   }

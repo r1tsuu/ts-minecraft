@@ -1,4 +1,4 @@
-import * as THREE from 'three'
+import type * as THREE from 'three'
 
 import type { ClientBlockRegisty } from './client/blocks.ts'
 import type { FPSControls } from './client/FPSControls.ts'

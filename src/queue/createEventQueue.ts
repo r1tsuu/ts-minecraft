@@ -2,6 +2,8 @@
  * Core event types
  * =========================================================== */
 
+import type { UUID } from '../types.ts'
+
 type Event<
   EventKeys extends string,
   Events extends Record<string, unknown>,
@@ -9,13 +11,17 @@ type Event<
   D extends Record<string, unknown> = {},
 > = {
   cancel: () => void
-  eventUUID: string
+  eventUUID: UUID
   from: 'CLIENT' | 'SERVER'
+  /**
+   * Indicates whether this event was forwarded from another environment.
+   */
+  isForwarded: boolean
   payload: D
   /**
    * Respond to this event with another event.
    */
-  respond: <T extends EventKeys, P extends Events[T]>(type: T, payload: P) => Promise<void>
+  respond: <T extends EventKeys, P extends Events[T]>(type: T, payload: P) => Promise<boolean>
   serialize: () => Omit<Event<EventKeys, Events, K, D>, 'cancel' | 'respond' | 'serialize'>
   timestamp: number
   type: K
@@ -27,8 +33,6 @@ type EventHandler<
   K extends string,
   D extends Record<string, unknown> = {},
 > = (event: Event<EventKeys, Events, K, D>) => Promise<void> | void
-
-const DEBUG = true
 
 /* ===========================================================
  * Event queue
@@ -101,6 +105,7 @@ export const createEventQueue = <Events extends Record<string, Record<string, un
     return new Promise((resolve) => {
       // @ts-expect-error
       const unsub = on(type, (event) => {
+        // console.log('waitUntilOn received event:', event, eventUUID) // DEBUG
         if (eventUUID && event.eventUUID !== eventUUID) return
         // @ts-expect-error
         resolve(event)
@@ -116,9 +121,10 @@ export const createEventQueue = <Events extends Record<string, Record<string, un
   const emit = async <K extends EventKey>(
     type: K,
     payload: Events[K],
-    id: string = crypto.randomUUID(),
+    uuid: UUID = crypto.randomUUID(),
     timestamp: number = Date.now(),
     from: 'CLIENT' | 'SERVER' = environment,
+    isForwarded: boolean = false,
   ) => {
     let canceled = false
 
@@ -126,11 +132,12 @@ export const createEventQueue = <Events extends Record<string, Record<string, un
       cancel: () => {
         canceled = true
       },
-      eventUUID: id,
+      eventUUID: uuid,
       from,
+      isForwarded,
       payload,
       respond: async (responseType, responsePayload) => {
-        await emit(responseType as EventKey, responsePayload as Events[EventKey], id)
+        return emit(responseType as EventKey, responsePayload as Events[EventKey], uuid)
       },
       serialize: () => {
         return {
@@ -145,9 +152,7 @@ export const createEventQueue = <Events extends Record<string, Record<string, un
       type,
     }
 
-    if (DEBUG) {
-      console.log(`[EventQueue][${environment}] Emitting event:`, event)
-    }
+    // console.log(`Event`, event, `emitted from`, environment, isForwarded ? `(forwarded)` : ``)
 
     const listeners = [
       ...(registry.get(type)?.listeners ?? []),
@@ -170,9 +175,9 @@ export const createEventQueue = <Events extends Record<string, Record<string, un
     type: K,
     payload: Events[K],
     typeUntil: UntilK,
-    eventUUID: string = crypto.randomUUID(),
+    eventUUID: UUID = crypto.randomUUID(),
   ): Promise<Event<EventKey, Events, UntilK, Events[UntilK]>> => {
-    await emit(type, payload, eventUUID)
+    emit(type, payload, eventUUID)
     return waitUntilOn(typeUntil, eventUUID)
   }
 

@@ -7,10 +7,13 @@ import type { UUID } from '../types.ts'
 
 import { createEventQueue } from './createEventQueue.ts'
 
-export const createMinecraftEventQueue = (environment: 'CLIENT' | 'SERVER') => {
+export const createMinecraftEventQueue = ({
+  environment,
+}: {
+  environment: 'CLIENT' | 'SERVER'
+}) => {
   const queue = createEventQueue<{
     EXIT_WORLD: {}
-    EXITED_WORLD: {}
     JOIN_WORLD: {
       worldUUID: UUID
     }

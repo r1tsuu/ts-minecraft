@@ -59,7 +59,7 @@ export type DatabaseSchema = {
 export type DatabaseWorldMetaData = Selectable<DatabaseSchema['worldMeta']>
 
 // Increment this when making changes to the database schema
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 const json = <T>(value: T): RawBuilder<string> => {
   return sql`CAST(${JSON.stringify(value)} AS JSONB)`
@@ -140,7 +140,6 @@ export const getWorldDatabase = async ({ databaseName }: { databaseName: string 
     await db.schema
       .createTable('players')
       .addColumn('uuid', 'uuid', (col) => col.primaryKey())
-      .addColumn('data', 'jsonb', (col) => col.notNull())
       .addColumn('canJump', 'boolean', (col) => col.notNull())
       .addColumn('direction', 'jsonb', (col) => col.notNull())
       .addColumn('jumpStrength', 'real', (col) => col.notNull())

@@ -1,4 +1,4 @@
-import type { BlockInWorld } from '../types.ts'
+import type { BlockInWorld, UUID } from '../types.ts'
 
 import { type BlocksRegistry, createBlocksRegistry } from '../blocks/registry.ts'
 import { createConfig, type SharedConfig } from '../config.ts'
@@ -34,9 +34,11 @@ export type MinecraftServerInstance = {
 
 export const createMinecraftServer = async ({
   eventQueue,
+  serverStartedEventUUID,
   worldDatabaseName,
 }: {
   eventQueue: MinecraftEventQueue
+  serverStartedEventUUID: UUID
   worldDatabaseName: string
 }) => {
   const database = await getWorldDatabase({ databaseName: worldDatabaseName })
@@ -98,9 +100,13 @@ export const createMinecraftServer = async ({
 
   await syncMeta()
 
-  eventQueue.emit('SERVER_STARTED', {
-    loadedChunks,
-  })
+  eventQueue.emit(
+    'SERVER_STARTED',
+    {
+      loadedChunks,
+    },
+    serverStartedEventUUID,
+  )
 
   eventQueue.on('REQUEST_PLAYER_JOIN', async (event) => {
     let playerData = server.players.find((player) => player.uuid === event.payload.playerUUID)
