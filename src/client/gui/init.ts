@@ -10,7 +10,6 @@ export const initGUI = ({ minecraft }: { minecraft: MinecraftClient }): GUI => {
     activePage: 'start',
     fps: 'Loading...',
     initializedGameUI: false,
-    isInitialized: false,
     isPaused: false,
     loadingWorldName: '',
     pauseText: 'Press Escape to Pause',
@@ -19,7 +18,7 @@ export const initGUI = ({ minecraft }: { minecraft: MinecraftClient }): GUI => {
     positionZ: '',
     rotationPitch: '',
     rotationYaw: '',
-    worldList: [],
+    worldList: minecraft.localStorageManager.getListWorlds(),
   }
 
   const setState = (newState: Partial<GUIState>, affectedQuerySelectors?: string | string[]) => {
@@ -214,10 +213,8 @@ export const initGUI = ({ minecraft }: { minecraft: MinecraftClient }): GUI => {
   const conditions: GUIConditions = {
     showCrosshair: () => minecraft.gameContext !== null && !state.isPaused,
     showGameUI: () => minecraft.gameContext !== null,
-    showLoadingButton: () => state.isInitialized === false,
     showOverlay: () => ['menuWorlds', 'start', 'worldLoading'].includes(state.activePage),
     showPauseMenu: () => state.isPaused,
-    showStartGameButton: () => state.isInitialized === true,
     showWorldsNotFound: () => state.worldList.length === 0,
   }
 

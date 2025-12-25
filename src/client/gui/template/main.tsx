@@ -199,18 +199,7 @@ const Main = () => {
           id="menu_start"
         >
           <h1 class={title({ size: 'xl' })}>Minecraft Clone</h1>
-          <button
-            class={button({ variant: 'primary' })}
-            data-condition={conditionKey('showLoadingButton')}
-            disabled
-          >
-            Loading...
-          </button>
-          <button
-            class={button({ variant: 'success' })}
-            data-action={actionKey('startGame')}
-            data-condition={conditionKey('showStartGameButton')}
-          >
+          <button class={button({ variant: 'success' })} data-action={actionKey('startGame')}>
             Start Game
           </button>
           <a class={button({ variant: 'secondary' })} href="https://github.com/r1tsuu/ts-minecraft">

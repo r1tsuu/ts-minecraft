@@ -1,7 +1,7 @@
 import type { MinecraftClient } from '../types.ts'
 
 import { createConfig } from '../config.ts'
-import { createMinecraftEventQueue, type MinecraftEventQueueEvent } from '../queue/minecraft.ts'
+import { createMinecraftEventQueue, type MinecraftEvent } from '../queue/minecraft.ts'
 import { createClientBlockRegistry } from './blocks.ts'
 import { createGameContext } from './gameContext.ts'
 import { initGameLoop } from './gameLoop.ts'
@@ -51,19 +51,38 @@ export const initMinecraftClient = () => {
 
     const singlePlayerWorker = new SinglePlayerWorker()
 
+    // Forward relevant events to the single player worker
+    const forwardMatcher = (event: MinecraftEvent) => {
+      if (event.from === 'SERVER') {
+        return false
+      }
+
+      if (event.type.startsWith('REQUEST_')) {
+        return true
+      }
+
+      if (event.type === 'START_LOCAL_SERVER' || event.type === 'SERVER_STARTED') {
+        return true
+      }
+
+      return false
+    }
+
     const unsubscribe = minecraft.eventQueue.on('*', (event) => {
-      if (event.from === 'CLIENT' && event.type.startsWith('REQUEST_')) {
-        singlePlayerWorker.postMessage(event)
+      if (forwardMatcher(event)) {
+        singlePlayerWorker.postMessage(event.serialize())
       }
     })
 
-    singlePlayerWorker.onmessage = (message: MessageEvent<MinecraftEventQueueEvent>) => {
+    singlePlayerWorker.onmessage = (message: MessageEvent<MinecraftEvent>) => {
+      console.log('Client worker message received:', message.data)
       if (message.data.from === 'SERVER') {
         minecraft.eventQueue.emit(
           message.data.type,
           message.data.payload,
           message.data.eventUUID,
           message.data.timestamp,
+          message.data.from,
         )
       }
     }
@@ -76,6 +95,8 @@ export const initMinecraftClient = () => {
       },
       'SERVER_STARTED',
     )
+
+    console.log('Server started response:', serverStartedResponse)
 
     const playerJoinResponse = await minecraft.eventQueue.emitAndWaitResponse(
       'REQUEST_PLAYER_JOIN',

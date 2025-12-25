@@ -91,7 +91,5 @@ export const getChunksCoordinatesInRadius = ({
     }
   }
 
-  console.log('Chunks in radius:', chunks)
-
   return chunks
 }

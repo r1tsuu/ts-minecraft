@@ -46,5 +46,7 @@ export const createMinecraftEventQueue = (environment: 'CLIENT' | 'SERVER') => {
   return queue
 }
 
+export type MinecraftEvent = Parameters<Parameters<MinecraftEventQueue['on']>[1]>[0]
 export type MinecraftEventQueue = ReturnType<typeof createMinecraftEventQueue>
-export type MinecraftEventQueueEvent = Parameters<Parameters<MinecraftEventQueue['on']>[1]>[0]
+
+export type RawMinecraftEvent = ReturnType<MinecraftEvent['serialize']>

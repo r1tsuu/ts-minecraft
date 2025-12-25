@@ -16,6 +16,7 @@ type Event<
    * Respond to this event with another event.
    */
   respond: <T extends EventKeys, P extends Events[T]>(type: T, payload: P) => Promise<void>
+  serialize: () => Omit<Event<EventKeys, Events, K, D>, 'cancel' | 'respond' | 'serialize'>
   timestamp: number
   type: K
 }
@@ -26,6 +27,8 @@ type EventHandler<
   K extends string,
   D extends Record<string, unknown> = {},
 > = (event: Event<EventKeys, Events, K, D>) => Promise<void> | void
+
+const DEBUG = true
 
 /* ===========================================================
  * Event queue
@@ -115,6 +118,7 @@ export const createEventQueue = <Events extends Record<string, Record<string, un
     payload: Events[K],
     id: string = crypto.randomUUID(),
     timestamp: number = Date.now(),
+    from: 'CLIENT' | 'SERVER' = environment,
   ) => {
     let canceled = false
 
@@ -123,13 +127,26 @@ export const createEventQueue = <Events extends Record<string, Record<string, un
         canceled = true
       },
       eventUUID: id,
-      from: environment,
+      from,
       payload,
       respond: async (responseType, responsePayload) => {
         await emit(responseType as EventKey, responsePayload as Events[EventKey], id)
       },
+      serialize: () => {
+        return {
+          eventUUID: event.eventUUID,
+          from: event.from,
+          payload: event.payload,
+          timestamp: event.timestamp,
+          type: event.type,
+        } as Omit<Event<EventKey, Events, K, Events[K]>, 'cancel' | 'respond'>
+      },
       timestamp,
       type,
+    }
+
+    if (DEBUG) {
+      console.log(`[EventQueue][${environment}] Emitting event:`, event)
     }
 
     const listeners = [

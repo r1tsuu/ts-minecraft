@@ -4,7 +4,6 @@ export type GUIState = {
   activePage: ActiveGUIPage
   fps: string
   initializedGameUI: boolean
-  isInitialized: boolean
   isPaused: boolean
   loadingWorldName: string
   pauseText: string
@@ -52,10 +51,8 @@ export type GUIActions = {
 export type GUIConditions = {
   showCrosshair: () => boolean
   showGameUI: () => boolean
-  showLoadingButton: () => boolean
   showOverlay: () => boolean
   showPauseMenu: () => boolean
-  showStartGameButton: () => boolean
   showWorldsNotFound: () => boolean
 }
 

@@ -2,7 +2,7 @@ import type { BlockInWorld } from '../types.ts'
 
 import { type BlocksRegistry, createBlocksRegistry } from '../blocks/registry.ts'
 import { createConfig, type SharedConfig } from '../config.ts'
-import { createMinecraftEventQueue, type MinecraftEventQueue } from '../queue/minecraft.ts'
+import { type MinecraftEventQueue } from '../queue/minecraft.ts'
 import {
   findByXYZ,
   findChunkByXZ,
@@ -33,12 +33,13 @@ export type MinecraftServerInstance = {
 }
 
 export const createMinecraftServer = async ({
+  eventQueue,
   worldDatabaseName,
 }: {
+  eventQueue: MinecraftEventQueue
   worldDatabaseName: string
 }) => {
   const database = await getWorldDatabase({ databaseName: worldDatabaseName })
-  const eventQueue = createMinecraftEventQueue('SERVER')
   const loadedChunks: DatabaseChunkData[] = []
   const players: DatabasePlayerData[] = await database.fetchPlayers()
   const meta = await database.fetchWorldMeta()
@@ -53,19 +54,14 @@ export const createMinecraftServer = async ({
 
   const blocksRegistry = createBlocksRegistry()
 
-  let serverTickTimeout: null | number = null
+  // let serverTickTimeout: null | number = null
 
   const server: MinecraftServerInstance = {
     blocksRegistry,
     config,
     currentTick: 0,
     database,
-    destroy: async () => {
-      await database.destroy()
-      if (serverTickTimeout !== null) {
-        clearTimeout(serverTickTimeout)
-      }
-    },
+    destroy: async () => {},
     eventQueue,
     loadedChunks,
     meta,
@@ -206,25 +202,25 @@ export const createMinecraftServer = async ({
 
   server.nextTickScheduledAt = performance.now() + config.tickDurationMs
 
-  const handleTick = async () => {}
+  // const handleTick = async () => {}
 
-  const serverTick = async () => {
-    const now = performance.now()
-    const delta = now - server.nextTickScheduledAt
+  // const serverTick = async () => {
+  //   const now = performance.now()
+  //   const delta = now - server.nextTickScheduledAt
 
-    server.nextTickScheduledAt += config.tickDurationMs
-    server.currentTick += 1
+  //   server.nextTickScheduledAt += config.tickDurationMs
+  //   server.currentTick += 1
 
-    await handleTick()
+  //   await handleTick()
 
-    eventQueue.emit('SERVER_TICK', {
-      currentTick: server.currentTick,
-    })
+  //   eventQueue.emit('SERVER_TICK', {
+  //     currentTick: server.currentTick,
+  //   })
 
-    serverTickTimeout = setTimeout(serverTick, Math.max(0, config.tickDurationMs - delta))
-  }
+  //   serverTickTimeout = setTimeout(serverTick, Math.max(0, config.tickDurationMs - delta))
+  // }
 
-  serverTickTimeout = setTimeout(serverTick, config.tickDurationMs)
+  // serverTickTimeout = setTimeout(serverTick, config.tickDurationMs)
 
   return server
 }
