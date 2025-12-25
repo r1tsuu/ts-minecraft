@@ -1,19 +1,21 @@
 import * as THREE from 'three'
 
-import type { BlockInWorld, BlockType, PlayerData, World } from './types.ts'
-import type { ActiveWorld } from './worker/types.ts'
+import type { MinecraftEventQueue } from '../queue/minecraft.ts'
+import type { DatabaseChunkData } from '../server/worldDatabase.ts'
+import type { BlockInWorld, BlockType, ClientPlayerData, World } from '../types.ts'
 
-import { blockRegistry, getBlockById } from './block.ts'
-import { CHUNK_SIZE, getBlockIndex, getBlockKey, RENDER_DISTANCE, WORLD_HEIGHT } from './util.ts'
-import { listenToWorkerEvents, sendEventToWorker } from './worker/workerClient.ts'
+import { blockRegistry, getBlockById } from '../block.ts'
+import { CHUNK_SIZE, getBlockIndex, getBlockKey, RENDER_DISTANCE, WORLD_HEIGHT } from '../util.ts'
 
 export const createWorld = ({
-  activeWorld,
-  player,
+  clientPlayer,
+  eventQueue,
+  initialChunksFromServer,
   scene,
 }: {
-  activeWorld: ActiveWorld
-  player: PlayerData
+  clientPlayer: ClientPlayerData
+  eventQueue: MinecraftEventQueue
+  initialChunksFromServer: DatabaseChunkData[]
   scene: THREE.Scene
 }): World => {
   const backgroundColor = 0x87ceeb
@@ -73,8 +75,8 @@ export const createWorld = ({
   }
 
   const update = () => {
-    const playerChunkX = Math.floor(player.position.x / CHUNK_SIZE)
-    const playerChunkZ = Math.floor(player.position.z / CHUNK_SIZE)
+    const playerChunkX = Math.floor(clientPlayer.position.x / CHUNK_SIZE)
+    const playerChunkZ = Math.floor(clientPlayer.position.z / CHUNK_SIZE)
 
     const needed = new Set<string>()
     const chunksToLoad: string[] = []
@@ -95,15 +97,11 @@ export const createWorld = ({
 
     if (chunksToLoad.length) {
       if (world.requestingChunksState === 'idle') {
-        sendEventToWorker({
-          payload: {
-            chunksCoordinates: chunksToLoad.map((key) => {
-              const [chunkX, chunkZ] = key.split(',').map(Number)
-              return { chunkX, chunkZ }
-            }),
-            worldID: world.id,
-          },
-          type: 'requestChunks',
+        eventQueue.emit('REQUEST_CHUNKS_LOAD', {
+          chunks: chunksToLoad.map((key) => {
+            const [chunkX, chunkZ] = key.split(',').map(Number)
+            return { chunkX, chunkZ }
+          }),
         })
         world.requestingChunksState = 'requesting'
       }
@@ -195,7 +193,7 @@ export const createWorld = ({
       const blocks: Map<string, BlockInWorld> = new Map()
       const blocksUint = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT)
 
-      for (const block of chunk.blocks) {
+      for (const block of chunk.data.blocks) {
         const blockKey = `${block.x},${block.y},${block.z}`
         blocks.set(blockKey, block)
         blocksUint[getBlockIndex(block.x, block.y, block.z)] = block.typeID
@@ -207,27 +205,26 @@ export const createWorld = ({
         blocksUint,
         chunkX: chunk.chunkX,
         chunkZ: chunk.chunkZ,
-        id: chunk.id,
         needsRenderUpdate: true,
+        uuid: chunk.uuid,
       })
     }
   }
 
-  const unsubscribeFromWorkerEvents = listenToWorkerEvents((event) => {
-    switch (event.type) {
-      case 'chunksGenerated': {
-        const { chunks } = event.payload
-        const now = Date.now()
-        world.syncChunksFromServer(chunks)
-        console.log('Processing chunks took', Date.now() - now, 'ms')
-        world.requestingChunksState = 'idle'
-        break
-      }
-    }
-  })
+  const subscriptions: Function[] = []
+
+  subscriptions.push(
+    eventQueue.on('RESPONSE_CHUNKS_LOAD', (event) => {
+      world.syncChunksFromServer(event.payload.chunks)
+      world.requestingChunksState = 'idle'
+    }),
+  )
 
   const dispose = () => {
-    unsubscribeFromWorkerEvents()
+    for (const unsubscribe of subscriptions) {
+      unsubscribe()
+    }
+
     for (const mesh of blockMeshes.values()) {
       mesh.geometry.dispose()
       if (Array.isArray(mesh.material)) {
@@ -252,14 +249,13 @@ export const createWorld = ({
     chunks: new Map(),
     dispose,
     getBlock,
-    id: activeWorld.world.id,
     requestingChunksState: 'idle',
     syncChunksFromServer,
     update,
   }
 
   // Initial sync of loaded chunks from server
-  world.syncChunksFromServer(activeWorld.loadedChunks)
+  world.syncChunksFromServer(initialChunksFromServer)
 
   return world
 }

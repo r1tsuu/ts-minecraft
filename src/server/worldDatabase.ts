@@ -45,7 +45,13 @@ export type DatabaseSchema = {
   worldMeta: {
     databaseName: string
     lastLoadedAt: Date | null
-    loadedChunks: JSONColumnType<{ chunkX: number; chunkZ: number; uuid: UUID }[]>
+    loadedChunks: JSONColumnType<
+      {
+        chunkX: number
+        chunkZ: number
+        uuid: UUID
+      }[]
+    >
     uuid: Generated<UUID>
   }
 }
@@ -209,7 +215,7 @@ export const getWorldDatabase = async ({ databaseName }: { databaseName: string 
     return result ?? null
   }
 
-  const fetchChunks = async ({
+  const fetchChunksByCoordinates = async ({
     coordinates,
   }: {
     coordinates: { chunkX: number; chunkZ: number }[]
@@ -225,6 +231,12 @@ export const getWorldDatabase = async ({ databaseName }: { databaseName: string 
       )
       .selectAll()
       .execute()
+
+    return result
+  }
+
+  const fetchChunksByUUIDs = async ({ uuids }: { uuids: UUID[] }): Promise<DatabaseChunkData[]> => {
+    const result = await db.selectFrom('chunks').where('uuid', 'in', uuids).selectAll().execute()
 
     return result
   }
@@ -286,7 +298,8 @@ export const getWorldDatabase = async ({ databaseName }: { databaseName: string 
     createPlayer,
     destroy,
     fetchChunk,
-    fetchChunks,
+    fetchChunksByCoordinates,
+    fetchChunksByUUIDs,
     fetchPlayers,
     fetchWorldMeta,
     updatePlayer,

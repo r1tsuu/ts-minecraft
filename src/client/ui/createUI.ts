@@ -1,32 +1,11 @@
 import { MathUtils } from 'three'
 
-import type { MinecraftInstance, UIInstance } from '../types.ts'
+import type { MinecraftClient, UIContext } from '../../types.ts'
 import type { UIActions, UICondition, UIState } from './state.ts'
 
-import { listenToWorkerEvents, sendEventToWorker } from '../worker/workerClient.ts'
 import { synchronize } from './synchronize.ts'
 
-export const createUI = ({
-  minecraft,
-  onCreateWorld,
-  onDeleteWorld,
-  onExitWorld,
-  onWorldPlay,
-}: {
-  minecraft: MinecraftInstance
-  onCreateWorld: (
-    name: string,
-    seed: string,
-  ) => Promise<{
-    createdAt: Date
-    id: number
-    name: string
-    seed: string
-  }>
-  onDeleteWorld: (id: number) => Promise<void>
-  onExitWorld: () => Promise<void>
-  onWorldPlay: (id: number) => Promise<void>
-}): UIInstance => {
+export const createUI = ({ minecraft }: { minecraft: MinecraftClient }): UIContext => {
   const state: UIState = {
     activePage: 'start',
     fps: 'Loading...',
@@ -69,46 +48,23 @@ export const createUI = ({
 
   const subscriptions: (() => void)[] = []
 
-  subscriptions.push(
-    listenToWorkerEvents((event) => {
-      switch (event.type) {
-        case 'listWorldsResponse': {
-          setState({
-            isInitialized: true,
-            worldList: event.payload.worlds.map((world) => ({
-              createdAt: new Date(world.createdAt).toLocaleString(),
-              id: world.id,
-              name: world.name,
-              seed: world.seed,
-            })),
-          })
-          break
-        }
-        case 'workerInitialized': {
-          sendEventToWorker({ payload: {}, type: 'requestListWorlds' })
-          break
-        }
-      }
-    }),
-  )
-
   const resumeButton = document.querySelector<HTMLButtonElement>('[data-action="resumeGame"]')!
 
   const onPointerLockChange = () => {
-    if (!minecraft.game) return
+    if (!minecraft.gameContext) return
 
-    const isLocked = document.pointerLockElement === minecraft.game.renderer.domElement
+    const isLocked = document.pointerLockElement === minecraft.gameContext.renderer.domElement
 
-    if (!isLocked && !state.isPaused && minecraft.game) {
+    if (!isLocked && !state.isPaused && minecraft.gameContext) {
       resumeButton.disabled = true
       setTimeout(() => {
         resumeButton.disabled = false
       }, 1000) // prevent immediate re-clicking
 
-      minecraft.game.player.isMovingBackward = false
-      minecraft.game.player.isMovingForward = false
-      minecraft.game.player.isMovingLeft = false
-      minecraft.game.player.isMovingRight = false
+      minecraft.gameContext.player.isMovingBackward = false
+      minecraft.gameContext.player.isMovingForward = false
+      minecraft.gameContext.player.isMovingLeft = false
+      minecraft.gameContext.player.isMovingRight = false
 
       setState({
         isPaused: true,
@@ -119,11 +75,11 @@ export const createUI = ({
   }
 
   const resumeGame = async () => {
-    if (!minecraft.game) return
+    if (!minecraft.gameContext) return
     if (!state.isPaused) return
 
     try {
-      await minecraft.game.renderer.domElement.requestPointerLock()
+      await minecraft.gameContext.renderer.domElement.requestPointerLock()
       setState({
         isPaused: false,
         pauseText: 'Press Escape to Pause',
@@ -140,28 +96,28 @@ export const createUI = ({
   })
 
   const gameInterval = setInterval(() => {
-    if (minecraft.game && !state.isPaused) {
+    if (minecraft.gameContext && !state.isPaused) {
       if (!state.initializedGameUI) {
         setState({ initializedGameUI: true }) // Trigger UI to show game elements
       }
 
       setState(
         {
-          fps: minecraft.game.frameCounter.fps.toFixed(0),
-          positionX: minecraft.game.player.position.x.toFixed(),
-          positionY: minecraft.game.player.position.y.toFixed(),
-          positionZ: minecraft.game.player.position.z.toFixed(),
-          rotationPitch: MathUtils.radToDeg(minecraft.game.player.pitch).toFixed(),
-          rotationYaw: MathUtils.radToDeg(minecraft.game.player.yaw).toFixed(),
+          fps: minecraft.gameContext.frameCounter.fps.toFixed(0),
+          positionX: minecraft.gameContext.player.position.x.toFixed(),
+          positionY: minecraft.gameContext.player.position.y.toFixed(),
+          positionZ: minecraft.gameContext.player.position.z.toFixed(),
+          rotationPitch: MathUtils.radToDeg(minecraft.gameContext.player.pitch).toFixed(),
+          rotationYaw: MathUtils.radToDeg(minecraft.gameContext.player.yaw).toFixed(),
         },
         ['#fps', '#position', '#rotation'],
       )
 
       let performance: 'average' | 'bad' | 'good'
 
-      if (minecraft.game.frameCounter.fps < 30) {
+      if (minecraft.gameContext.frameCounter.fps < 30) {
         performance = 'bad'
-      } else if (minecraft.game.frameCounter.fps < 60) {
+      } else if (minecraft.gameContext.frameCounter.fps < 60) {
         performance = 'average'
       } else {
         performance = 'good'
@@ -174,7 +130,7 @@ export const createUI = ({
   const actions: UIActions = {
     backToMenu: async () => {
       console.log('Exiting world...')
-      await onExitWorld()
+      await minecraft.eventQueue.emitAndWaitResponse('EXIT_WORLD', {}, 'EXITED_WORLD')
       setState({
         activePage: 'start',
         fps: 'Loading...',
@@ -196,15 +152,15 @@ export const createUI = ({
       const name = worldNameInput.value.trim() || 'New World'
       const seed = worldSeedInput.value.trim() || crypto.randomUUID()
       button.disabled = true
-      const world = await onCreateWorld(name, seed)
+      const world = minecraft.localStorageManager.addWorld(name, seed)
       setState({
         worldList: [
           ...state.worldList,
           {
             createdAt: new Date(world.createdAt).toLocaleString(),
-            id: world.id,
             name: world.name,
             seed: world.seed,
+            uuid: world.uuid,
           },
         ],
       })
@@ -215,9 +171,9 @@ export const createUI = ({
     deleteWorld: async ({ event }) => {
       const index = getIndexFromEvent(event)
       const world = state.worldList[index]
-      onDeleteWorld(world.id)
+      minecraft.localStorageManager.deleteWorld(world.uuid)
       setState({
-        worldList: state.worldList.filter((w) => w.id !== world.id),
+        worldList: state.worldList.filter((w) => w.uuid !== world.uuid),
       })
     },
     playWorld: async ({ event }) => {
@@ -227,7 +183,13 @@ export const createUI = ({
         activePage: 'worldLoading',
         loadingWorldName: world.name,
       })
-      await onWorldPlay(world.id)
+      await minecraft.eventQueue.emitAndWaitResponse(
+        'JOIN_WORLD',
+        {
+          worldUUID: world.uuid,
+        },
+        'JOINED_WORLD',
+      )
       setState({
         activePage: 'game',
         loadingWorldName: ' ',
@@ -244,8 +206,8 @@ export const createUI = ({
   }
 
   const conditions: UICondition = {
-    showCrosshair: () => minecraft.game !== null && !state.isPaused,
-    showGameUI: () => minecraft.game !== null,
+    showCrosshair: () => minecraft.gameContext !== null && !state.isPaused,
+    showGameUI: () => minecraft.gameContext !== null,
     showLoadingButton: () => state.isInitialized === false,
     showOverlay: () => ['menuWorlds', 'start', 'worldLoading'].includes(state.activePage),
     showPauseMenu: () => state.isPaused,

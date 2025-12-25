@@ -1,7 +1,11 @@
 import * as THREE from 'three'
 
-import type { FPSControls } from './FPSControls.ts'
-import type { UIState } from './ui/state.ts'
+import type { FPSControls } from './client/FPSControls.ts'
+import type { LocalStorageManager } from './client/localStorageManager.ts'
+import type { UIState } from './client/ui/state.ts'
+import type { SharedConfig } from './config/createConfig.ts'
+import type { MinecraftEventQueue } from './queue/minecraft.ts'
+import type { DatabaseChunkData } from './server/worldDatabase.ts'
 
 export const BLOCK_NAMES = ['dirt', 'grass', 'stone'] as const
 
@@ -28,40 +32,11 @@ export type Chunk = {
   blocksUint: Uint8Array
   chunkX: number
   chunkZ: number
-  id: number
   needsRenderUpdate: boolean
+  uuid: UUID
 }
 
-export type GameInstance = {
-  camera: THREE.PerspectiveCamera
-  controls: FPSControls
-  dispose: () => void
-  frameCounter: {
-    fps: number
-    lastFrames: number
-    lastTime: number
-    totalFrames: number
-    totalTime: number
-  }
-  paused: boolean
-  player: PlayerData
-  raycaster: {
-    update: () => void
-  }
-  renderer: THREE.WebGLRenderer
-  scene: THREE.Scene
-  world: World
-}
-
-export type MinecraftInstance = {
-  eventQueue: EventQueue
-  game: GameInstance | null
-  getGame: () => GameInstance
-  getUI: () => UIInstance
-  ui: null | UIInstance
-}
-
-export type PlayerData = {
+export type ClientPlayerData = {
   canJump: boolean
   direction: THREE.Vector3
   height: number
@@ -78,19 +53,50 @@ export type PlayerData = {
   yaw: number
 }
 
+export type GameContext = {
+  camera: THREE.PerspectiveCamera
+  controls: FPSControls
+  dispose: () => void
+  frameCounter: {
+    fps: number
+    lastFrames: number
+    lastTime: number
+    totalFrames: number
+    totalTime: number
+  }
+  paused: boolean
+  player: ClientPlayerData
+  raycaster: {
+    update: () => void
+  }
+  renderer: THREE.WebGLRenderer
+  scene: THREE.Scene
+  world: World
+}
+
+export type MinecraftClient = {
+  config: SharedConfig
+  eventQueue: MinecraftEventQueue
+  gameContext: GameContext | null
+  getGameContext: () => GameContext
+  getUIContext: () => UIContext
+  localStorageManager: LocalStorageManager
+  uiContext: null | UIContext
+}
+
 export type RawVector3 = {
   x: number
   y: number
   z: number
 }
 
-export type UIInstance = {
+export type UIContext = {
   destroy: () => void
   setState: (newState: Partial<UIState>, affectedQuerySelectors?: string | string[]) => void
   state: UIState
 }
 
-export type UUID = ReturnType<Crypto['randomUUID']>
+export type UUID = `${string}-${string}-${string}-${string}-${string}`
 
 export type World = {
   blockMeshes: Map<number, THREE.InstancedMesh>
@@ -99,15 +105,7 @@ export type World = {
   chunks: Map<string, Chunk>
   dispose: () => void
   getBlock: (x: number, y: number, z: number) => BlockType | null
-  id: number
   requestingChunksState: 'idle' | 'requesting'
-  syncChunksFromServer: (
-    chunks: {
-      blocks: BlockInWorld[]
-      chunkX: number
-      chunkZ: number
-      id: number
-    }[],
-  ) => void
+  syncChunksFromServer: (chunks: DatabaseChunkData[]) => void
   update: () => void
 }

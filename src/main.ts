@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-import type { MinecraftInstance } from './types.ts'
+import type { MinecraftClient } from './types.ts'
 
 import { initBlocks } from './client.ts'
 import { createEventQueue } from './clientEventQueue.ts'
@@ -10,24 +10,24 @@ import { requestWorker } from './worker/workerClient.ts'
 
 initBlocks()
 
-const minecraft: MinecraftInstance = {
+const minecraft: MinecraftClient = {
   eventQueue: createEventQueue(),
-  game: null,
-  getGame: () => {
-    if (!minecraft.game) {
+  gameContext: null,
+  getGameContext: () => {
+    if (!minecraft.gameContext) {
       throw new Error('Game instance is not initialized')
     }
 
-    return minecraft.game
+    return minecraft.gameContext
   },
-  getUI: () => {
-    if (!minecraft.ui) {
+  getUIContext: () => {
+    if (!minecraft.uiContext) {
       throw new Error('UI instance is not initialized')
     }
 
-    return minecraft.ui
+    return minecraft.uiContext
   },
-  ui: null,
+  uiContext: null,
 }
 
 const ui = createUI({
@@ -58,9 +58,9 @@ const ui = createUI({
     )
   },
   onExitWorld: async () => {
-    if (minecraft.game) {
-      minecraft.game.dispose()
-      minecraft.game = null
+    if (minecraft.gameContext) {
+      minecraft.gameContext.dispose()
+      minecraft.gameContext = null
     }
   },
   onWorldPlay: async (worldID: number) => {
@@ -74,7 +74,7 @@ const ui = createUI({
       'worldInitialized',
     )
 
-    minecraft.game = await createGameInstance({
+    minecraft.gameContext = await createGameInstance({
       activeWorld,
       minecraft,
     })
@@ -84,9 +84,9 @@ const ui = createUI({
     let clockStopped = false
 
     const loop = async () => {
-      if (!minecraft.game) return
+      if (!minecraft.gameContext) return
 
-      if (minecraft.getUI().state.isPaused) {
+      if (minecraft.getUIContext().state.isPaused) {
         clock.stop()
         clockStopped = true
         requestAnimationFrame(loop)
@@ -97,27 +97,30 @@ const ui = createUI({
       }
 
       const delta = clock.getDelta()
-      minecraft.game.frameCounter.lastTime += delta
-      minecraft.game.frameCounter.totalTime += delta
-      minecraft.game.frameCounter.lastFrames++
-      minecraft.game.frameCounter.totalFrames++
+      minecraft.gameContext.frameCounter.lastTime += delta
+      minecraft.gameContext.frameCounter.totalTime += delta
+      minecraft.gameContext.frameCounter.lastFrames++
+      minecraft.gameContext.frameCounter.totalFrames++
 
-      if (minecraft.game.frameCounter.lastTime >= 1) {
-        minecraft.game.frameCounter.fps = minecraft.game.frameCounter.lastFrames
-        minecraft.game.frameCounter.lastFrames = 0
-        minecraft.game.frameCounter.lastTime = 0
+      if (minecraft.gameContext.frameCounter.lastTime >= 1) {
+        minecraft.gameContext.frameCounter.fps = minecraft.gameContext.frameCounter.lastFrames
+        minecraft.gameContext.frameCounter.lastFrames = 0
+        minecraft.gameContext.frameCounter.lastTime = 0
       }
 
-      minecraft.game.renderer.render(minecraft.game.scene, minecraft.game.camera)
+      minecraft.gameContext.renderer.render(
+        minecraft.gameContext.scene,
+        minecraft.gameContext.camera,
+      )
 
       if (!document.pointerLockElement && !requestingPointerLock) {
         requestingPointerLock = true
-        await minecraft.game.renderer.domElement.requestPointerLock()
+        await minecraft.gameContext.renderer.domElement.requestPointerLock()
       }
 
-      minecraft.game.controls.update(delta)
-      minecraft.game.world.update()
-      minecraft.game.raycaster.update()
+      minecraft.gameContext.controls.update(delta)
+      minecraft.gameContext.world.update()
+      minecraft.gameContext.raycaster.update()
 
       requestAnimationFrame(loop)
     }
@@ -126,4 +129,4 @@ const ui = createUI({
   },
 })
 
-minecraft.ui = ui
+minecraft.uiContext = ui

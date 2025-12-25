@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
         enforce: 'pre',
         name: 'buildIndexHtml',
         async transformIndexHtml(html) {
-          const { renderTemplate } = await import('./src/ui/template/main.js')
+          const { renderTemplate } = await import('./src/client/ui/template/main.js')
           return html.replace('<!--main-->', renderTemplate())
         },
       },

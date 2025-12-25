@@ -1,21 +1,22 @@
 import * as THREE from 'three'
 
-import type { GameInstance, MinecraftInstance, PlayerData } from './types.ts'
-import type { ActiveWorld } from './worker/types.ts'
+import type { DatabaseChunkData, DatabasePlayerData } from '../server/worldDatabase.ts'
+import type { ClientPlayerData, GameContext, MinecraftClient } from '../types.ts'
 
-import { rawVector3ToThreeVector3, threeVector3ToRawVector3 } from './client.ts'
+import { rawVector3ToThreeVector3, threeVector3ToRawVector3 } from '../client.ts'
 import { createRaycaster } from './createRaycaster.ts'
 import { createWorld } from './createWorld.ts'
 import { FPSControls } from './FPSControls.ts'
-import { requestWorker, sendEventToWorker } from './worker/workerClient.ts'
 
-export const createGameInstance = async ({
-  activeWorld,
+export const createGameContext = async ({
+  initialChunksFromServer,
   minecraft,
+  player,
 }: {
-  activeWorld: ActiveWorld
-  minecraft: MinecraftInstance
-}): Promise<GameInstance> => {
+  initialChunksFromServer: DatabaseChunkData[]
+  minecraft: MinecraftClient
+  player: DatabasePlayerData
+}): Promise<GameContext> => {
   const scene = new THREE.Scene()
   const canvas = document.querySelector('#game_canvas') as HTMLCanvasElement
   const renderer = new THREE.WebGLRenderer({
@@ -38,11 +39,21 @@ export const createGameInstance = async ({
   camera.position.set(0, 40, 0)
   camera.lookAt(30, 35, 30)
 
-  const player: PlayerData = {
-    ...activeWorld.world.playerData,
-    direction: rawVector3ToThreeVector3(activeWorld.world.playerData.direction),
-    position: rawVector3ToThreeVector3(activeWorld.world.playerData.position),
-    velocity: rawVector3ToThreeVector3(activeWorld.world.playerData.velocity),
+  const clientPlayer: ClientPlayerData = {
+    canJump: true,
+    direction: rawVector3ToThreeVector3(player.direction),
+    height: minecraft.config.playerHeight,
+    isMovingBackward: false,
+    isMovingForward: false,
+    isMovingLeft: false,
+    isMovingRight: false,
+    jumpStrength: minecraft.config.defaultPlayerJumpStrength,
+    pitch: player.pitch,
+    position: rawVector3ToThreeVector3(player.position),
+    speed: minecraft.config.defaultPlayerSpeed,
+    velocity: rawVector3ToThreeVector3(player.velocity),
+    width: minecraft.config.playerWidth,
+    yaw: player.yaw,
   }
 
   camera.position.copy(player.position)
@@ -50,12 +61,17 @@ export const createGameInstance = async ({
   let disposed = false
   let syncying = false
 
-  const world = createWorld({ activeWorld, player, scene })
+  const world = createWorld({
+    clientPlayer,
+    eventQueue: minecraft.eventQueue,
+    initialChunksFromServer,
+    scene,
+  })
 
   let lastTimeout: null | number = null
 
   const syncPlayer = async () => {
-    if (minecraft.getUI().state.isPaused) {
+    if (minecraft.getUIContext().state.isPaused) {
       lastTimeout = setTimeout(syncPlayer, 1000)
       return
     }
@@ -67,19 +83,21 @@ export const createGameInstance = async ({
 
     try {
       syncying = true
-      await requestWorker(
+      await minecraft.eventQueue.emitAndWaitResponse(
+        'REQUEST_SYNC_PLAYER',
         {
-          payload: {
-            playerData: {
-              ...player,
-              direction: threeVector3ToRawVector3(player.direction),
-              position: threeVector3ToRawVector3(player.position),
-              velocity: threeVector3ToRawVector3(player.velocity),
-            },
+          playerData: {
+            canJump: clientPlayer.canJump,
+            direction: threeVector3ToRawVector3(clientPlayer.direction),
+            jumpStrength: clientPlayer.jumpStrength,
+            pitch: clientPlayer.pitch,
+            position: threeVector3ToRawVector3(clientPlayer.position),
+            uuid: player.uuid,
+            velocity: threeVector3ToRawVector3(clientPlayer.velocity),
+            yaw: clientPlayer.yaw,
           },
-          type: 'syncPlayer',
         },
-        'playerSynced',
+        'RESPONSE_SYNC_PLAYER',
       )
     } finally {
       syncying = false
@@ -90,7 +108,6 @@ export const createGameInstance = async ({
   lastTimeout = setTimeout(syncPlayer, 1000)
 
   const dispose = () => {
-    sendEventToWorker({ payload: {}, type: 'stopActiveWorld' })
     window.removeEventListener('resize', onResize)
     world.dispose()
     renderer.dispose()
@@ -103,9 +120,15 @@ export const createGameInstance = async ({
     disposed = true
   }
 
-  const game: GameInstance = {
+  const game: GameContext = {
     camera,
-    controls: new FPSControls(camera, renderer.domElement, world, player, minecraft.getUI()),
+    controls: new FPSControls(
+      camera,
+      renderer.domElement,
+      world,
+      clientPlayer,
+      minecraft.getUIContext(),
+    ),
     dispose,
     frameCounter: {
       fps: 0,
@@ -115,10 +138,10 @@ export const createGameInstance = async ({
       totalTime: 0,
     },
     paused: false,
-    player,
+    player: clientPlayer,
     raycaster: createRaycaster({
       camera,
-      player,
+      player: clientPlayer,
       scene,
       world,
     }),

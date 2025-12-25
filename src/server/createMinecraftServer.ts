@@ -83,7 +83,9 @@ export const createMinecraftServer = async ({
 
     await database.createChunks(loadedChunks)
   } else {
-    const chunks = await database.fetchChunks({ coordinates: spawnChunksCoordinates })
+    const chunks = await database.fetchChunksByUUIDs({
+      uuids: meta.loadedChunks.map((chunk) => chunk.uuid),
+    })
     loadedChunks.push(...chunks)
   }
 
@@ -100,7 +102,9 @@ export const createMinecraftServer = async ({
 
   await syncMeta()
 
-  eventQueue.emit('SERVER_STARTED', {})
+  eventQueue.emit('SERVER_STARTED', {
+    loadedChunks,
+  })
 
   eventQueue.on('REQUEST_PLAYER_JOIN', async (event) => {
     let playerData = server.players.find((player) => player.uuid === event.payload.playerUUID)
@@ -144,7 +148,7 @@ export const createMinecraftServer = async ({
     })
   })
 
-  eventQueue.on('RESPONSE_CHUNKS_LOAD', async (event) => {
+  eventQueue.on('REQUEST_CHUNKS_LOAD', async (event) => {
     const response: DatabaseChunkData[] = []
 
     const coordsToLoad: { chunkX: number; chunkZ: number }[] = []
@@ -160,7 +164,7 @@ export const createMinecraftServer = async ({
       }
     }
 
-    const loadedFromDb = await database.fetchChunks({ coordinates: coordsToLoad })
+    const loadedFromDb = await database.fetchChunksByCoordinates({ coordinates: coordsToLoad })
 
     for (const chunk of loadedFromDb) {
       loadedChunks.push(chunk)
@@ -196,6 +200,8 @@ export const createMinecraftServer = async ({
       Object.assign(player, event.payload.playerData)
       await database.updatePlayer(player)
     }
+
+    await event.respond('RESPONSE_SYNC_PLAYER', {})
   })
 
   server.nextTickScheduledAt = performance.now() + config.tickDurationMs

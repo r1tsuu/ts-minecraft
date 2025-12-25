@@ -1,3 +1,5 @@
+import type { UUID } from '../../types.ts'
+
 export type UIState = {
   activePage: ActiveUIPage
   fps: string
@@ -13,9 +15,9 @@ export type UIState = {
   rotationYaw: string
   worldList: {
     createdAt: string
-    id: number
     name: string
     seed: string
+    uuid: UUID
   }[]
 }
 
