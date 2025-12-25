@@ -2,7 +2,7 @@
  * Minecraft-specific queue
  * =========================================================== */
 
-import type { DatabaseChunkData, DatabasePlayerData } from '../server/worldDatabase.ts'
+import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatabase.ts'
 import type { UUID } from '../types.ts'
 
 import { createEventQueue } from './createEventQueue.ts'
@@ -49,7 +49,10 @@ export const createMinecraftEventQueue = ({
   return queue
 }
 
-export type MinecraftEvent = Parameters<Parameters<MinecraftEventQueue['on']>[1]>[0]
+export type AnyMinecraftEvent = Parameters<Parameters<MinecraftEventQueue['on']>[1]>[0]
+export type AnyRawMinecraftEvent = ReturnType<AnyMinecraftEvent['serialize']>
+export type MinecraftEvent<T extends AnyMinecraftEvent['type']> = Extract<
+  AnyMinecraftEvent,
+  { type: T }
+>
 export type MinecraftEventQueue = ReturnType<typeof createMinecraftEventQueue>
-
-export type RawMinecraftEvent = ReturnType<MinecraftEvent['serialize']>

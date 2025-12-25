@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-import { type BlockName, createBlocksRegistry } from '../blocks/registry.ts'
+import { type BlockName, BlocksRegistry } from '../blocks/BlocksRegistry.ts'
 import dirtTextureImg from '../static/dirt.png?no-inline'
 import grassBlockSideTextureImg from '../static/grass_block_side.png?no-inline'
 import grassBlockTopTextureImg from '../static/grass_block_top.png?no-inline'
@@ -12,7 +12,7 @@ type BlockClientData = {
 }
 
 export const createClientBlockRegistry = () => {
-  const registry = createBlocksRegistry()
+  const registry = new BlocksRegistry()
   const clientRegistry = new Map<number, BlockClientData>()
   const textureLoader = new THREE.TextureLoader()
 

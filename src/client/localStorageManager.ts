@@ -13,49 +13,21 @@ type MinecraftClientLocalStorage = {
 
 const LOCAL_STORAGE_KEY = 'minecraft_client_local_storage_v1'
 
-export type LocalStorageManager = ReturnType<typeof createLocalStorageManager>
-
-export const createLocalStorageManager = () => {
-  const storage = window.localStorage.getItem(LOCAL_STORAGE_KEY)
-
-  if (!storage) {
-    const initialData: MinecraftClientLocalStorage = {
-      playerUUID: crypto.randomUUID(),
-      worlds: [],
-    }
-    window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialData))
-  }
-
-  const getStorage = (): MinecraftClientLocalStorage => {
+export class LocalStorageManager {
+  constructor() {
     const storage = window.localStorage.getItem(LOCAL_STORAGE_KEY)
 
     if (!storage) {
-      throw new Error('Local storage is not initialized')
+      const initialData: MinecraftClientLocalStorage = {
+        playerUUID: crypto.randomUUID(),
+        worlds: [],
+      }
+      window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialData))
     }
-
-    return JSON.parse(storage) as MinecraftClientLocalStorage
   }
 
-  const setStorage = (data: MinecraftClientLocalStorage) => {
-    window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data))
-  }
-
-  const getListWorlds = () => {
-    return getStorage().worlds
-  }
-
-  const getWorld = (worldUUID: UUID) => {
-    const world = getListWorlds().find((world) => world.uuid === worldUUID)
-
-    if (!world) {
-      throw new Error(`World with UUID ${worldUUID} not found`)
-    }
-
-    return world
-  }
-
-  const addWorld = (name: string, seed: string) => {
-    const storage = getStorage()
+  addWorld(name: string, seed: string) {
+    const storage = this.getStorage()
 
     const newWorld = {
       createdAt: new Date().toISOString(),
@@ -67,28 +39,48 @@ export const createLocalStorageManager = () => {
 
     storage.worlds.push(newWorld)
 
-    setStorage(storage)
+    this.setStorage(storage)
 
     return newWorld
   }
 
-  const deleteWorld = (worldUUID: UUID) => {
-    const storage = getStorage()
+  deleteWorld(worldUUID: UUID) {
+    const storage = this.getStorage()
 
     storage.worlds = storage.worlds.filter((world) => world.uuid !== worldUUID)
 
-    setStorage(storage)
+    this.setStorage(storage)
   }
 
-  const getPlayerUUID = () => {
-    return getStorage().playerUUID
+  getListWorlds() {
+    return this.getStorage().worlds
   }
 
-  return {
-    addWorld,
-    deleteWorld,
-    getListWorlds,
-    getPlayerUUID,
-    getWorld,
+  getPlayerUUID() {
+    return this.getStorage().playerUUID
+  }
+
+  getWorld(worldUUID: UUID) {
+    const world = this.getListWorlds().find((world) => world.uuid === worldUUID)
+
+    if (!world) {
+      throw new Error(`World with UUID ${worldUUID} not found`)
+    }
+
+    return world
+  }
+
+  private getStorage(): MinecraftClientLocalStorage {
+    const storage = window.localStorage.getItem(LOCAL_STORAGE_KEY)
+
+    if (!storage) {
+      throw new Error('Local storage is not initialized')
+    }
+
+    return JSON.parse(storage) as MinecraftClientLocalStorage
+  }
+
+  private setStorage(data: MinecraftClientLocalStorage): void {
+    window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data))
   }
 }

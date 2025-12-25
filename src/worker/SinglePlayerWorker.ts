@@ -1,13 +1,13 @@
-import { createMinecraftEventQueue, type MinecraftEvent } from '../queue/minecraft.ts'
-import { createMinecraftServer, type MinecraftServerInstance } from '../server/create.ts'
+import { type AnyMinecraftEvent, createMinecraftEventQueue } from '../queue/minecraft.ts'
+import { MinecraftServer } from '../server/MinecraftServer.ts'
 
-let localServer: MinecraftServerInstance | null = null
+let localServer: MinecraftServer | null = null
 
 const eventQueue = createMinecraftEventQueue({
   environment: 'SERVER',
 })
 
-const clientEventForwardMatcher = (event: MinecraftEvent) => {
+const shouldForwardEventToClient = (event: AnyMinecraftEvent) => {
   if (event.from === 'CLIENT') {
     return false
   }
@@ -24,12 +24,12 @@ const clientEventForwardMatcher = (event: MinecraftEvent) => {
 }
 
 eventQueue.on('*', (event) => {
-  if (clientEventForwardMatcher(event)) {
+  if (shouldForwardEventToClient(event)) {
     postMessage(event.serialize())
   }
 })
 
-onmessage = async (message: MessageEvent<MinecraftEvent>) => {
+onmessage = async (message: MessageEvent<AnyMinecraftEvent>) => {
   if (message.data.type === 'START_LOCAL_SERVER') {
     if (localServer) {
       console.warn('Received START_LOCAL_SERVER but Local server is already started.')
@@ -38,11 +38,11 @@ onmessage = async (message: MessageEvent<MinecraftEvent>) => {
 
     console.log(`Starting local server...`, message)
 
-    localServer = await createMinecraftServer({
+    localServer = await MinecraftServer.create(
       eventQueue,
-      serverStartedEventUUID: message.data.eventUUID,
-      worldDatabaseName: message.data.payload.worldDatabaseName,
-    })
+      message.data.eventUUID,
+      message.data.payload.worldDatabaseName,
+    )
 
     console.log('Local server started.', localServer)
 
@@ -50,7 +50,7 @@ onmessage = async (message: MessageEvent<MinecraftEvent>) => {
   }
 
   if (localServer !== null) {
-    localServer.eventQueue.emit(
+    eventQueue.emit(
       message.data.type,
       message.data.payload,
       message.data.eventUUID,

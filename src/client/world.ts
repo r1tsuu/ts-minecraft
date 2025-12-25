@@ -1,61 +1,93 @@
 import * as THREE from 'three'
 
-import type { MinecraftEventQueue } from '../queue/minecraft.ts'
-import type { DatabaseChunkData } from '../server/worldDatabase.ts'
-import type { BlockInWorld, ClientPlayerData, World } from '../types.ts'
+import type { MinecraftEvent, MinecraftEventQueue } from '../queue/minecraft.ts'
+import type { DatabaseChunkData } from '../server/WorldDatabase.ts'
+import type { BlockInWorld, Chunk, ClientPlayerData } from '../types.ts'
 import type { ClientBlockRegisty } from './blocks.ts'
 
 import { CHUNK_SIZE, getBlockIndex, getBlockKey, RENDER_DISTANCE, WORLD_HEIGHT } from '../util.ts'
 
-export const createWorld = ({
-  blockRegistry,
-  clientPlayer,
-  eventQueue,
-  initialChunksFromServer,
-  scene,
-}: {
-  blockRegistry: ClientBlockRegisty
-  clientPlayer: ClientPlayerData
-  eventQueue: MinecraftEventQueue
-  initialChunksFromServer: DatabaseChunkData[]
-  scene: THREE.Scene
-}): World => {
-  const backgroundColor = 0x87ceeb
-  scene.fog = new THREE.Fog(backgroundColor, 1, 96)
-  scene.background = new THREE.Color(backgroundColor)
+const chunkKey = (x: number, z: number) => `${x},${z}`
 
-  const sunLight = new THREE.DirectionalLight(0xffffff, 3)
-  sunLight.position.set(500, 500, 500)
-  scene.add(sunLight)
-  const sunLight2 = new THREE.DirectionalLight(0xffffff, 3)
-  sunLight2.position.set(-500, 500, -500)
-  scene.add(sunLight2)
+export class World {
+  blockMeshes = new Map<number, THREE.InstancedMesh>()
+  blockMeshesCount = new Map<number, number>()
+  blocksMeshesFreeIndexes = new Map<number, number[]>()
+  chunks = new Map<string, Chunk>()
+  requestingChunksState: 'idle' | 'requesting' = 'idle'
+  private dispositions: Function[] = []
 
-  const reflectionLight = new THREE.AmbientLight(0x404040, 0.5)
-  scene.add(reflectionLight)
+  constructor(
+    private readonly clientPlayer: ClientPlayerData,
+    private readonly eventQueue: MinecraftEventQueue,
+    private readonly scene: THREE.Scene,
+    {
+      blockRegistry,
+      initialChunksFromServer,
+    }: {
+      blockRegistry: ClientBlockRegisty
+      initialChunksFromServer: DatabaseChunkData[]
+    },
+  ) {
+    const backgroundColor = 0x87ceeb
+    this.scene.fog = new THREE.Fog(backgroundColor, 1, 96)
+    this.scene.background = new THREE.Color(backgroundColor)
 
-  const blockMeshes = new Map<number, THREE.InstancedMesh>()
-  const blockMeshesCount = new Map<number, number>()
-  const blocksMeshesFreeIndexes = new Map<number, number[]>()
+    const sunLight = new THREE.DirectionalLight(0xffffff, 3)
+    sunLight.position.set(500, 500, 500)
+    this.scene.add(sunLight)
+    const sunLight2 = new THREE.DirectionalLight(0xffffff, 3)
+    sunLight2.position.set(-500, 500, -500)
+    this.scene.add(sunLight2)
 
-  const MAX_COUNT = (RENDER_DISTANCE * RENDER_DISTANCE * CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT) / 2
+    const reflectionLight = new THREE.AmbientLight(0x404040, 0.5)
+    this.scene.add(reflectionLight)
 
-  const geometry = new THREE.BoxGeometry()
+    const MAX_COUNT =
+      (RENDER_DISTANCE * RENDER_DISTANCE * CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT) / 2
 
-  for (const [id, block] of blockRegistry.clientRegistry) {
-    const mesh = new THREE.InstancedMesh(geometry, block.material, MAX_COUNT)
-    mesh.frustumCulled = false
-    scene.add(mesh)
-    blockMeshes.set(id, mesh)
-    blockMeshesCount.set(id, 0)
-    blocksMeshesFreeIndexes.set(id, [])
+    const geometry = new THREE.BoxGeometry()
+
+    for (const [id, block] of blockRegistry.clientRegistry) {
+      const mesh = new THREE.InstancedMesh(geometry, block.material, MAX_COUNT)
+      mesh.frustumCulled = false
+      this.scene.add(mesh)
+      this.blockMeshes.set(id, mesh)
+      this.blockMeshesCount.set(id, 0)
+      this.blocksMeshesFreeIndexes.set(id, [])
+    }
+
+    this.setupEventListeners()
+    this.syncChunksFromServer(initialChunksFromServer)
   }
 
-  const getBlock = (x: number, y: number, z: number): null | number => {
+  dispose(): void {
+    for (const unsubscribe of this.dispositions) {
+      unsubscribe()
+    }
+
+    for (const mesh of this.blockMeshes.values()) {
+      mesh.geometry.dispose()
+      if (Array.isArray(mesh.material)) {
+        for (const mat of mesh.material) {
+          mat.dispose()
+        }
+      } else {
+        mesh.material.dispose()
+      }
+      this.scene.remove(mesh)
+    }
+    this.blockMeshes.clear()
+    this.blockMeshesCount.clear()
+    this.blocksMeshesFreeIndexes.clear()
+    this.chunks.clear()
+  }
+
+  getBlock(x: number, y: number, z: number): null | number {
     const chunkX = Math.floor(x / CHUNK_SIZE)
     const chunkZ = Math.floor(z / CHUNK_SIZE)
     const key = chunkKey(chunkX, chunkZ)
-    const chunk = world.chunks.get(key)
+    const chunk = this.chunks.get(key)
 
     if (!chunk) {
       return null
@@ -76,9 +108,9 @@ export const createWorld = ({
     return block
   }
 
-  const update = () => {
-    const playerChunkX = Math.floor(clientPlayer.position.x / CHUNK_SIZE)
-    const playerChunkZ = Math.floor(clientPlayer.position.z / CHUNK_SIZE)
+  update(): void {
+    const playerChunkX = Math.floor(this.clientPlayer.position.x / CHUNK_SIZE)
+    const playerChunkZ = Math.floor(this.clientPlayer.position.z / CHUNK_SIZE)
 
     const needed = new Set<string>()
     const chunksToLoad: string[] = []
@@ -91,34 +123,34 @@ export const createWorld = ({
 
         needed.add(key)
 
-        if (!world.chunks.has(key)) {
+        if (!this.chunks.has(key)) {
           chunksToLoad.push(key)
         }
       }
     }
 
     if (chunksToLoad.length) {
-      if (world.requestingChunksState === 'idle') {
-        eventQueue.emit('REQUEST_CHUNKS_LOAD', {
+      if (this.requestingChunksState === 'idle') {
+        this.eventQueue.emit('REQUEST_CHUNKS_LOAD', {
           chunks: chunksToLoad.map((key) => {
             const [chunkX, chunkZ] = key.split(',').map(Number)
             return { chunkX, chunkZ }
           }),
         })
-        world.requestingChunksState = 'requesting'
+        this.requestingChunksState = 'requesting'
       }
     }
 
     const meshesNeedUpdate = new Set<THREE.InstancedMesh>()
 
     // Unload chunks outside render distance
-    for (const key of world.chunks.keys()) {
+    for (const key of this.chunks.keys()) {
       if (!needed.has(key)) {
-        const chunk = world.chunks.get(key)!
+        const chunk = this.chunks.get(key)!
         for (const block of chunk.blocks.values()) {
           const blockTypeID = block.typeID
           if (!blockTypeID) continue
-          const count = world.blockMeshesCount.get(blockTypeID)
+          const count = this.blockMeshesCount.get(blockTypeID)
           if (count === undefined) {
             throw new Error(`Mesh count for block ID ${blockTypeID} not found`)
           }
@@ -128,20 +160,20 @@ export const createWorld = ({
           )!
 
           if (blockMeshIndex !== undefined) {
-            const mesh = world.blockMeshes.get(blockTypeID)!
+            const mesh = this.blockMeshes.get(blockTypeID)!
             mesh.setMatrixAt(blockMeshIndex, new THREE.Matrix4())
-            world.blocksMeshesFreeIndexes.get(blockTypeID)!.push(blockMeshIndex)
+            this.blocksMeshesFreeIndexes.get(blockTypeID)!.push(blockMeshIndex)
             meshesNeedUpdate.add(mesh)
           }
         }
 
-        world.chunks.delete(key)
+        this.chunks.delete(key)
       }
     }
 
     const matrix = new THREE.Matrix4()
 
-    for (const chunk of world.chunks.values()) {
+    for (const chunk of this.chunks.values()) {
       if (!chunk.needsRenderUpdate) continue
 
       chunk.needsRenderUpdate = false
@@ -150,9 +182,9 @@ export const createWorld = ({
         const blockTypeID = block.typeID
         if (!blockTypeID) continue
 
-        const freeList = world.blocksMeshesFreeIndexes.get(blockTypeID)!
+        const freeList = this.blocksMeshesFreeIndexes.get(blockTypeID)!
 
-        const mesh = world.blockMeshes.get(blockTypeID)
+        const mesh = this.blockMeshes.get(blockTypeID)
 
         if (!mesh) {
           throw new Error(`Mesh for block ID ${blockTypeID} not found`)
@@ -168,12 +200,12 @@ export const createWorld = ({
         if (freeList.length > 0) {
           index = freeList.pop()!
         } else {
-          index = world.blockMeshesCount.get(blockTypeID)!
-          world.blockMeshesCount.set(blockTypeID, index + 1)
+          index = this.blockMeshesCount.get(blockTypeID)!
+          this.blockMeshesCount.set(blockTypeID, index + 1)
         }
 
         if (index === undefined) {
-          console.log(world.blockMeshesCount, blockTypeID)
+          console.log(this.blockMeshesCount, blockTypeID)
           throw new Error(`Mesh count for block ID ${blockTypeID} not found`)
         }
 
@@ -188,7 +220,18 @@ export const createWorld = ({
     }
   }
 
-  const syncChunksFromServer: World['syncChunksFromServer'] = (chunks) => {
+  private onResponseChunksLoad(event: MinecraftEvent<'RESPONSE_CHUNKS_LOAD'>): void {
+    this.syncChunksFromServer(event.payload.chunks)
+    this.requestingChunksState = 'idle'
+  }
+
+  private setupEventListeners(): void {
+    this.dispositions.push(
+      this.eventQueue.on('RESPONSE_CHUNKS_LOAD', this.onResponseChunksLoad.bind(this)),
+    )
+  }
+
+  private syncChunksFromServer(chunks: DatabaseChunkData[]): void {
     for (const chunk of chunks) {
       const key = `${chunk.chunkX},${chunk.chunkZ}`
 
@@ -201,7 +244,7 @@ export const createWorld = ({
         blocksUint[getBlockIndex(block.x, block.y, block.z)] = block.typeID
       }
 
-      world.chunks.set(key, {
+      this.chunks.set(key, {
         blocks,
         blocksMeshesIndexes: new Map<string, number>(),
         blocksUint,
@@ -212,54 +255,4 @@ export const createWorld = ({
       })
     }
   }
-
-  const subscriptions: Function[] = []
-
-  subscriptions.push(
-    eventQueue.on('RESPONSE_CHUNKS_LOAD', (event) => {
-      world.syncChunksFromServer(event.payload.chunks)
-      world.requestingChunksState = 'idle'
-    }),
-  )
-
-  const dispose = () => {
-    for (const unsubscribe of subscriptions) {
-      unsubscribe()
-    }
-
-    for (const mesh of blockMeshes.values()) {
-      mesh.geometry.dispose()
-      if (Array.isArray(mesh.material)) {
-        for (const mat of mesh.material) {
-          mat.dispose()
-        }
-      } else {
-        mesh.material.dispose()
-      }
-      scene.remove(mesh)
-    }
-    blockMeshes.clear()
-    blockMeshesCount.clear()
-    blocksMeshesFreeIndexes.clear()
-    world.chunks.clear()
-  }
-
-  const world: World = {
-    blockMeshes: blockMeshes,
-    blockMeshesCount,
-    blocksMeshesFreeIndexes,
-    chunks: new Map(),
-    dispose,
-    getBlock,
-    requestingChunksState: 'idle',
-    syncChunksFromServer,
-    update,
-  }
-
-  // Initial sync of loaded chunks from server
-  world.syncChunksFromServer(initialChunksFromServer)
-
-  return world
 }
-
-const chunkKey = (x: number, z: number) => `${x},${z}`

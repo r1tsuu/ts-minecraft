@@ -1,46 +1,48 @@
 import * as THREE from 'three'
 
-import type { ClientPlayerData, World } from '../types.ts'
+import type { ClientPlayerData } from '../types.ts'
+import type { World } from './World.ts'
 
 const FAR = 5
 
-export const createRaycaster = ({
-  camera,
-  player,
-  scene,
-  world,
-}: {
-  camera: THREE.PerspectiveCamera
-  player: ClientPlayerData
-  scene: THREE.Scene
-  world: World
-}) => {
-  const raycaster = new THREE.Raycaster()
-  raycaster.far = FAR + 1
+export class Raycaster {
+  private lastUpdated: null | number = null
+  private mesh: THREE.Mesh
+  private raycaster: THREE.Raycaster
+  private raycastingMesh: THREE.InstancedMesh
 
-  const raycastingMesh = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshPhongMaterial({
-      color: THREE.Color.NAMES.black,
-      wireframe: true, // debug
-    }),
-    (FAR * 2 + 1) ** 3,
-  )
+  constructor(
+    private camera: THREE.PerspectiveCamera,
+    private player: ClientPlayerData,
+    private scene: THREE.Scene,
+    private world: World,
+  ) {
+    this.raycaster = new THREE.Raycaster()
+    this.raycaster.far = FAR + 1
 
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(1.01, 1.01, 1.01),
-    new THREE.MeshStandardMaterial({ opacity: 0.5, transparent: true }),
-  )
+    this.raycastingMesh = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshPhongMaterial({
+        color: THREE.Color.NAMES.black,
+        wireframe: true, // debug
+      }),
+      (FAR * 2 + 1) ** 3,
+    )
 
-  let lastUpdated: null | number = null
-  scene.add(raycastingMesh)
+    this.mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1.01, 1.01, 1.01),
+      new THREE.MeshStandardMaterial({ opacity: 0.5, transparent: true }),
+    )
 
-  const update = () => {
-    if (lastUpdated !== null && Date.now() - lastUpdated < 20) return
+    this.scene.add(this.raycastingMesh)
+  }
 
-    scene.remove(mesh)
+  update() {
+    if (this.lastUpdated !== null && Date.now() - this.lastUpdated < 20) return
 
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera)
+    this.scene.remove(this.mesh)
+
+    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera)
 
     let index = 0
     const matrix = new THREE.Matrix4()
@@ -48,24 +50,24 @@ export const createRaycaster = ({
     for (let x = -FAR; x <= FAR; x++) {
       for (let y = -FAR; y <= FAR; y++) {
         for (let z = -FAR; z <= FAR; z++) {
-          const worldX = Math.floor(player.position.x + x)
-          const worldY = Math.floor(player.position.y + y)
-          const worldZ = Math.floor(player.position.z + z)
+          const worldX = Math.floor(this.player.position.x + x)
+          const worldY = Math.floor(this.player.position.y + y)
+          const worldZ = Math.floor(this.player.position.z + z)
 
-          if (!world.getBlock(worldX, worldY, worldZ)) continue
+          if (!this.world.getBlock(worldX, worldY, worldZ)) continue
 
           matrix.setPosition(worldX, worldY, worldZ)
-          raycastingMesh.setMatrixAt(index, matrix)
+          this.raycastingMesh.setMatrixAt(index, matrix)
           index++
         }
       }
     }
 
-    raycastingMesh.instanceMatrix.needsUpdate = true
-    raycastingMesh.computeBoundingSphere()
-    raycastingMesh.computeBoundingBox()
+    this.raycastingMesh.instanceMatrix.needsUpdate = true
+    this.raycastingMesh.computeBoundingSphere()
+    this.raycastingMesh.computeBoundingBox()
 
-    const [intersects] = raycaster.intersectObject(raycastingMesh, false)
+    const [intersects] = this.raycaster.intersectObject(this.raycastingMesh, false)
 
     if (
       intersects &&
@@ -75,14 +77,10 @@ export const createRaycaster = ({
       const matrix = new THREE.Matrix4()
       intersects.object.getMatrixAt(intersects.instanceId, matrix)
       const poistion = new THREE.Vector3().setFromMatrixPosition(matrix)
-      mesh.position.set(poistion.x, poistion.y, poistion.z)
-      scene.add(mesh)
+      this.mesh.position.set(poistion.x, poistion.y, poistion.z)
+      this.scene.add(this.mesh)
     }
 
-    lastUpdated = Date.now()
-  }
-
-  return {
-    update,
+    this.lastUpdated = Date.now()
   }
 }
