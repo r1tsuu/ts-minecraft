@@ -50,6 +50,7 @@ export type ClientPlayerData = {
 }
 
 export type GameContext = {
+  addOnDisposeCallback: (cb: () => void) => void
   camera: THREE.PerspectiveCamera
   controls: FPSControls
   dispose: () => void
@@ -67,11 +68,13 @@ export type GameContext = {
   }
   renderer: THREE.WebGLRenderer
   scene: THREE.Scene
+  singlePlayerWorker: Worker
   world: World
 }
 
 export type GUI = {
   destroy: () => void
+  getCanvas: () => HTMLCanvasElement
   setState: (newState: Partial<GUIState>, affectedQuerySelectors?: string | string[]) => void
   state: GUIState
 }

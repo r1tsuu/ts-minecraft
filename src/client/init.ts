@@ -44,24 +44,31 @@ export const initMinecraftClient = () => {
   minecraft.gui = ui
 
   minecraft.eventQueue.on('JOIN_WORLD', async (event) => {
+    if (minecraft.gameContext) {
+      console.warn('Received JOIN_WORLD but already in a world.')
+      return
+    }
+
     const singlePlayerWorker = new SinglePlayerWorker()
 
-    minecraft.eventQueue.on('*', (event) => {
-      if (event.type.startsWith('REQUEST_')) {
+    const unsubscribe = minecraft.eventQueue.on('*', (event) => {
+      if (event.from === 'CLIENT' && event.type.startsWith('REQUEST_')) {
         singlePlayerWorker.postMessage(event)
       }
     })
 
     singlePlayerWorker.onmessage = (message: MessageEvent<MinecraftEventQueueEvent>) => {
-      minecraft.eventQueue.emit(
-        message.data.type,
-        message.data.payload,
-        message.data.eventUUID,
-        message.data.timestamp,
-      )
+      if (message.data.from === 'SERVER') {
+        minecraft.eventQueue.emit(
+          message.data.type,
+          message.data.payload,
+          message.data.eventUUID,
+          message.data.timestamp,
+        )
+      }
     }
 
-    await minecraft.eventQueue.waitUntilOn('WORKER_READY')
+    await minecraft.eventQueue.waitUntilOn('SINGLEPLAYER_WORKER_READY')
     const serverStartedResponse = await minecraft.eventQueue.emitAndWaitResponse(
       'START_LOCAL_SERVER',
       {
@@ -82,9 +89,12 @@ export const initMinecraftClient = () => {
       initialChunksFromServer: serverStartedResponse.payload.loadedChunks,
       minecraft,
       player: playerJoinResponse.payload.playerData,
+      singlePlayerWorker,
     })
 
     minecraft.gameContext = gameContext
+
+    gameContext.addOnDisposeCallback(unsubscribe)
 
     initGameLoop(minecraft)
   })

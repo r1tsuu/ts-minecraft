@@ -4,10 +4,9 @@ import type { MinecraftClient } from '../types.ts'
 
 export const initGameLoop = (minecraft: MinecraftClient) => {
   const clock = new THREE.Clock()
-  let requestedPointerLock = false
   let clockStopped = false
 
-  const loop = async () => {
+  const loop = () => {
     if (!minecraft.gameContext) return
 
     if (minecraft.getGUI().state.isPaused) {
@@ -33,11 +32,6 @@ export const initGameLoop = (minecraft: MinecraftClient) => {
     }
 
     minecraft.gameContext.renderer.render(minecraft.gameContext.scene, minecraft.gameContext.camera)
-
-    if (!document.pointerLockElement && !requestedPointerLock) {
-      requestedPointerLock = true
-      await minecraft.gameContext.renderer.domElement.requestPointerLock()
-    }
 
     minecraft.gameContext.controls.update(delta)
     minecraft.gameContext.world.update()

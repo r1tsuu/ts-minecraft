@@ -3,25 +3,26 @@ import * as THREE from 'three'
 import type { DatabaseChunkData, DatabasePlayerData } from '../server/worldDatabase.ts'
 import type { ClientPlayerData, GameContext, MinecraftClient } from '../types.ts'
 
-import { rawVector3ToThreeVector3, threeVector3ToRawVector3 } from '../client.ts'
 import { FPSControls } from './FPSControls.ts'
 import { createRaycaster } from './raycaster.ts'
+import { rawVector3ToThreeVector3, threeVector3ToRawVector3 } from './utils.ts'
 import { createWorld } from './world.ts'
 
 export const createGameContext = async ({
   initialChunksFromServer,
   minecraft,
   player,
+  singlePlayerWorker,
 }: {
   initialChunksFromServer: DatabaseChunkData[]
   minecraft: MinecraftClient
   player: DatabasePlayerData
+  singlePlayerWorker: Worker
 }): Promise<GameContext> => {
   const scene = new THREE.Scene()
-  const canvas = document.querySelector('#game_canvas') as HTMLCanvasElement
   const renderer = new THREE.WebGLRenderer({
     antialias: false,
-    canvas,
+    canvas: minecraft.getGUI().getCanvas(),
     powerPreference: 'high-performance',
   })
   renderer.setSize(window.innerWidth, window.innerHeight)
@@ -29,7 +30,12 @@ export const createGameContext = async ({
   const onResize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight)
   }
+
+  const additionalOnDisposeCallbacks: Array<() => void> = []
   window.addEventListener('resize', onResize)
+  additionalOnDisposeCallbacks.push(() => {
+    window.removeEventListener('resize', onResize)
+  })
 
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.ACESFilmicToneMapping
@@ -118,10 +124,19 @@ export const createGameContext = async ({
       clearTimeout(lastTimeout)
     }
 
+    singlePlayerWorker.terminate()
+
+    for (const callback of additionalOnDisposeCallbacks) {
+      callback()
+    }
+
     disposed = true
   }
 
-  const game: GameContext = {
+  const gameContext: GameContext = {
+    addOnDisposeCallback: (callback) => {
+      additionalOnDisposeCallbacks.push(callback)
+    },
     camera,
     controls: new FPSControls(camera, renderer.domElement, world, clientPlayer, minecraft.getGUI()),
     dispose,
@@ -142,8 +157,9 @@ export const createGameContext = async ({
     }),
     renderer,
     scene,
+    singlePlayerWorker,
     world,
   }
 
-  return game
+  return gameContext
 }

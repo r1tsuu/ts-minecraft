@@ -194,6 +194,12 @@ export const initGUI = ({ minecraft }: { minecraft: MinecraftClient }): GUI => {
         activePage: 'game',
         loadingWorldName: ' ',
       })
+      minecraft
+        .getGameContext()
+        .renderer.domElement.requestPointerLock()
+        .catch((e) => {
+          console.warn('Pointer lock request failed', e)
+        })
     },
     resumeGame: async () => {
       await resumeGame()
@@ -225,6 +231,7 @@ export const initGUI = ({ minecraft }: { minecraft: MinecraftClient }): GUI => {
 
       clearInterval(gameInterval)
     },
+    getCanvas: () => document.getElementById('gameCanvas') as HTMLCanvasElement,
     setState,
     state,
   }

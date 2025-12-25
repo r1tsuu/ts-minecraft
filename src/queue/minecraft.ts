@@ -37,10 +37,10 @@ export const createMinecraftEventQueue = (environment: 'CLIENT' | 'SERVER') => {
     SERVER_TICK: {
       currentTick: number
     }
+    SINGLEPLAYER_WORKER_READY: {}
     START_LOCAL_SERVER: {
       worldDatabaseName: string
     }
-    WORKER_READY: {}
   }>({ environment })
 
   return queue

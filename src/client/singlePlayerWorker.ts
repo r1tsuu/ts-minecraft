@@ -16,7 +16,11 @@ onmessage = async (message: MessageEvent<MinecraftEventQueueEvent>) => {
     })
 
     localServer.eventQueue.on('*', (event) => {
-      if (event.type.startsWith('RESPONSE_') || event.type === 'SERVER_STARTED') postMessage(event)
+      if (
+        event.from === 'SERVER' &&
+        (event.type.startsWith('RESPONSE_') || event.type === 'SERVER_STARTED')
+      )
+        postMessage(event)
     })
 
     return
@@ -39,7 +43,7 @@ const readyEvent: Omit<MinecraftEventQueueEvent, 'cancel' | 'respond'> = {
   from: 'SERVER',
   payload: {},
   timestamp: Date.now(),
-  type: 'WORKER_READY',
+  type: 'SINGLEPLAYER_WORKER_READY',
 }
 
 postMessage(readyEvent)
