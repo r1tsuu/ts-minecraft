@@ -67,7 +67,7 @@ export class GUI {
   private createActions(): GUIActions {
     return {
       backToMenu: async () => {
-        this.minecraft.eventQueue.emit('EXIT_WORLD', {})
+        this.minecraft.eventQueue.emit('Client.ExitWorld', {})
         this.setState({
           activePage: 'start',
           fps: 'Loading...',
@@ -122,11 +122,11 @@ export class GUI {
         })
 
         await this.minecraft.eventQueue.emitAndWaitResponse(
-          'JOIN_WORLD',
+          'Client.JoinWorld',
           {
             worldUUID: world.uuid,
           },
-          'JOINED_WORLD',
+          'Client.JoinedWorld',
         )
 
         console.log('Joined world:', world.name)

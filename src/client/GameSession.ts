@@ -193,7 +193,7 @@ export class GameSession {
     try {
       this.syncying = true
       await this.minecraft.eventQueue.emitAndWaitResponse(
-        'REQUEST_SYNC_PLAYER',
+        'Client.RequestSyncPlayer',
         {
           playerData: {
             canJump: this.player.canJump,
@@ -206,7 +206,7 @@ export class GameSession {
             yaw: this.player.yaw,
           },
         },
-        'RESPONSE_SYNC_PLAYER',
+        'Server.ResponseSyncPlayer',
       )
     } finally {
       this.syncying = false

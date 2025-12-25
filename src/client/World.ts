@@ -132,7 +132,7 @@ export class World {
 
     if (chunksToLoad.length) {
       if (this.requestingChunksState === 'idle') {
-        this.eventQueue.emit('REQUEST_CHUNKS_LOAD', {
+        this.eventQueue.emit('Client.RequestChunksLoad', {
           chunks: chunksToLoad.map((key) => {
             const [chunkX, chunkZ] = key.split(',').map(Number)
             return { chunkX, chunkZ }
@@ -221,14 +221,14 @@ export class World {
     }
   }
 
-  private onResponseChunksLoad(event: MinecraftEvent<'RESPONSE_CHUNKS_LOAD'>): void {
+  private onResponseChunksLoad(event: MinecraftEvent<'Server.ResponseChunksLoad'>): void {
     this.syncChunksFromServer(event.payload.chunks)
     this.requestingChunksState = 'idle'
   }
 
   private setupEventListeners(): void {
     this.dispositions.push(
-      this.eventQueue.on('RESPONSE_CHUNKS_LOAD', this.onResponseChunksLoad.bind(this)),
+      this.eventQueue.on('Server.ResponseChunksLoad', this.onResponseChunksLoad.bind(this)),
     )
   }
 

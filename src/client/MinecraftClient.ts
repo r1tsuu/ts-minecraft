@@ -70,9 +70,9 @@ export class MinecraftClient {
     }
   }
 
-  private async onJoinWorld(event: MinecraftEvent<'JOIN_WORLD'>): Promise<void> {
+  private async onJoinWorld(event: MinecraftEvent<'Client.JoinWorld'>): Promise<void> {
     if (this.gameSession) {
-      console.warn('Received JOIN_WORLD but already in a world.')
+      console.warn(`Received ${event.type} but already in a world.`)
       return
     }
 
@@ -94,24 +94,24 @@ export class MinecraftClient {
     }
 
     console.log('Waiting for single player worker to be ready...')
-    await this.eventQueue.waitUntilOn('SINGLEPLAYER_WORKER_READY')
+    await this.eventQueue.waitUntilOn('SinglePlayerWorker.WorkerReady')
     console.log('Single player worker is ready.')
     const serverStartedResponse = await this.eventQueue.emitAndWaitResponse(
-      'START_LOCAL_SERVER',
+      'Client.StartLocalServer',
       {
         worldDatabaseName: `world_${event.payload.worldUUID}`,
       },
-      'SERVER_STARTED',
+      'SinglePlayerWorker.ServerStarted',
     )
 
     console.log('Server started response:', serverStartedResponse)
 
     const playerJoinResponse = await this.eventQueue.emitAndWaitResponse(
-      'REQUEST_PLAYER_JOIN',
+      'Client.RequestPlayerJoin',
       {
         playerUUID: this.localStorageManager.getPlayerUUID(),
       },
-      'RESPONSE_PLAYER_JOIN',
+      'Server.ResponsePlayerJoin',
     )
 
     console.log('Player join response:', playerJoinResponse)
@@ -126,12 +126,12 @@ export class MinecraftClient {
     gameSession.addOnDisposeCallback(unsubscribe)
     gameSession.startGameLoop()
 
-    this.eventQueue.respond(event, 'JOINED_WORLD', {})
+    this.eventQueue.respond(event, 'Client.JoinedWorld', {})
   }
 
   private setupEventListeners(): void {
-    this.dispositions.push(this.eventQueue.on('JOIN_WORLD', this.onJoinWorld.bind(this)))
-    this.dispositions.push(this.eventQueue.on('EXIT_WORLD', this.onExitWorld.bind(this)))
+    this.dispositions.push(this.eventQueue.on('Client.JoinWorld', this.onJoinWorld.bind(this)))
+    this.dispositions.push(this.eventQueue.on('Client.ExitWorld', this.onExitWorld.bind(this)))
   }
 
   private shouldForwardEventToServer(event: AnyMinecraftEvent): boolean {
@@ -139,11 +139,11 @@ export class MinecraftClient {
       return false
     }
 
-    if (event.type.startsWith('REQUEST_')) {
+    if (event.type.startsWith('Client.Request')) {
       return true
     }
 
-    if (event.type === 'START_LOCAL_SERVER' || event.type === 'SERVER_STARTED') {
+    if (event.type === 'Client.StartLocalServer') {
       return true
     }
 

@@ -10,11 +10,14 @@ const shouldForwardEventToClient = (event: AnyMinecraftEvent) => {
     return false
   }
 
-  if (event.type.startsWith('RESPONSE_')) {
+  if (event.type.startsWith('Server.Response')) {
     return true
   }
 
-  if (event.type === 'SINGLEPLAYER_WORKER_READY' || event.type === 'SERVER_STARTED') {
+  if (
+    event.type === 'SinglePlayerWorker.WorkerReady' ||
+    event.type === 'SinglePlayerWorker.ServerStarted'
+  ) {
     return true
   }
 
@@ -28,7 +31,7 @@ eventQueue.on('*', (event) => {
 })
 
 onmessage = async (message: MessageEvent<AnyMinecraftEvent>) => {
-  if (message.data.type === 'START_LOCAL_SERVER') {
+  if (message.data.type === 'Client.StartLocalServer') {
     if (localServer) {
       console.warn('Received START_LOCAL_SERVER but Local server is already started.')
       return
@@ -39,7 +42,7 @@ onmessage = async (message: MessageEvent<AnyMinecraftEvent>) => {
     localServer = await MinecraftServer.create(eventQueue, message.data.payload.worldDatabaseName)
 
     eventQueue.emit(
-      'SERVER_STARTED',
+      'SinglePlayerWorker.ServerStarted',
       {
         loadedChunks: localServer.loadedChunks,
       },
@@ -61,4 +64,4 @@ onmessage = async (message: MessageEvent<AnyMinecraftEvent>) => {
   }
 }
 
-eventQueue.emit('SINGLEPLAYER_WORKER_READY', {})
+eventQueue.emit('SinglePlayerWorker.WorkerReady', {})

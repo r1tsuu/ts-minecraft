@@ -90,7 +90,9 @@ export class MinecraftServer {
     this.setupEventHandlers()
   }
 
-  private async onRequestChunksLoad(event: MinecraftEvent<'REQUEST_CHUNKS_LOAD'>): Promise<void> {
+  private async onRequestChunksLoad(
+    event: MinecraftEvent<'Client.RequestChunksLoad'>,
+  ): Promise<void> {
     const response: DatabaseChunkData[] = []
 
     const coordsToLoad: ChunkCoordinates[] = []
@@ -131,12 +133,12 @@ export class MinecraftServer {
 
     await this.syncMeta()
 
-    await this.eventQueue.respond(event, 'RESPONSE_CHUNKS_LOAD', {
+    await this.eventQueue.respond(event, 'Server.ResponseChunksLoad', {
       chunks: response,
     })
   }
 
-  private async onRequestPlayerJoin(event: MinecraftEvent<'REQUEST_PLAYER_JOIN'>) {
+  private async onRequestPlayerJoin(event: MinecraftEvent<'Client.RequestPlayerJoin'>) {
     let playerData = this.players.find((player) => player.uuid === event.payload.playerUUID)
 
     if (!playerData) {
@@ -173,12 +175,14 @@ export class MinecraftServer {
       this.players.push(playerData)
     }
 
-    this.eventQueue.respond(event, 'RESPONSE_PLAYER_JOIN', {
+    this.eventQueue.respond(event, 'Server.ResponsePlayerJoin', {
       playerData,
     })
   }
 
-  private async onRequestSyncPlayer(event: MinecraftEvent<'REQUEST_SYNC_PLAYER'>): Promise<void> {
+  private async onRequestSyncPlayer(
+    event: MinecraftEvent<'Client.RequestSyncPlayer'>,
+  ): Promise<void> {
     const player = this.players.find((p) => p.uuid === event.payload.playerData.uuid)
 
     if (player) {
@@ -186,18 +190,18 @@ export class MinecraftServer {
       await this.database.updatePlayer(player)
     }
 
-    await this.eventQueue.respond(event, 'RESPONSE_SYNC_PLAYER', {})
+    await this.eventQueue.respond(event, 'Server.ResponseSyncPlayer', {})
   }
 
   private setupEventHandlers(): void {
     this.dispositions.push(
-      this.eventQueue.on('REQUEST_PLAYER_JOIN', this.onRequestPlayerJoin.bind(this)),
+      this.eventQueue.on('Client.RequestPlayerJoin', this.onRequestPlayerJoin.bind(this)),
     )
     this.dispositions.push(
-      this.eventQueue.on('REQUEST_CHUNKS_LOAD', this.onRequestChunksLoad.bind(this)),
+      this.eventQueue.on('Client.RequestChunksLoad', this.onRequestChunksLoad.bind(this)),
     )
     this.dispositions.push(
-      this.eventQueue.on('REQUEST_SYNC_PLAYER', this.onRequestSyncPlayer.bind(this)),
+      this.eventQueue.on('Client.RequestSyncPlayer', this.onRequestSyncPlayer.bind(this)),
     )
   }
 

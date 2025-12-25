@@ -10,9 +10,11 @@ const WILDCARD = '*'
 
 type EventHandler<
   K extends string,
-  D extends Record<string, unknown> = {},
+  Events extends Record<string, Record<string, unknown>>,
   Meta extends Record<string, unknown> = {},
-> = (event: Event<Exclude<K, WildcardKey>, D, Meta>) => Promise<void> | void
+> = (
+  event: Event<Exclude<K, WildcardKey>, K extends keyof Events ? Events[K] : any, Meta>,
+) => Promise<void> | void
 
 type EventKey<Events extends Record<string, unknown>> = keyof Events & string
 
@@ -24,6 +26,7 @@ export class EventQueue<
   Meta extends Record<string, unknown> = {},
 > {
   private beforeEmitHooks: ((event: AnyEvent<Events, Meta>) => Promise<void> | void)[] = []
+  private eventTypesRegistry = new Map<string, {}>()
 
   private registry = new Map<
     RegistryKey<Events>,
@@ -36,12 +39,14 @@ export class EventQueue<
     this.beforeEmitHooks.push(hook)
   }
 
-  async emit<K extends EventKey<Events>>(
+  async emit<K extends ({} & string) | EventKey<Events>>(
     type: K,
-    payload: Events[K],
+    payload: K extends keyof Events ? Events[K] : any,
     eventUUID?: UUID,
     metadata?: Meta,
   ): Promise<boolean> {
+    this.validateEventType(type)
+
     const event = new Event(type, payload, eventUUID, metadata)
 
     for (const hook of this.beforeEmitHooks) {
@@ -65,13 +70,16 @@ export class EventQueue<
     return !event.isCanceled
   }
 
-  async emitAndWaitResponse<K extends EventKey<Events>, UntilK extends EventKey<Events>>(
+  async emitAndWaitResponse<
+    K extends ({} & string) | EventKey<Events>,
+    UntilK extends ({} & string) | EventKey<Events>,
+  >(
     type: K,
-    payload: Events[K],
+    payload: K extends keyof Events ? Events[K] : any,
     typeUntil: UntilK,
     eventUUID?: UUID,
     metadata?: Meta,
-  ): Promise<Event<UntilK, Events[UntilK]>> {
+  ): Promise<Event<UntilK, UntilK extends keyof Events ? Events[UntilK] : any>> {
     if (!eventUUID) {
       eventUUID = crypto.randomUUID()
     }
@@ -79,12 +87,14 @@ export class EventQueue<
     return this.waitUntilOn(typeUntil, eventUUID)
   }
 
-  on<K extends RegistryKey<Events>>(
+  on<K extends ({} & string) | RegistryKey<Events>>(
     type: K,
     handler: K extends '*'
       ? (event: AnyEvent<Events, Meta>) => Promise<void> | void
-      : EventHandler<K, Events[K], Meta>,
+      : EventHandler<K, Events, Meta>,
   ): () => void {
+    this.validateEventType(type)
+
     let entry = this.registry.get(type)
 
     if (!entry) {
@@ -99,23 +109,30 @@ export class EventQueue<
     }
   }
 
+  registerEventType(type: string): void {
+    this.eventTypesRegistry.set(type, {})
+  }
+
   removeBeforeEmitHook(hook: (event: AnyEvent<Events, Meta>) => Promise<void> | void): void {
     this.beforeEmitHooks = this.beforeEmitHooks.filter((h) => h !== hook)
   }
 
-  async respond<OriginalK extends EventKey<Events>, K extends EventKey<Events>>(
-    originalEvent: Event<OriginalK, Events[OriginalK], Meta>,
+  async respond<
+    OriginalK extends ({} & string) | EventKey<Events>,
+    K extends ({} & string) | EventKey<Events>,
+  >(
+    originalEvent: Event<OriginalK, OriginalK extends keyof Events ? Events[OriginalK] : any, Meta>,
     type: K,
-    payload: Events[K],
+    payload: K extends keyof Events ? Events[K] : any,
   ): Promise<void> {
     this.emit(type, payload, originalEvent.eventUUID)
     await this.waitUntilOn(type, originalEvent.eventUUID)
   }
 
-  waitUntilOn<K extends EventKey<Events>>(
+  waitUntilOn<K extends ({} & string) | EventKey<Events>>(
     type: K,
     eventUUID?: string,
-  ): Promise<Event<K, Events[K], Meta>> {
+  ): Promise<Event<K, K extends keyof Events ? Events[K] : any, Meta>> {
     return new Promise((resolve) => {
       // @ts-expect-error
       const unsub = this.on(type, (event) => {
@@ -125,5 +142,11 @@ export class EventQueue<
         unsub()
       })
     })
+  }
+
+  private validateEventType(type: string): void {
+    if (!this.eventTypesRegistry.has(type) && type !== WILDCARD) {
+      throw new Error(`Event type "${type}" is not registered in the EventQueue.`)
+    }
   }
 }

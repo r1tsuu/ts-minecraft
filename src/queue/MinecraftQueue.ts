@@ -16,62 +16,80 @@ type MinecraftEventMetadata = {
 }
 
 type MinecraftEventsData = {
-  EXIT_WORLD: {}
-  JOIN_WORLD: {
+  'Client.ExitWorld': {}
+  'Client.JoinedWorld': {}
+  'Client.JoinWorld': {
     worldUUID: UUID
   }
-  JOINED_WORLD: {}
-  REQUEST_CHUNKS_LOAD: {
+  'Client.RequestChunksLoad': {
     chunks: ChunkCoordinates[]
   }
-  REQUEST_PLAYER_JOIN: {
+  'Client.RequestPlayerJoin': {
     playerUUID: UUID
   }
-  REQUEST_SYNC_PLAYER: {
+  'Client.RequestSyncPlayer': {
     playerData: DatabasePlayerData
   }
-  RESPONSE_CHUNKS_LOAD: {
-    chunks: DatabaseChunkData[]
-  }
-  RESPONSE_PLAYER_JOIN: {
-    playerData: DatabasePlayerData
-  }
-  RESPONSE_SYNC_PLAYER: {}
-  SERVER_STARTED: {
-    loadedChunks: DatabaseChunkData[]
-  }
-  SERVER_TICK: {
-    currentTick: number
-  }
-  SINGLEPLAYER_WORKER_READY: {}
-  START_LOCAL_SERVER: {
+  'Client.StartLocalServer': {
     worldDatabaseName: string
   }
+  'Server.ResponseChunksLoad': {
+    chunks: DatabaseChunkData[]
+  }
+  'Server.ResponsePlayerJoin': {
+    playerData: DatabasePlayerData
+  }
+  'Server.ResponseSyncPlayer': {}
+  'Server.ServerTick': {
+    currentTick: number
+  }
+  'SinglePlayerWorker.ServerStarted': {
+    loadedChunks: DatabaseChunkData[]
+  }
+  'SinglePlayerWorker.WorkerReady': {}
 }
 
 type MinecraftEventType = keyof MinecraftEventsData
 
-export class MinecraftEvent<T extends MinecraftEventType> extends Event<
+export class MinecraftEvent<T extends ({} & string) | MinecraftEventType> extends Event<
   T,
-  MinecraftEventsData[T],
+  T extends keyof MinecraftEventsData ? MinecraftEventsData[T] : any,
   MinecraftEventMetadata
 > {}
-
-const debug = true
 
 export class MinecraftEventQueue extends EventQueue<MinecraftEventsData, MinecraftEventMetadata> {
   constructor(environment: 'CLIENT' | 'SERVER') {
     super()
+
+    const coreEvents: {
+      [K in keyof MinecraftEventsData]: K
+    } = {
+      'Client.ExitWorld': 'Client.ExitWorld',
+      'Client.JoinedWorld': 'Client.JoinedWorld',
+      'Client.JoinWorld': 'Client.JoinWorld',
+      'Client.RequestChunksLoad': 'Client.RequestChunksLoad',
+      'Client.RequestPlayerJoin': 'Client.RequestPlayerJoin',
+      'Client.RequestSyncPlayer': 'Client.RequestSyncPlayer',
+      'Client.StartLocalServer': 'Client.StartLocalServer',
+      'Server.ResponseChunksLoad': 'Server.ResponseChunksLoad',
+      'Server.ResponsePlayerJoin': 'Server.ResponsePlayerJoin',
+      'Server.ResponseSyncPlayer': 'Server.ResponseSyncPlayer',
+      'Server.ServerTick': 'Server.ServerTick',
+      'SinglePlayerWorker.ServerStarted': 'SinglePlayerWorker.ServerStarted',
+      'SinglePlayerWorker.WorkerReady': 'SinglePlayerWorker.WorkerReady',
+    }
+
+    for (const eventType of Object.keys(coreEvents)) {
+      this.registerEventType(eventType)
+    }
 
     this.addBeforeEmitHook((event) => {
       event.metadata.environment = event.metadata.environment ?? environment
       event.metadata.isForwarded = event.metadata.isForwarded ?? false
     })
 
-    if (debug) {
-      this.on('*', (event) => {
-        console.log(`[MinecraftEventQueue][${environment}] Event emitted:`, event)
-      })
-    }
+    // this.on('*', (event) => {
+    //   console.log(`[MinecraftEventQueue][${environment}] Event emitted:`, event)
+    // })
   }
 }
