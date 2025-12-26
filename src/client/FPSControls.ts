@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import type { GameSession } from './GameSession.ts'
 import type { GUI } from './gui/GUI.ts'
 
-import { GRAVITY_ACCELERATION } from '../util.ts'
+import { Config } from '../shared/Config.ts'
 
 export class FPSControls {
   blockBox = new THREE.Box3()
@@ -34,7 +34,7 @@ export class FPSControls {
     const player = this.gameSession.player
 
     // Apply gravity
-    player.velocity.y -= GRAVITY_ACCELERATION * delta
+    player.velocity.y -= Config.GRAVITY * delta
 
     // Calculate movement direction
     player.direction.set(0, 0, 0)

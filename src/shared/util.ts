@@ -1,19 +1,25 @@
-import type { RawVector3 } from './types.ts'
+import type { RawVector3 } from '../types.ts'
 
-export const CHUNK_SIZE = 16
+import { Config } from './Config.ts'
 
-export const RENDER_DISTANCE = 2
+export const minutes = (m: number): number => {
+  return m * 60 * 1000
+}
 
-export const WORLD_HEIGHT = 256
+export const seconds = (s: number): number => {
+  return s * 1000
+}
 
-export const GRAVITY_ACCELERATION = 9.81
+export const ticks = (t: number): number => {
+  return t * Config.TICK_RATE
+}
 
 export const getBlockKey = (x: number, y: number, z: number): string => {
   return `${x},${y},${z}`
 }
 
 export const getBlockIndex = (x: number, y: number, z: number): number => {
-  return x + CHUNK_SIZE * (z + CHUNK_SIZE * y)
+  return x + Config.CHUNK_SIZE * (z + Config.CHUNK_SIZE * y)
 }
 
 export const findByXZ = <T extends { x: number; z: number }>(

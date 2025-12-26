@@ -1,15 +1,16 @@
 import type { BlockInWorld, ChunkCoordinates } from '../types.ts'
 
-import { BlocksRegistry } from '../blocks/BlocksRegistry.ts'
-import { createConfig, type SharedConfig } from '../config.ts'
 import { type MinecraftEvent, MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
+import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
+import { Config } from '../shared/Config.ts'
+import { Scheduler } from '../shared/Scheduler.ts'
 import {
   findByXYZ,
   findChunkByXZ,
   getChunksCoordinatesInRadius,
   rawVector3,
   zeroRawVector3,
-} from '../util.ts'
+} from '../shared/util.ts'
 import { TerrainGenerator } from './TerrainGenerator.ts'
 import {
   type DatabaseChunkData,
@@ -20,10 +21,9 @@ import {
 
 export class MinecraftServer {
   blocksRegistry: BlocksRegistry
-  config: SharedConfig
   currentTick: number = 0
   loadedChunks: DatabaseChunkData[] = []
-
+  scheduler = new Scheduler()
   terrainGenerator: TerrainGenerator
 
   private constructor(
@@ -32,9 +32,8 @@ export class MinecraftServer {
     private readonly meta: DatabaseWorldMetaData,
     private players: DatabasePlayerData[],
   ) {
-    this.config = createConfig()
     this.blocksRegistry = new BlocksRegistry()
-    this.terrainGenerator = new TerrainGenerator(this.blocksRegistry, this.config)
+    this.terrainGenerator = new TerrainGenerator(this.blocksRegistry)
   }
 
   static async create(
@@ -54,6 +53,7 @@ export class MinecraftServer {
 
   async dispose(): Promise<void> {
     MinecraftEventQueue.unregisterHandlers(this)
+    this.scheduler.unregisterInstance(this)
     await this.database.dispose()
     this.loadedChunks = []
     this.currentTick = 0
@@ -118,7 +118,7 @@ export class MinecraftServer {
 
       let latestBlock: BlockInWorld | null = null
 
-      for (let y = 0; y < this.config.worldHeight; y++) {
+      for (let y = 0; y < Config.WORLD_HEIGHT; y++) {
         const maybeBlock = findByXYZ(centralChunk.data.blocks, 0, y, 0)
 
         if (maybeBlock) {
@@ -135,7 +135,7 @@ export class MinecraftServer {
       playerData = {
         canJump: true,
         direction: zeroRawVector3(),
-        jumpStrength: this.config.defaultPlayerJumpStrength,
+        jumpStrength: Config.DEFAULT_PLAYER_JUMP_STRENGTH,
         pitch: 0,
         position: rawVector3(latestBlock.x, latestBlock.y + 4, latestBlock.z),
         uuid: event.payload.playerUUID,
@@ -166,11 +166,19 @@ export class MinecraftServer {
     await this.eventQueue.respond(event, 'Server.ResponseSyncPlayer', {})
   }
 
+  @Scheduler.Every(Config.TICK_RATE, {
+    runImmediately: true,
+  })
+  protected tick(): void {
+    console.log(`Server Tick ${this.currentTick}`)
+    this.currentTick++
+  }
+
   private async initialize(): Promise<void> {
     const spawnChunksCoordinates = getChunksCoordinatesInRadius({
       centerChunkX: 0,
       centerChunkZ: 0,
-      chunkRadius: this.config.spawnChunkRadius,
+      chunkRadius: Config.SPAWN_CHUNK_RADIUS,
     })
 
     // Setup initial world state if this is the first server start
@@ -193,6 +201,7 @@ export class MinecraftServer {
     await this.syncMeta()
 
     this.eventQueue.registerHandlers(this)
+    this.scheduler.registerInstance(this)
   }
 
   private async syncMeta(): Promise<void> {

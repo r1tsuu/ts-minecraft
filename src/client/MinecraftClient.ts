@@ -1,4 +1,3 @@
-import { createConfig, type SharedConfig } from '../config.ts'
 import {
   type AnyMinecraftEvent,
   type MinecraftEvent,
@@ -12,8 +11,6 @@ import { LocalStorageManager } from './LocalStorageManager.ts'
 
 export class MinecraftClient {
   blocksRegistry: ClientBlockRegisty = createClientBlockRegistry()
-  config: SharedConfig = createConfig()
-
   eventQueue: MinecraftEventQueue = new MinecraftEventQueue('Client')
   gameSession: GameSession | null = null
   gui: GUI | null = null

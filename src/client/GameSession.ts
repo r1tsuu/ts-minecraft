@@ -4,6 +4,7 @@ import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatab
 import type { ClientPlayerData, UUID } from '../types.ts'
 import type { MinecraftClient } from './MinecraftClient.ts'
 
+import { Config } from '../shared/Config.ts'
 import { FPSControls } from './FPSControls.ts'
 import { Raycaster } from './Raycaster.ts'
 import { rawVector3ToThreeVector3, threeVector3ToRawVector3 } from './utils.ts'
@@ -76,17 +77,17 @@ export class GameSession {
     this.player = {
       canJump: true,
       direction: rawVector3ToThreeVector3(player.direction),
-      height: minecraft.config.playerHeight,
+      height: Config.PLAYER_HEIGHT,
       isMovingBackward: false,
       isMovingForward: false,
       isMovingLeft: false,
       isMovingRight: false,
-      jumpStrength: minecraft.config.defaultPlayerJumpStrength,
+      jumpStrength: player.jumpStrength,
       pitch: player.pitch,
       position: rawVector3ToThreeVector3(player.position),
-      speed: minecraft.config.defaultPlayerSpeed,
+      speed: Config.DEFAULT_PLAYER_SPEED,
       velocity: rawVector3ToThreeVector3(player.velocity),
-      width: minecraft.config.playerWidth,
+      width: Config.PLAYER_WIDTH,
       yaw: player.yaw,
     }
 

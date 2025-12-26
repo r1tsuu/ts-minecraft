@@ -5,7 +5,8 @@ import type { BlockInWorld, Chunk, ClientPlayerData } from '../types.ts'
 import type { ClientBlockRegisty } from './blocks.ts'
 
 import { MinecraftEvent, MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
-import { CHUNK_SIZE, getBlockIndex, getBlockKey, RENDER_DISTANCE, WORLD_HEIGHT } from '../util.ts'
+import { Config } from '../shared/Config.ts'
+import { getBlockIndex, getBlockKey } from '../shared/util.ts'
 
 const chunkKey = (x: number, z: number) => `${x},${z}`
 
@@ -43,7 +44,12 @@ export class World {
     this.scene.add(reflectionLight)
 
     const MAX_COUNT =
-      (RENDER_DISTANCE * RENDER_DISTANCE * CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT) / 2
+      (Config.RENDER_DISTANCE *
+        Config.RENDER_DISTANCE *
+        Config.CHUNK_SIZE *
+        Config.CHUNK_SIZE *
+        Config.WORLD_HEIGHT) /
+      2
 
     const geometry = new THREE.BoxGeometry()
 
@@ -81,18 +87,18 @@ export class World {
   }
 
   getBlock(x: number, y: number, z: number): null | number {
-    const chunkX = Math.floor(x / CHUNK_SIZE)
-    const chunkZ = Math.floor(z / CHUNK_SIZE)
+    const chunkX = Math.floor(x / Config.CHUNK_SIZE)
+    const chunkZ = Math.floor(z / Config.CHUNK_SIZE)
     const key = chunkKey(chunkX, chunkZ)
     const chunk = this.chunks.get(key)
 
     if (!chunk) {
       return null
     }
-    const localX = x - chunkX * CHUNK_SIZE
-    const localZ = z - chunkZ * CHUNK_SIZE
+    const localX = x - chunkX * Config.CHUNK_SIZE
+    const localZ = z - chunkZ * Config.CHUNK_SIZE
 
-    if (y < 0 || y >= WORLD_HEIGHT) {
+    if (y < 0 || y >= Config.WORLD_HEIGHT) {
       return null
     }
 
@@ -106,14 +112,14 @@ export class World {
   }
 
   update(): void {
-    const playerChunkX = Math.floor(this.clientPlayer.position.x / CHUNK_SIZE)
-    const playerChunkZ = Math.floor(this.clientPlayer.position.z / CHUNK_SIZE)
+    const playerChunkX = Math.floor(this.clientPlayer.position.x / Config.CHUNK_SIZE)
+    const playerChunkZ = Math.floor(this.clientPlayer.position.z / Config.CHUNK_SIZE)
 
     const needed = new Set<string>()
     const chunksToLoad: string[] = []
 
-    for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
-      for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
+    for (let dx = -Config.RENDER_DISTANCE; dx <= Config.RENDER_DISTANCE; dx++) {
+      for (let dz = -Config.RENDER_DISTANCE; dz <= Config.RENDER_DISTANCE; dz++) {
         const cx = playerChunkX + dx
         const cz = playerChunkZ + dz
         const key = chunkKey(cx, cz)
@@ -188,9 +194,9 @@ export class World {
         }
 
         matrix.setPosition(
-          chunk.chunkX * CHUNK_SIZE + block.x,
+          chunk.chunkX * Config.CHUNK_SIZE + block.x,
           block.y,
-          chunk.chunkZ * CHUNK_SIZE + block.z,
+          chunk.chunkZ * Config.CHUNK_SIZE + block.z,
         )
 
         let index: number
@@ -228,7 +234,7 @@ export class World {
       const key = `${chunk.chunkX},${chunk.chunkZ}`
 
       const blocks: Map<string, BlockInWorld> = new Map()
-      const blocksUint = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT)
+      const blocksUint = new Uint8Array(Config.CHUNK_SIZE * Config.CHUNK_SIZE * Config.WORLD_HEIGHT)
 
       for (const block of chunk.data.blocks) {
         const blockKey = `${block.x},${block.y},${block.z}`
