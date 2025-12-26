@@ -31,7 +31,6 @@ export type DatabaseSchema = {
     uuid: UUID
   } & ChunkCoordinates
   players: {
-    direction: JSONColumnType<RawVector3>
     position: JSONColumnType<RawVector3>
     rotation: JSONColumnType<{
       x: number
@@ -136,7 +135,6 @@ export class WorldDatabase {
       .insertInto('players')
       .values({
         ...data,
-        direction: json(data.direction),
         position: json(data.position),
         rotation: json(data.rotation),
         velocity: json(data.velocity),
@@ -199,7 +197,6 @@ export class WorldDatabase {
     await this.db
       .updateTable('players')
       .set({
-        direction: json(player.direction),
         position: json(player.position),
         rotation: json(player.rotation),
         velocity: json(player.velocity),
@@ -271,7 +268,6 @@ export class WorldDatabase {
       await this.db.schema
         .createTable('players')
         .addColumn('uuid', 'uuid', (col) => col.primaryKey())
-        .addColumn('direction', 'jsonb', (col) => col.notNull())
         .addColumn('position', 'jsonb', (col) => col.notNull())
         .addColumn('velocity', 'jsonb', (col) => col.notNull())
         .addColumn('rotation', 'jsonb', (col) => col.notNull())

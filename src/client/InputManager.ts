@@ -53,6 +53,22 @@ export class InputManager {
 
   dispose: () => void = () => {}
 
+  getMouseDelta() {
+    return {
+      deltaX: this.mouseState.deltaX,
+      deltaY: this.mouseState.deltaY,
+    }
+  }
+
+  isKeyPressed(key: KeyboardKey): boolean {
+    return this.keyboardState[key].isPressed
+  }
+
+  resetMouseDelta() {
+    this.mouseState.deltaX = 0
+    this.mouseState.deltaY = 0
+  }
+
   private isPaused(): boolean {
     return this.minecraft.getGameSession().paused
   }
@@ -67,11 +83,8 @@ export class InputManager {
     }
 
     const keyState = this.keyboardState[event.code]
-    keyState.isPressed = true
 
-    this.minecraft.eventQueue.emit('Client.Input.KeyDown', {
-      keyCode: event.code,
-    })
+    keyState.isPressed = true
   }
 
   private onKeyUp = (event: KeyboardEvent) => {
@@ -83,11 +96,8 @@ export class InputManager {
       return
     }
     const keyState = this.keyboardState[event.code]
-    keyState.isPressed = false
 
-    this.minecraft.eventQueue.emit('Client.Input.KeyUp', {
-      keyCode: event.code,
-    })
+    keyState.isPressed = false
   }
 
   private onMouseDown = (event: MouseEvent) => {
@@ -97,10 +107,8 @@ export class InputManager {
 
     if (event.button === 0) {
       this.mouseState.isPressedLeft = true
-      this.minecraft.eventQueue.emit('Client.Input.MouseLeftDown', {})
     } else if (event.button === 2) {
       this.mouseState.isPressedRight = true
-      this.minecraft.eventQueue.emit('Client.Input.MouseRightDown', {})
     }
   }
 
@@ -109,12 +117,8 @@ export class InputManager {
       return
     }
 
-    this.mouseState.deltaX = event.movementX
-    this.mouseState.deltaY = event.movementY
-    this.minecraft.eventQueue.emit('Client.Input.MouseMove', {
-      deltaX: event.movementX,
-      deltaY: event.movementY,
-    })
+    this.mouseState.deltaX += event.movementX
+    this.mouseState.deltaY += event.movementY
   }
 
   private onMouseUp = (event: MouseEvent) => {
@@ -124,10 +128,8 @@ export class InputManager {
 
     if (event.button === 0) {
       this.mouseState.isPressedLeft = false
-      this.minecraft.eventQueue.emit('Client.Input.MouseLeftUp', {})
     } else if (event.button === 2) {
       this.mouseState.isPressedRight = false
-      this.minecraft.eventQueue.emit('Client.Input.MouseRightUp', {})
     }
   }
 }

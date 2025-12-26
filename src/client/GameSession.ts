@@ -4,6 +4,7 @@ import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatab
 import type { UUID } from '../types.ts'
 import type { MinecraftClient } from './MinecraftClient.ts'
 
+import { MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import { Config } from '../shared/Config.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
 import { ClientPlayerManager } from './ClientPlayerManager.ts'
@@ -77,9 +78,8 @@ export class GameSession {
 
     this.player = new Player(
       initialPlayerFromServer.uuid,
-      THREE.Vector3.fromRaw(initialPlayerFromServer.direction),
-      new THREE.Vector3(0, 0, 0),
       THREE.Vector3.fromRaw(initialPlayerFromServer.position),
+      THREE.Vector3.fromRaw(initialPlayerFromServer.velocity),
       new THREE.Euler(
         initialPlayerFromServer.rotation.x,
         initialPlayerFromServer.rotation.y,
@@ -99,6 +99,7 @@ export class GameSession {
 
     this.raycaster = new Raycaster(this.camera, this.player, this.scene, this.world)
     minecraft.scheduler.registerInstance(this)
+    minecraft.eventQueue.registerHandlers(this)
   }
 
   addOnDisposeCallback(callback: () => void): void {
@@ -122,6 +123,7 @@ export class GameSession {
     }
 
     this.minecraft.scheduler.unregisterInstance(this)
+    MinecraftEventQueue.unregisterHandlers(this)
 
     this.disposed = true
   }
@@ -144,9 +146,14 @@ export class GameSession {
     return this.delta
   }
 
+  @MinecraftEventQueue.Handler('Client.PauseToggle')
+  protected onPauseToggle(): void {
+    this.paused = !this.paused
+  }
+
   @Scheduler.Every(1000)
   protected async syncPlayer(): Promise<void> {
-    if (this.minecraft.getGUI().state.isPaused) {
+    if (this.paused) {
       return
     }
 
@@ -154,7 +161,6 @@ export class GameSession {
       'Client.RequestSyncPlayer',
       {
         playerData: {
-          direction: this.player.direction.toRaw(),
           position: this.player.position.toRaw(),
           rotation: {
             x: this.player.rotation.x,
@@ -169,7 +175,9 @@ export class GameSession {
   }
 
   private handleGameFrame() {
-    if (this.minecraft.getGUI().state.isPaused) {
+    if (this.paused) {
+      this.gameLoopClock.stop()
+      this.isGameLoopClockStopped = true
       return
     }
 
@@ -194,6 +202,7 @@ export class GameSession {
     /**
      * UPDATE GAME STATE HERE
      */
+    this.clientPlayerManager.update()
     this.player.update()
     this.world.update()
     this.raycaster.update()
@@ -205,5 +214,7 @@ export class GameSession {
      * RENDERING CODE HERE
      */
     this.renderer.render(this.scene, this.camera)
+
+    this.inputManager.resetMouseDelta()
   }
 }

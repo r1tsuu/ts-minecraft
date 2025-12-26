@@ -240,7 +240,6 @@ export class World {
         }
 
         if (index === undefined) {
-          console.log(this.blockMeshesCount, blockTypeID)
           throw new Error(`Mesh count for block ID ${blockTypeID} not found`)
         }
 

@@ -23,7 +23,6 @@ export class Player {
   constructor(
     readonly uuid: string,
     readonly position: THREE.Vector3,
-    readonly direction: THREE.Vector3,
     readonly velocity: THREE.Vector3,
     readonly rotation: THREE.Euler,
     private readonly minecraft: MinecraftClient,
@@ -42,31 +41,33 @@ export class Player {
   }
 
   update(): void {
-    return
     const gameSession = this.minecraft.getGameSession()
     const delta = gameSession.getDelta()
     this.velocity.y -= Config.GRAVITY * delta
-    this.direction.set(0, 0, 0)
+    const direction = new THREE.Vector3()
 
-    if (this.moving.forward) this.direction.z += 1
-    if (this.moving.backward) this.direction.z -= 1
-    if (this.moving.left) this.direction.x -= 1
-    if (this.moving.right) this.direction.x += 1
+    if (this.moving.forward) direction.z += 1
+    if (this.moving.backward) direction.z -= 1
+    if (this.moving.left) direction.x -= 1
+    if (this.moving.right) direction.x += 1
 
-    if (this.direction.lengthSq() > 0) {
-      this.direction.normalize()
+    if (direction.lengthSq() > 0) {
+      direction.normalize()
     }
 
-    const forward = new THREE.Vector3()
-    forward.applyEuler(this.rotation).normalize()
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(
+      new THREE.Quaternion().setFromEuler(this.rotation),
+    )
+
     forward.y = 0
+    forward.normalize()
 
     const right = new THREE.Vector3()
     right.crossVectors(forward, UP_VECTOR).normalize()
 
     const move = new THREE.Vector3()
-    move.addScaledVector(forward, this.direction.z)
-    move.addScaledVector(right, this.direction.x)
+    move.addScaledVector(forward, direction.z)
+    move.addScaledVector(right, direction.x)
 
     const horizontalVelocity = move.multiplyScalar(Config.PLAYER_WALK_SPEED * delta)
 
@@ -125,17 +126,17 @@ export class Player {
   }
 
   private getPlayerBoxAtPosition(position: THREE.Vector3): THREE.Box3 {
-    return new THREE.Box3(
-      new THREE.Vector3(
-        position.x - Config.PLAYER_WIDTH / 2,
-        position.y,
-        position.z - Config.PLAYER_WIDTH / 2,
-      ),
-      new THREE.Vector3(
-        position.x + Config.PLAYER_WIDTH / 2,
-        position.y + Config.PLAYER_HEIGHT,
-        position.z + Config.PLAYER_WIDTH / 2,
-      ),
+    const min = new THREE.Vector3(
+      position.x - Config.PLAYER_WIDTH / 2,
+      position.y - Config.PLAYER_HEIGHT,
+      position.z - Config.PLAYER_WIDTH / 2,
     )
+    const max = new THREE.Vector3(
+      position.x + Config.PLAYER_WIDTH / 2,
+      position.y,
+      position.z + Config.PLAYER_WIDTH / 2,
+    )
+
+    return new THREE.Box3(min, max)
   }
 }

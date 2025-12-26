@@ -14,9 +14,7 @@ type EventHandler<
   K extends string,
   Events extends Record<string, Record<string, unknown>>,
   Meta extends Record<string, unknown> = {},
-> = (
-  event: Event<Exclude<K, WildcardKey>, K extends keyof Events ? Events[K] : any, Meta>,
-) => Promise<void> | void
+> = (event: Event<Exclude<K, WildcardKey>, K extends keyof Events ? Events[K] : any, Meta>) => void
 
 interface EventHandlerMetadata {
   eventType: string
@@ -32,13 +30,13 @@ export class EventQueue<
   Events extends Record<string, Record<string, unknown>>,
   Meta extends Record<string, unknown> = {},
 > {
-  private beforeEmitHooks: ((event: AnyEvent<Events, Meta>) => Promise<void> | void)[] = []
+  private beforeEmitHooks: ((event: AnyEvent<Events, Meta>) => void)[] = []
   private eventTypesRegistry = new Map<string, {}>()
 
   private registry = new Map<
     RegistryKey<Events>,
     {
-      listeners: ((event: any) => Promise<void> | void)[]
+      listeners: ((event: any) => void)[]
     }
   >()
 
@@ -82,18 +80,18 @@ export class EventQueue<
     this.beforeEmitHooks.push(hook)
   }
 
-  async emit<K extends ({} & string) | EventKey<Events>>(
+  emit<K extends ({} & string) | EventKey<Events>>(
     type: K,
     payload: K extends keyof Events ? Events[K] : any,
     eventUUID?: UUID,
     metadata?: Meta,
-  ): Promise<void> {
+  ): void {
     this.validateEventType(type)
 
     const event = new Event(type, payload, eventUUID, metadata)
 
     for (const hook of this.beforeEmitHooks) {
-      await hook(event)
+      hook(event)
     }
 
     // console.log(`Event`, event, `emitted from`, environment, isForwarded ? `(forwarded)` : ``)
@@ -104,7 +102,7 @@ export class EventQueue<
     ]
 
     for (const handler of listeners) {
-      await handler(event)
+      handler(event)
       if (event.isCanceled()) {
         break
       }

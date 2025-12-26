@@ -133,8 +133,7 @@ export class MinecraftServer {
       }
 
       playerData = {
-        direction: zeroRawVector3(),
-        position: rawVector3(latestBlock.x, latestBlock.y + 4, latestBlock.z),
+        position: rawVector3(latestBlock.x, latestBlock.y + 2, latestBlock.z),
         rotation: {
           x: 0,
           y: 0,
