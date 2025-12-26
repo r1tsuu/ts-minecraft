@@ -30,7 +30,7 @@ export class MinecraftServer {
     private readonly database: WorldDatabase,
     private readonly eventQueue: MinecraftEventQueue,
     private readonly meta: DatabaseWorldMetaData,
-    private readonly players: DatabasePlayerData[],
+    private players: DatabasePlayerData[],
   ) {
     this.config = createConfig()
     this.blocksRegistry = new BlocksRegistry()
@@ -54,6 +54,10 @@ export class MinecraftServer {
 
   async dispose(): Promise<void> {
     MinecraftEventQueue.unregisterHandlers(this)
+    await this.database.dispose()
+    this.loadedChunks = []
+    this.currentTick = 0
+    this.players = []
   }
 
   @MinecraftEventQueue.Handler('Client.RequestChunksLoad')

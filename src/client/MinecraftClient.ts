@@ -11,23 +11,17 @@ import { GUI } from './gui/GUI.ts'
 import { LocalStorageManager } from './LocalStorageManager.ts'
 
 export class MinecraftClient {
-  blocksRegistry: ClientBlockRegisty
-  config: SharedConfig
-  dispositions: Function[] = []
-  eventQueue: MinecraftEventQueue
+  blocksRegistry: ClientBlockRegisty = createClientBlockRegistry()
+  config: SharedConfig = createConfig()
+
+  eventQueue: MinecraftEventQueue = new MinecraftEventQueue('Client')
   gameSession: GameSession | null = null
   gui: GUI | null = null
-  localStorageManager: LocalStorageManager
+
+  localStorageManager: LocalStorageManager = new LocalStorageManager()
 
   constructor() {
-    this.eventQueue = new MinecraftEventQueue('Client')
-
-    this.config = createConfig()
-    this.blocksRegistry = createClientBlockRegistry()
-    this.localStorageManager = new LocalStorageManager()
-
     this.gui = new GUI(this)
-
     this.eventQueue.registerHandlers(this)
   }
 
@@ -116,15 +110,14 @@ export class MinecraftClient {
 
     console.log('Player join response:', playerJoinResponse)
 
-    const gameSession = new GameSession(this, singlePlayerWorker, {
+    this.gameSession = new GameSession(this, {
       initialChunksFromServer: serverStartedResponse.payload.loadedChunks,
       player: playerJoinResponse.payload.playerData,
     })
 
-    this.gameSession = gameSession
-
-    gameSession.addOnDisposeCallback(unsubscribe)
-    gameSession.startGameLoop()
+    this.gameSession.addOnDisposeCallback(unsubscribe)
+    this.gameSession.addOnDisposeCallback(() => singlePlayerWorker.terminate())
+    this.gameSession.enterGameLoop()
 
     this.eventQueue.respond(event, 'Client.JoinedWorld', {})
   }

@@ -7,9 +7,19 @@ const FAR = 5
 
 export class Raycaster {
   private lastUpdated: null | number = null
-  private mesh: THREE.Mesh
-  private raycaster: THREE.Raycaster
-  private raycastingMesh: THREE.InstancedMesh
+  private mesh: THREE.Mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(1.01, 1.01, 1.01),
+    new THREE.MeshStandardMaterial({ opacity: 0.5, transparent: true }),
+  )
+  private raycaster: THREE.Raycaster = new THREE.Raycaster()
+  private raycastingMesh: THREE.InstancedMesh = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshPhongMaterial({
+      color: THREE.Color.NAMES.black,
+      wireframe: true, // debug
+    }),
+    (FAR * 2 + 1) ** 3,
+  )
 
   constructor(
     private camera: THREE.PerspectiveCamera,
@@ -17,23 +27,6 @@ export class Raycaster {
     private scene: THREE.Scene,
     private world: World,
   ) {
-    this.raycaster = new THREE.Raycaster()
-    this.raycaster.far = FAR + 1
-
-    this.raycastingMesh = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshPhongMaterial({
-        color: THREE.Color.NAMES.black,
-        wireframe: true, // debug
-      }),
-      (FAR * 2 + 1) ** 3,
-    )
-
-    this.mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(1.01, 1.01, 1.01),
-      new THREE.MeshStandardMaterial({ opacity: 0.5, transparent: true }),
-    )
-
     this.scene.add(this.raycastingMesh)
   }
 

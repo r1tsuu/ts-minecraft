@@ -3,6 +3,7 @@ import { MathUtils } from 'three'
 import type { MinecraftClient } from '../MinecraftClient.ts'
 import type { GUIActions, GUIConditions, GUIState as GUIState } from './state.ts'
 
+import { MinecraftEventQueue } from '../../queue/MinecraftQueue.ts'
 import { synchronize } from './synchronize.ts'
 
 export class GUI {
@@ -52,6 +53,8 @@ export class GUI {
       dispose()
     }
 
+    MinecraftEventQueue.unregisterHandlers(this)
+
     clearInterval(this.gameInterval)
   }
 
@@ -62,6 +65,20 @@ export class GUI {
   setState(newState: Partial<GUIState>, affectedQuerySelectors?: string | string[]): void {
     Object.assign(this.state, newState)
     synchronize(this.state, this.actions, this.conditions, affectedQuerySelectors)
+  }
+
+  @MinecraftEventQueue.Handler('Client.JoinedWorld')
+  protected onJoinedWorld(): void {
+    this.setState({
+      activePage: 'game',
+      loadingWorldName: ' ',
+    })
+    this.minecraft
+      .getGameSession()
+      .renderer.domElement.requestPointerLock()
+      .catch((e) => {
+        console.warn('Pointer lock request failed', e)
+      })
   }
 
   private createActions(): GUIActions {
@@ -113,7 +130,7 @@ export class GUI {
           worldList: this.state.worldList.filter((w) => w.uuid !== world.uuid),
         })
       },
-      playWorld: async ({ event }) => {
+      playWorld: ({ event }) => {
         const index = this.getIndexFromEvent(event)
         const world = this.state.worldList[index]
         this.setState({
@@ -121,26 +138,7 @@ export class GUI {
           loadingWorldName: world.name,
         })
 
-        await this.minecraft.eventQueue.emitAndWaitResponse(
-          'Client.JoinWorld',
-          {
-            worldUUID: world.uuid,
-          },
-          'Client.JoinedWorld',
-        )
-
-        console.log('Joined world:', world.name)
-
-        this.setState({
-          activePage: 'game',
-          loadingWorldName: ' ',
-        })
-        this.minecraft
-          .getGameSession()
-          .renderer.domElement.requestPointerLock()
-          .catch((e) => {
-            console.warn('Pointer lock request failed', e)
-          })
+        this.minecraft.eventQueue.emit('Client.JoinWorld', { worldUUID: world.uuid })
       },
       resumeGame: async () => {
         await this.resumeGame()
@@ -220,6 +218,7 @@ export class GUI {
 
   private setupEventListeners(): void {
     document.addEventListener('pointerlockchange', this.onPointerLockChange)
+    this.minecraft.eventQueue.registerHandlers(this)
 
     this.dispositions.push(() => {
       document.removeEventListener('pointerlockchange', this.onPointerLockChange)

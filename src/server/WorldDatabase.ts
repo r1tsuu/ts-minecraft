@@ -144,7 +144,7 @@ export class WorldDatabase {
       .executeTakeFirstOrThrow()
   }
 
-  async destroy() {
+  async dispose() {
     await this.db.destroy()
     await this.pg.close()
   }

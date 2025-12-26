@@ -23,14 +23,14 @@ export class GameSession {
   player: ClientPlayerData
   raycaster: Raycaster
   renderer: THREE.WebGLRenderer
-  scene: THREE.Scene
+  scene: THREE.Scene = new THREE.Scene()
   world: World
 
   private additionalOnDisposeCallbacks: Array<() => void> = []
   private delta: number = 0
   private disposed = false
   private gameLoopClock = new THREE.Clock()
-  private gameLoopClocked = false
+  private isGameLoopClockStopped = false
   private lastTimeout: null | number = null
   private onResize: () => void
 
@@ -40,7 +40,6 @@ export class GameSession {
 
   constructor(
     private readonly minecraft: MinecraftClient,
-    private readonly singlePlayerWorker: Worker,
     {
       initialChunksFromServer,
       player,
@@ -50,7 +49,6 @@ export class GameSession {
     },
   ) {
     this.playerUUID = player.uuid
-    this.scene = new THREE.Scene()
     this.renderer = new THREE.WebGLRenderer({
       antialias: false,
       canvas: minecraft.getGUI().getCanvas(),
@@ -121,8 +119,6 @@ export class GameSession {
       clearTimeout(this.lastTimeout)
     }
 
-    this.singlePlayerWorker.terminate()
-
     for (const callback of this.additionalOnDisposeCallbacks) {
       callback()
     }
@@ -130,27 +126,32 @@ export class GameSession {
     this.disposed = true
   }
 
+  enterGameLoop() {
+    const frame = () => {
+      if (this.disposed) {
+        return
+      }
+
+      this.handleGameFrame()
+
+      requestAnimationFrame(frame)
+    }
+
+    requestAnimationFrame(frame)
+  }
+
   getDelta(): number {
     return this.delta
   }
 
-  startGameLoop() {
-    this.loop()
-  }
-
-  private loop() {
-    if (this.disposed) {
+  private handleGameFrame() {
+    if (this.minecraft.getGUI().state.isPaused) {
       return
     }
 
-    if (this.minecraft.getGUI().state.isPaused) {
-      this.gameLoopClock.stop()
-      this.gameLoopClocked = true
-      requestAnimationFrame(this.loop.bind(this))
-      return
-    } else if (this.gameLoopClocked) {
+    if (this.isGameLoopClockStopped) {
       this.gameLoopClock.start()
-      this.gameLoopClocked = false
+      this.isGameLoopClockStopped = false
     }
 
     this.delta = this.gameLoopClock.getDelta()
@@ -166,13 +167,17 @@ export class GameSession {
       this.frameCounter.lastTime = 0
     }
 
-    this.renderer.render(this.scene, this.camera)
-
+    /**
+     * UPDATE GAME STATE HERE
+     */
     this.controls.update()
     this.world.update()
     this.raycaster.update()
 
-    requestAnimationFrame(this.loop.bind(this))
+    /**
+     * RENDERING CODE HERE
+     */
+    this.renderer.render(this.scene, this.camera)
   }
 
   private startPlayerSync(): void {
