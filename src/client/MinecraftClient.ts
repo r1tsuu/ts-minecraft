@@ -110,7 +110,7 @@ export class MinecraftClient {
 
     this.gameSession = new GameSession(this, {
       initialChunksFromServer: serverStartedResponse.payload.loadedChunks,
-      player: playerJoinResponse.payload.playerData,
+      initialPlayerFromServer: playerJoinResponse.payload.playerData,
     })
 
     this.gameSession.addOnDisposeCallback(unsubscribe)

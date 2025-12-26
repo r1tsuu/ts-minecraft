@@ -18,7 +18,7 @@ type MinecraftEventMetadata = {
   isForwarded: boolean
 }
 
-const createEventType = <Payload>() => {
+const e = <Payload>() => {
   return <EventType extends string>(t: EventType) => {
     return {
       payload: {} as Payload,
@@ -28,26 +28,26 @@ const createEventType = <Payload>() => {
 }
 
 const eventTypes = [
-  createEventType<{}>()('Client.ExitWorld'),
-  createEventType<{}>()('Client.JoinedWorld'),
-  createEventType<{ worldUUID: UUID }>()('Client.JoinWorld'),
-  createEventType<{ chunks: ChunkCoordinates[] }>()('Client.RequestChunksLoad'),
-  createEventType<{ playerUUID: UUID }>()('Client.RequestPlayerJoin'),
-  createEventType<{ playerData: DatabasePlayerData }>()('Client.RequestSyncPlayer'),
-  createEventType<{ worldDatabaseName: string }>()('Client.StartLocalServer'),
-  createEventType<{ chunks: DatabaseChunkData[] }>()('Server.ResponseChunksLoad'),
-  createEventType<{ playerData: DatabasePlayerData }>()('Server.ResponsePlayerJoin'),
-  createEventType<{}>()('Server.ResponseSyncPlayer'),
-  createEventType<{ currentTick: number }>()('Server.ServerTick'),
-  createEventType<{ loadedChunks: DatabaseChunkData[] }>()('SinglePlayerWorker.ServerStarted'),
-  createEventType<{}>()('SinglePlayerWorker.WorkerReady'),
-  createEventType<{ keyCode: KeyboardKey }>()('Client.Input.KeyDown'),
-  createEventType<{ keyCode: KeyboardKey }>()('Client.Input.KeyUp'),
-  createEventType<{ deltaX: number; deltaY: number }>()('Client.Input.MouseMove'),
-  createEventType<{}>()('Client.Input.MouseLeftDown'),
-  createEventType<{}>()('Client.Input.MouseLeftUp'),
-  createEventType<{}>()('Client.Input.MouseRightDown'),
-  createEventType<{}>()('Client.Input.MouseRightUp'),
+  e<{}>()('Client.ExitWorld'),
+  e<{}>()('Client.JoinedWorld'),
+  e<{ worldUUID: UUID }>()('Client.JoinWorld'),
+  e<{ chunks: ChunkCoordinates[] }>()('Client.RequestChunksLoad'),
+  e<{ playerUUID: UUID }>()('Client.RequestPlayerJoin'),
+  e<{ playerData: DatabasePlayerData }>()('Client.RequestSyncPlayer'),
+  e<{ worldDatabaseName: string }>()('Client.StartLocalServer'),
+  e<{ chunks: DatabaseChunkData[] }>()('Server.ResponseChunksLoad'),
+  e<{ playerData: DatabasePlayerData }>()('Server.ResponsePlayerJoin'),
+  e<{}>()('Server.ResponseSyncPlayer'),
+  e<{ currentTick: number }>()('Server.ServerTick'),
+  e<{ loadedChunks: DatabaseChunkData[] }>()('SinglePlayerWorker.ServerStarted'),
+  e<{}>()('SinglePlayerWorker.WorkerReady'),
+  e<{ keyCode: KeyboardKey }>()('Client.Input.KeyDown'),
+  e<{ keyCode: KeyboardKey }>()('Client.Input.KeyUp'),
+  e<{ deltaX: number; deltaY: number }>()('Client.Input.MouseMove'),
+  e<{}>()('Client.Input.MouseLeftDown'),
+  e<{}>()('Client.Input.MouseLeftUp'),
+  e<{}>()('Client.Input.MouseRightDown'),
+  e<{}>()('Client.Input.MouseRightUp'),
 ]
 
 type MinecraftEventsData = {
@@ -72,7 +72,8 @@ export class MinecraftEventQueue extends EventQueue<MinecraftEventsData, Minecra
       event.metadata.environment = event.metadata.environment ?? environment
       event.metadata.isForwarded = event.metadata.isForwarded ?? false
 
-      console.log(`[${event.metadata.environment}] Emitting Minecraft event:`, event)
+      if (event.metadata.environment === 'Server')
+        console.log(`[${event.metadata.environment}] Emitting Minecraft event:`, event)
     })
   }
 

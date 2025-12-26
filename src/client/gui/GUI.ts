@@ -84,7 +84,7 @@ export class GUI {
   private createActions(): GUIActions {
     return {
       backToMenu: async () => {
-        this.minecraft.eventQueue.emit('Client.ExitWorld', {})
+        await this.minecraft.eventQueue.emit('Client.ExitWorld', {})
         this.setState({
           activePage: 'start',
           fps: 'Loading...',

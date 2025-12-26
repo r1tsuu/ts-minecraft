@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import type { MinecraftClient } from './MinecraftClient.ts'
 
 import { Config } from '../shared/Config.ts'
-import { UP_VECTOR } from './utils.ts'
+import { UP_VECTOR } from '../shared/util.ts'
 
 export class Player {
   moving: {
@@ -42,6 +42,7 @@ export class Player {
   }
 
   update(): void {
+    return
     const gameSession = this.minecraft.getGameSession()
     const delta = gameSession.getDelta()
     this.velocity.y -= Config.GRAVITY * delta

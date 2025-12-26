@@ -10,7 +10,6 @@ import { ClientPlayerManager } from './ClientPlayerManager.ts'
 import { InputManager } from './InputManager.ts'
 import { Player } from './Player.ts'
 import { Raycaster } from './Raycaster.ts'
-import { rawVector3ToThreeVector3, threeVector3ToRawVector3 } from './utils.ts'
 import { World } from './World.ts'
 
 export class GameSession {
@@ -45,13 +44,13 @@ export class GameSession {
     private readonly minecraft: MinecraftClient,
     {
       initialChunksFromServer,
-      player,
+      initialPlayerFromServer,
     }: {
       initialChunksFromServer: DatabaseChunkData[]
-      player: DatabasePlayerData
+      initialPlayerFromServer: DatabasePlayerData
     },
   ) {
-    this.playerUUID = player.uuid
+    this.playerUUID = initialPlayerFromServer.uuid
     this.renderer = new THREE.WebGLRenderer({
       antialias: false,
       canvas: minecraft.getGUI().getCanvas(),
@@ -77,11 +76,16 @@ export class GameSession {
     this.camera.lookAt(30, 35, 30)
 
     this.player = new Player(
-      player.uuid,
-      rawVector3ToThreeVector3(player.position),
+      initialPlayerFromServer.uuid,
+      THREE.Vector3.fromRaw(initialPlayerFromServer.direction),
       new THREE.Vector3(0, 0, 0),
-      rawVector3ToThreeVector3(player.velocity),
-      new THREE.Euler(player.rotation.x, player.rotation.y, 0, Config.EULER_ORDER),
+      THREE.Vector3.fromRaw(initialPlayerFromServer.position),
+      new THREE.Euler(
+        initialPlayerFromServer.rotation.x,
+        initialPlayerFromServer.rotation.y,
+        0,
+        Config.EULER_ORDER,
+      ),
       minecraft,
     )
 
@@ -150,14 +154,14 @@ export class GameSession {
       'Client.RequestSyncPlayer',
       {
         playerData: {
-          direction: threeVector3ToRawVector3(this.player.direction),
-          position: threeVector3ToRawVector3(this.player.position),
+          direction: this.player.direction.toRaw(),
+          position: this.player.position.toRaw(),
           rotation: {
             x: this.player.rotation.x,
             y: this.player.rotation.y,
           },
           uuid: this.playerUUID,
-          velocity: threeVector3ToRawVector3(this.player.velocity),
+          velocity: this.player.velocity.toRaw(),
         },
       },
       'Server.ResponseSyncPlayer',

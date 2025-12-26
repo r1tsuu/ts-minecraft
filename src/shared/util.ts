@@ -1,3 +1,5 @@
+import * as THREE from 'three'
+
 import type { RawVector3 } from '../types.ts'
 
 import { Config } from './Config.ts'
@@ -99,3 +101,28 @@ export const getChunksCoordinatesInRadius = ({
 
   return chunks
 }
+
+declare module 'three' {
+  interface Vector3 {
+    toRaw(): RawVector3
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Vector3 {
+    function fromRaw(rawVector: RawVector3): Vector3
+  }
+}
+
+THREE.Vector3.prototype.toRaw = function (): RawVector3 {
+  return {
+    x: this.x,
+    y: this.y,
+    z: this.z,
+  }
+}
+
+THREE.Vector3.fromRaw = function (rawVector: RawVector3): THREE.Vector3 {
+  return new THREE.Vector3(rawVector.x, rawVector.y, rawVector.z)
+}
+
+export const UP_VECTOR = new THREE.Vector3(0, 1, 0)
