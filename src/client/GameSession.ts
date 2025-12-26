@@ -5,6 +5,7 @@ import type { ClientPlayerData, UUID } from '../types.ts'
 import type { MinecraftClient } from './MinecraftClient.ts'
 
 import { Config } from '../shared/Config.ts'
+import { Scheduler } from '../shared/Scheduler.ts'
 import { FPSControls } from './FPSControls.ts'
 import { Raycaster } from './Raycaster.ts'
 import { rawVector3ToThreeVector3, threeVector3ToRawVector3 } from './utils.ts'
@@ -102,8 +103,7 @@ export class GameSession {
     this.controls = new FPSControls(minecraft.getGUI(), this)
 
     this.raycaster = new Raycaster(this.camera, this.player, this.scene, this.world)
-
-    this.startPlayerSync()
+    minecraft.scheduler.registerInstance(this)
   }
 
   addOnDisposeCallback(callback: () => void): void {
@@ -124,6 +124,8 @@ export class GameSession {
       callback()
     }
 
+    this.minecraft.scheduler.unregisterInstance(this)
+
     this.disposed = true
   }
 
@@ -143,6 +145,35 @@ export class GameSession {
 
   getDelta(): number {
     return this.delta
+  }
+
+  @Scheduler.Every(1000)
+  protected async syncPlayer(): Promise<void> {
+    if (this.minecraft.getGUI().state.isPaused) {
+      return
+    }
+
+    if (this.disposed || this.syncying) {
+      console.log('Skipping syncPlayer because disposed or syncying')
+      return
+    }
+
+    await this.minecraft.eventQueue.emitAndWaitResponse(
+      'Client.RequestSyncPlayer',
+      {
+        playerData: {
+          canJump: this.player.canJump,
+          direction: threeVector3ToRawVector3(this.player.direction),
+          jumpStrength: this.player.jumpStrength,
+          pitch: this.player.pitch,
+          position: threeVector3ToRawVector3(this.player.position),
+          uuid: this.playerUUID,
+          velocity: threeVector3ToRawVector3(this.player.velocity),
+          yaw: this.player.yaw,
+        },
+      },
+      'Server.ResponseSyncPlayer',
+    )
   }
 
   private handleGameFrame() {
@@ -179,44 +210,5 @@ export class GameSession {
      * RENDERING CODE HERE
      */
     this.renderer.render(this.scene, this.camera)
-  }
-
-  private startPlayerSync(): void {
-    this.lastTimeout = setTimeout(() => this.syncPlayer(), 1000)
-  }
-
-  private async syncPlayer(): Promise<void> {
-    if (this.minecraft.getGUI().state.isPaused) {
-      this.startPlayerSync()
-      return
-    }
-
-    if (this.disposed || this.syncying) {
-      console.log('Skipping syncPlayer because disposed or syncying')
-      return
-    }
-
-    try {
-      this.syncying = true
-      await this.minecraft.eventQueue.emitAndWaitResponse(
-        'Client.RequestSyncPlayer',
-        {
-          playerData: {
-            canJump: this.player.canJump,
-            direction: threeVector3ToRawVector3(this.player.direction),
-            jumpStrength: this.player.jumpStrength,
-            pitch: this.player.pitch,
-            position: threeVector3ToRawVector3(this.player.position),
-            uuid: this.playerUUID,
-            velocity: threeVector3ToRawVector3(this.player.velocity),
-            yaw: this.player.yaw,
-          },
-        },
-        'Server.ResponseSyncPlayer',
-      )
-    } finally {
-      this.syncying = false
-      this.startPlayerSync()
-    }
   }
 }

@@ -3,6 +3,7 @@ import {
   type MinecraftEvent,
   MinecraftEventQueue,
 } from '../queue/MinecraftQueue.ts'
+import { Scheduler } from '../shared/Scheduler.ts'
 import SinglePlayerWorker from '../worker/SinglePlayerWorker.ts?worker'
 import { type ClientBlockRegisty, createClientBlockRegistry } from './blocks.ts'
 import { GameSession } from './GameSession.ts'
@@ -14,8 +15,8 @@ export class MinecraftClient {
   eventQueue: MinecraftEventQueue = new MinecraftEventQueue('Client')
   gameSession: GameSession | null = null
   gui: GUI | null = null
-
   localStorageManager: LocalStorageManager = new LocalStorageManager()
+  scheduler: Scheduler = new Scheduler()
 
   constructor() {
     this.gui = new GUI(this)

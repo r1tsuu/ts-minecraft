@@ -38,7 +38,10 @@ export class Scheduler {
    */
   static Every(
     intervalMs: number,
-    options: { allowOverlapping?: boolean; runImmediately?: boolean } = {},
+    options: {
+      allowOverlapping?: boolean
+      runImmediately?: boolean
+    } = {},
   ) {
     return function (target: any, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
       if (!target.constructor[SCHEDULER_EVERY_KEY]) {
