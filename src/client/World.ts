@@ -1,8 +1,9 @@
 import * as THREE from 'three'
 
 import type { DatabaseChunkData } from '../server/WorldDatabase.ts'
-import type { BlockInWorld, Chunk, ClientPlayerData } from '../types.ts'
+import type { BlockInWorld, Chunk } from '../types.ts'
 import type { ClientBlockRegisty } from './blocks.ts'
+import type { Player } from './Player.ts'
 
 import { MinecraftEvent, MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import { Config } from '../shared/Config.ts'
@@ -18,7 +19,7 @@ export class World {
   requestingChunksState: 'idle' | 'requesting' = 'idle'
 
   constructor(
-    private readonly clientPlayer: ClientPlayerData,
+    private readonly player: Player,
     private readonly eventQueue: MinecraftEventQueue,
     private readonly scene: THREE.Scene,
     {
@@ -64,6 +65,37 @@ export class World {
 
     this.eventQueue.registerHandlers(this)
     this.syncChunksFromServer(initialChunksFromServer)
+  }
+
+  checkCollisionWithBox(box: THREE.Box3): boolean {
+    const minX = Math.floor(box.min.x)
+    const maxX = Math.floor(box.max.x)
+    const minY = Math.floor(box.min.y)
+    const maxY = Math.floor(box.max.y)
+    const minZ = Math.floor(box.min.z)
+    const maxZ = Math.floor(box.max.z)
+
+    // Check all blocks that could intersect with box
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        for (let z = minZ; z <= maxZ; z++) {
+          if (this.getBlock(x, y, z)) {
+            // Block exists, create its bounding box
+            const blockBox = new THREE.Box3().setFromCenterAndSize(
+              new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5),
+              new THREE.Vector3(1, 1, 1),
+            )
+
+            // Check intersection
+            if (box.intersectsBox(blockBox)) {
+              return true
+            }
+          }
+        }
+      }
+    }
+
+    return false
   }
 
   dispose(): void {
@@ -112,8 +144,8 @@ export class World {
   }
 
   update(): void {
-    const playerChunkX = Math.floor(this.clientPlayer.position.x / Config.CHUNK_SIZE)
-    const playerChunkZ = Math.floor(this.clientPlayer.position.z / Config.CHUNK_SIZE)
+    const playerChunkX = Math.floor(this.player.position.x / Config.CHUNK_SIZE)
+    const playerChunkZ = Math.floor(this.player.position.z / Config.CHUNK_SIZE)
 
     const needed = new Set<string>()
     const chunksToLoad: string[] = []

@@ -40,10 +40,15 @@ export class Scheduler {
     intervalMs: number,
     options: {
       allowOverlapping?: boolean
+      disabled?: boolean
       runImmediately?: boolean
     } = {},
   ) {
     return function (target: any, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+      if (options.disabled) {
+        return descriptor
+      }
+
       if (!target.constructor[SCHEDULER_EVERY_KEY]) {
         target.constructor[SCHEDULER_EVERY_KEY] = []
       }

@@ -133,14 +133,14 @@ export class MinecraftServer {
       }
 
       playerData = {
-        canJump: true,
         direction: zeroRawVector3(),
-        jumpStrength: Config.DEFAULT_PLAYER_JUMP_STRENGTH,
-        pitch: 0,
         position: rawVector3(latestBlock.x, latestBlock.y + 4, latestBlock.z),
+        rotation: {
+          x: 0,
+          y: 0,
+        },
         uuid: event.payload.playerUUID,
         velocity: zeroRawVector3(),
-        yaw: 0,
       }
 
       await this.database.createPlayer(playerData)
@@ -166,13 +166,14 @@ export class MinecraftServer {
     await this.eventQueue.respond(event, 'Server.ResponseSyncPlayer', {})
   }
 
-  @Scheduler.Every(Config.TICK_RATE, {
-    runImmediately: true,
-  })
-  protected tick(): void {
-    console.log(`Server Tick ${this.currentTick}`)
-    this.currentTick++
-  }
+  // @Scheduler.Every(Config.TICK_RATE, {
+  //   disabled: true, // Enable when ready to run the server tick loop
+  //   runImmediately: true,
+  // })
+  // protected tick(): void {
+  //   console.log(`Server Tick ${this.currentTick}`)
+  //   this.currentTick++
+  // }
 
   private async initialize(): Promise<void> {
     const spawnChunksCoordinates = getChunksCoordinatesInRadius({

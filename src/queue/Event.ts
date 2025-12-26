@@ -40,10 +40,6 @@ export class Event<
   D extends Record<string, unknown> = {},
   Meta extends Record<string, unknown> = {},
 > extends RawEvent<K, D, Meta> {
-  get isCanceled(): boolean {
-    return this._isCanceled
-  }
-
   private _isCanceled = false
 
   constructor(type: K, payload: D, eventUUID?: UUID, metadata?: Meta) {
@@ -69,5 +65,9 @@ export class Event<
 
   intoRaw(): RawEvent<K, D, Meta> {
     return new RawEvent<K, D, Meta>(this.type, this.payload, this.eventUUID, this.metadata)
+  }
+
+  isCanceled(): boolean {
+    return this._isCanceled
   }
 }

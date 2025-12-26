@@ -87,7 +87,7 @@ export class EventQueue<
     payload: K extends keyof Events ? Events[K] : any,
     eventUUID?: UUID,
     metadata?: Meta,
-  ): Promise<boolean> {
+  ): Promise<void> {
     this.validateEventType(type)
 
     const event = new Event(type, payload, eventUUID, metadata)
@@ -105,12 +105,10 @@ export class EventQueue<
 
     for (const handler of listeners) {
       await handler(event)
-      if (event.isCanceled) {
+      if (event.isCanceled()) {
         break
       }
     }
-
-    return !event.isCanceled
   }
 
   async emitAndWaitResponse<

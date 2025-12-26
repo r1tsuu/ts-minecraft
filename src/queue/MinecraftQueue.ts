@@ -2,6 +2,7 @@
  * Minecraft-specific queue
  * =========================================================== */
 
+import type { KeyboardKey } from '../client/InputManager.ts'
 import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatabase.ts'
 import type { ChunkCoordinates, UUID } from '../types.ts'
 
@@ -40,6 +41,13 @@ const eventTypes = [
   createEventType<{ currentTick: number }>()('Server.ServerTick'),
   createEventType<{ loadedChunks: DatabaseChunkData[] }>()('SinglePlayerWorker.ServerStarted'),
   createEventType<{}>()('SinglePlayerWorker.WorkerReady'),
+  createEventType<{ keyCode: KeyboardKey }>()('Client.Input.KeyDown'),
+  createEventType<{ keyCode: KeyboardKey }>()('Client.Input.KeyUp'),
+  createEventType<{ deltaX: number; deltaY: number }>()('Client.Input.MouseMove'),
+  createEventType<{}>()('Client.Input.MouseLeftDown'),
+  createEventType<{}>()('Client.Input.MouseLeftUp'),
+  createEventType<{}>()('Client.Input.MouseRightDown'),
+  createEventType<{}>()('Client.Input.MouseRightUp'),
 ]
 
 type MinecraftEventsData = {
@@ -63,6 +71,8 @@ export class MinecraftEventQueue extends EventQueue<MinecraftEventsData, Minecra
     this.addBeforeEmitHook((event) => {
       event.metadata.environment = event.metadata.environment ?? environment
       event.metadata.isForwarded = event.metadata.isForwarded ?? false
+
+      console.log(`[${event.metadata.environment}] Emitting Minecraft event:`, event)
     })
   }
 

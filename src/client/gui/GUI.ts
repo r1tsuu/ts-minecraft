@@ -188,11 +188,6 @@ export class GUI {
         this.resumeButton.disabled = false
       }, 1000)
 
-      this.minecraft.gameSession.player.isMovingBackward = false
-      this.minecraft.gameSession.player.isMovingForward = false
-      this.minecraft.gameSession.player.isMovingLeft = false
-      this.minecraft.gameSession.player.isMovingRight = false
-
       this.setState({
         isPaused: true,
         pauseText: 'Click to Resume',
@@ -238,8 +233,10 @@ export class GUI {
             positionX: this.minecraft.gameSession.player.position.x.toFixed(),
             positionY: this.minecraft.gameSession.player.position.y.toFixed(),
             positionZ: this.minecraft.gameSession.player.position.z.toFixed(),
-            rotationPitch: MathUtils.radToDeg(this.minecraft.gameSession.player.pitch).toFixed(),
-            rotationYaw: MathUtils.radToDeg(this.minecraft.gameSession.player.yaw).toFixed(),
+            rotationPitch: MathUtils.radToDeg(
+              this.minecraft.gameSession.player.rotation.x,
+            ).toFixed(),
+            rotationYaw: MathUtils.radToDeg(this.minecraft.gameSession.player.rotation.y).toFixed(),
           },
           ['#fps', '#position', '#rotation'],
         )

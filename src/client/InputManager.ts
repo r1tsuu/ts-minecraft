@@ -1,28 +1,21 @@
-type KeyboardKey = 'KeyA' | 'KeyD' | 'KeyS' | 'KeyW' | 'Space'
+import type { MinecraftClient } from './MinecraftClient.ts'
+
+const GameKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space'] as const
+
+const isGameKey = (key: string): key is KeyboardKey => {
+  return GameKeys.includes(key as KeyboardKey)
+}
+
+export type KeyboardKey = (typeof GameKeys)[number]
 
 export class InputManager {
-  private keyboardState: Record<
-    KeyboardKey,
-    {
-      isPressed: boolean
-    }
-  > = {
-    KeyA: {
-      isPressed: false,
+  private keyboardState = GameKeys.reduce<Record<KeyboardKey, { isPressed: boolean }>>(
+    (acc, key) => {
+      acc[key] = { isPressed: false }
+      return acc
     },
-    KeyD: {
-      isPressed: false,
-    },
-    KeyS: {
-      isPressed: false,
-    },
-    KeyW: {
-      isPressed: false,
-    },
-    Space: {
-      isPressed: false,
-    },
-  }
+    {} as Record<KeyboardKey, { isPressed: boolean }>,
+  )
 
   private mouseState: {
     deltaX: number
@@ -36,23 +29,7 @@ export class InputManager {
     isPressedRight: false,
   }
 
-  dispose: () => void = () => {}
-
-  getMouseDelta(): {
-    deltaX: number
-    deltaY: number
-  } {
-    return {
-      deltaX: this.mouseState.deltaX,
-      deltaY: this.mouseState.deltaY,
-    }
-  }
-
-  isKeyPressed(key: KeyboardKey): boolean {
-    return this.keyboardState[key].isPressed
-  }
-
-  setup() {
+  constructor(private readonly minecraft: MinecraftClient) {
     const onKeyDown = this.onKeyDown.bind(this)
     const onKeyUp = this.onKeyUp.bind(this)
     const onMouseDown = this.onMouseDown.bind(this)
@@ -74,40 +51,83 @@ export class InputManager {
     }
   }
 
-  private onKeyDown = (event: KeyboardEvent) => {
-    const keyState = this.keyboardState[event.code as KeyboardKey]
+  dispose: () => void = () => {}
 
-    if (keyState) {
-      keyState.isPressed = true
+  private isPaused(): boolean {
+    return this.minecraft.getGameSession().paused
+  }
+
+  private onKeyDown = (event: KeyboardEvent) => {
+    if (this.isPaused()) {
+      return
     }
+
+    if (!isGameKey(event.code)) {
+      return
+    }
+
+    const keyState = this.keyboardState[event.code]
+    keyState.isPressed = true
+
+    this.minecraft.eventQueue.emit('Client.Input.KeyDown', {
+      keyCode: event.code,
+    })
   }
 
   private onKeyUp = (event: KeyboardEvent) => {
-    const keyState = this.keyboardState[event.code as KeyboardKey]
-
-    if (keyState) {
-      keyState.isPressed = false
+    if (this.isPaused()) {
+      return
     }
+
+    if (!isGameKey(event.code)) {
+      return
+    }
+    const keyState = this.keyboardState[event.code]
+    keyState.isPressed = false
+
+    this.minecraft.eventQueue.emit('Client.Input.KeyUp', {
+      keyCode: event.code,
+    })
   }
 
   private onMouseDown = (event: MouseEvent) => {
+    if (this.isPaused()) {
+      return
+    }
+
     if (event.button === 0) {
       this.mouseState.isPressedLeft = true
+      this.minecraft.eventQueue.emit('Client.Input.MouseLeftDown', {})
     } else if (event.button === 2) {
       this.mouseState.isPressedRight = true
+      this.minecraft.eventQueue.emit('Client.Input.MouseRightDown', {})
     }
   }
 
   private onMouseMove = (event: MouseEvent) => {
+    if (this.isPaused()) {
+      return
+    }
+
     this.mouseState.deltaX = event.movementX
     this.mouseState.deltaY = event.movementY
+    this.minecraft.eventQueue.emit('Client.Input.MouseMove', {
+      deltaX: event.movementX,
+      deltaY: event.movementY,
+    })
   }
 
   private onMouseUp = (event: MouseEvent) => {
+    if (this.isPaused()) {
+      return
+    }
+
     if (event.button === 0) {
       this.mouseState.isPressedLeft = false
+      this.minecraft.eventQueue.emit('Client.Input.MouseLeftUp', {})
     } else if (event.button === 2) {
       this.mouseState.isPressedRight = false
+      this.minecraft.eventQueue.emit('Client.Input.MouseRightUp', {})
     }
   }
 }

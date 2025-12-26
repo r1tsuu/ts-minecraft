@@ -1,19 +1,21 @@
 import * as THREE from 'three'
 
 import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatabase.ts'
-import type { ClientPlayerData, UUID } from '../types.ts'
+import type { UUID } from '../types.ts'
 import type { MinecraftClient } from './MinecraftClient.ts'
 
 import { Config } from '../shared/Config.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
-import { FPSControls } from './FPSControls.ts'
+import { ClientPlayerManager } from './ClientPlayerManager.ts'
+import { InputManager } from './InputManager.ts'
+import { Player } from './Player.ts'
 import { Raycaster } from './Raycaster.ts'
 import { rawVector3ToThreeVector3, threeVector3ToRawVector3 } from './utils.ts'
 import { World } from './World.ts'
 
 export class GameSession {
   camera: THREE.PerspectiveCamera
-  controls: FPSControls
+  clientPlayerManager: ClientPlayerManager
   frameCounter = {
     fps: 0,
     lastFrames: 0,
@@ -21,8 +23,9 @@ export class GameSession {
     totalFrames: 0,
     totalTime: 0,
   }
+  inputManager: InputManager
   paused = false
-  player: ClientPlayerData
+  player: Player
   raycaster: Raycaster
   renderer: THREE.WebGLRenderer
   scene: THREE.Scene = new THREE.Scene()
@@ -37,8 +40,6 @@ export class GameSession {
   private onResize: () => void
 
   private playerUUID: UUID
-
-  private syncying = false
 
   constructor(
     private readonly minecraft: MinecraftClient,
@@ -75,32 +76,22 @@ export class GameSession {
     this.camera.position.set(0, 40, 0)
     this.camera.lookAt(30, 35, 30)
 
-    this.player = {
-      canJump: true,
-      direction: rawVector3ToThreeVector3(player.direction),
-      height: Config.PLAYER_HEIGHT,
-      isMovingBackward: false,
-      isMovingForward: false,
-      isMovingLeft: false,
-      isMovingRight: false,
-      jumpStrength: player.jumpStrength,
-      pitch: player.pitch,
-      position: rawVector3ToThreeVector3(player.position),
-      speed: Config.DEFAULT_PLAYER_SPEED,
-      velocity: rawVector3ToThreeVector3(player.velocity),
-      width: Config.PLAYER_WIDTH,
-      yaw: player.yaw,
-    }
-
-    this.camera.position.copy(player.position)
-    this.camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
+    this.player = new Player(
+      player.uuid,
+      rawVector3ToThreeVector3(player.position),
+      new THREE.Vector3(0, 0, 0),
+      rawVector3ToThreeVector3(player.velocity),
+      new THREE.Euler(player.rotation.x, player.rotation.y, 0, Config.EULER_ORDER),
+      minecraft,
+    )
 
     this.world = new World(this.player, minecraft.eventQueue, this.scene, {
       blockRegistry: minecraft.blocksRegistry,
       initialChunksFromServer,
     })
 
-    this.controls = new FPSControls(minecraft.getGUI(), this)
+    this.clientPlayerManager = new ClientPlayerManager(minecraft)
+    this.inputManager = new InputManager(minecraft)
 
     this.raycaster = new Raycaster(this.camera, this.player, this.scene, this.world)
     minecraft.scheduler.registerInstance(this)
@@ -115,6 +106,8 @@ export class GameSession {
     this.world.dispose()
     this.renderer.dispose()
     this.scene.clear()
+    this.clientPlayerManager.dispose()
+    this.inputManager.dispose()
 
     if (this.lastTimeout) {
       clearTimeout(this.lastTimeout)
@@ -153,23 +146,18 @@ export class GameSession {
       return
     }
 
-    if (this.disposed || this.syncying) {
-      console.log('Skipping syncPlayer because disposed or syncying')
-      return
-    }
-
     await this.minecraft.eventQueue.emitAndWaitResponse(
       'Client.RequestSyncPlayer',
       {
         playerData: {
-          canJump: this.player.canJump,
           direction: threeVector3ToRawVector3(this.player.direction),
-          jumpStrength: this.player.jumpStrength,
-          pitch: this.player.pitch,
           position: threeVector3ToRawVector3(this.player.position),
+          rotation: {
+            x: this.player.rotation.x,
+            y: this.player.rotation.y,
+          },
           uuid: this.playerUUID,
           velocity: threeVector3ToRawVector3(this.player.velocity),
-          yaw: this.player.yaw,
         },
       },
       'Server.ResponseSyncPlayer',
@@ -202,9 +190,12 @@ export class GameSession {
     /**
      * UPDATE GAME STATE HERE
      */
-    this.controls.update()
+    this.player.update()
     this.world.update()
     this.raycaster.update()
+
+    this.camera.position.copy(this.player.position)
+    this.camera.rotation.copy(this.player.rotation)
 
     /**
      * RENDERING CODE HERE
