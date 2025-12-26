@@ -1,4 +1,4 @@
-import type { MinecraftClient } from './MinecraftClient.ts'
+import type { GameSession } from './GameSession.ts'
 
 const GameKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space'] as const
 
@@ -29,7 +29,7 @@ export class InputManager {
     isPressedRight: false,
   }
 
-  constructor(private readonly minecraft: MinecraftClient) {
+  constructor(private readonly gameSession: GameSession) {
     const onKeyDown = this.onKeyDown.bind(this)
     const onKeyUp = this.onKeyUp.bind(this)
     const onMouseDown = this.onMouseDown.bind(this)
@@ -64,17 +64,20 @@ export class InputManager {
     return this.keyboardState[key].isPressed
   }
 
+  resetKeyboardState() {
+    for (const key of GameKeys) {
+      this.keyboardState[key].isPressed = false
+    }
+  }
+
   resetMouseDelta() {
     this.mouseState.deltaX = 0
     this.mouseState.deltaY = 0
   }
 
-  private isPaused(): boolean {
-    return this.minecraft.getGameSession().paused
-  }
-
   private onKeyDown = (event: KeyboardEvent) => {
-    if (this.isPaused()) {
+    if (this.gameSession.paused) {
+      this.resetKeyboardState()
       return
     }
 
@@ -88,7 +91,8 @@ export class InputManager {
   }
 
   private onKeyUp = (event: KeyboardEvent) => {
-    if (this.isPaused()) {
+    if (this.gameSession.paused) {
+      this.resetKeyboardState()
       return
     }
 
@@ -101,7 +105,7 @@ export class InputManager {
   }
 
   private onMouseDown = (event: MouseEvent) => {
-    if (this.isPaused()) {
+    if (this.gameSession.paused) {
       return
     }
 
@@ -113,7 +117,7 @@ export class InputManager {
   }
 
   private onMouseMove = (event: MouseEvent) => {
-    if (this.isPaused()) {
+    if (this.gameSession.paused) {
       return
     }
 
@@ -122,7 +126,7 @@ export class InputManager {
   }
 
   private onMouseUp = (event: MouseEvent) => {
-    if (this.isPaused()) {
+    if (this.gameSession.paused) {
       return
     }
 

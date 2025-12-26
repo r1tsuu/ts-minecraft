@@ -95,7 +95,7 @@ export class GameSession {
     })
 
     this.clientPlayerManager = new ClientPlayerManager(minecraft)
-    this.inputManager = new InputManager(minecraft)
+    this.inputManager = new InputManager(this)
 
     this.raycaster = new Raycaster(this.camera, this.player, this.scene, this.world)
     minecraft.scheduler.registerInstance(this)
