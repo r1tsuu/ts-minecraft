@@ -31,14 +31,13 @@ export type DatabaseSchema = {
     uuid: UUID
   } & ChunkCoordinates
   players: {
-    canJump: boolean
-    direction: JSONColumnType<RawVector3>
-    jumpStrength: number
-    pitch: number
     position: JSONColumnType<RawVector3>
+    rotation: JSONColumnType<{
+      x: number
+      y: number
+    }>
     uuid: UUID
     velocity: JSONColumnType<RawVector3>
-    yaw: number
   }
   worldMeta: {
     databaseName: string
@@ -57,7 +56,7 @@ export type DatabaseSchema = {
 export type DatabaseWorldMetaData = Selectable<DatabaseSchema['worldMeta']>
 
 // Increment this when making changes to the database schema
-const DB_VERSION = 3
+const DB_VERSION = 6
 
 const json = <T>(value: T): RawBuilder<string> => {
   return sql`CAST(${JSON.stringify(value)} AS JSONB)`
@@ -136,8 +135,8 @@ export class WorldDatabase {
       .insertInto('players')
       .values({
         ...data,
-        direction: json(data.direction),
         position: json(data.position),
+        rotation: json(data.rotation),
         velocity: json(data.velocity),
       })
       .returning('uuid')
@@ -198,11 +197,8 @@ export class WorldDatabase {
     await this.db
       .updateTable('players')
       .set({
-        canJump: player.canJump,
-        direction: json(player.direction),
-        jumpStrength: player.jumpStrength,
-        pitch: player.pitch,
         position: json(player.position),
+        rotation: json(player.rotation),
         velocity: json(player.velocity),
       })
       .where('uuid', '=', player.uuid)
@@ -272,13 +268,9 @@ export class WorldDatabase {
       await this.db.schema
         .createTable('players')
         .addColumn('uuid', 'uuid', (col) => col.primaryKey())
-        .addColumn('canJump', 'boolean', (col) => col.notNull())
-        .addColumn('direction', 'jsonb', (col) => col.notNull())
-        .addColumn('jumpStrength', 'real', (col) => col.notNull())
-        .addColumn('pitch', 'real', (col) => col.notNull())
         .addColumn('position', 'jsonb', (col) => col.notNull())
         .addColumn('velocity', 'jsonb', (col) => col.notNull())
-        .addColumn('yaw', 'real', (col) => col.notNull())
+        .addColumn('rotation', 'jsonb', (col) => col.notNull())
         .execute()
 
       await this.db.schema

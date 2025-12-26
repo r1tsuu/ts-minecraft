@@ -1,19 +1,27 @@
-import type { RawVector3 } from './types.ts'
+import * as THREE from 'three'
 
-export const CHUNK_SIZE = 16
+import type { RawVector3 } from '../types.ts'
 
-export const RENDER_DISTANCE = 2
+import { Config } from './Config.ts'
 
-export const WORLD_HEIGHT = 256
+export const minutes = (m: number): number => {
+  return m * 60 * 1000
+}
 
-export const GRAVITY_ACCELERATION = 9.81
+export const seconds = (s: number): number => {
+  return s * 1000
+}
+
+export const ticks = (t: number): number => {
+  return t * Config.TICK_RATE
+}
 
 export const getBlockKey = (x: number, y: number, z: number): string => {
   return `${x},${y},${z}`
 }
 
 export const getBlockIndex = (x: number, y: number, z: number): number => {
-  return x + CHUNK_SIZE * (z + CHUNK_SIZE * y)
+  return x + Config.CHUNK_SIZE * (z + Config.CHUNK_SIZE * y)
 }
 
 export const findByXZ = <T extends { x: number; z: number }>(
@@ -93,3 +101,28 @@ export const getChunksCoordinatesInRadius = ({
 
   return chunks
 }
+
+declare module 'three' {
+  interface Vector3 {
+    toRaw(): RawVector3
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Vector3 {
+    function fromRaw(rawVector: RawVector3): Vector3
+  }
+}
+
+THREE.Vector3.prototype.toRaw = function (): RawVector3 {
+  return {
+    x: this.x,
+    y: this.y,
+    z: this.z,
+  }
+}
+
+THREE.Vector3.fromRaw = function (rawVector: RawVector3): THREE.Vector3 {
+  return new THREE.Vector3(rawVector.x, rawVector.y, rawVector.z)
+}
+
+export const UP_VECTOR = new THREE.Vector3(0, 1, 0)

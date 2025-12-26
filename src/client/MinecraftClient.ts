@@ -1,9 +1,9 @@
-import { createConfig, type SharedConfig } from '../config.ts'
 import {
   type AnyMinecraftEvent,
   type MinecraftEvent,
   MinecraftEventQueue,
 } from '../queue/MinecraftQueue.ts'
+import { Scheduler } from '../shared/Scheduler.ts'
 import SinglePlayerWorker from '../worker/SinglePlayerWorker.ts?worker'
 import { type ClientBlockRegisty, createClientBlockRegistry } from './blocks.ts'
 import { GameSession } from './GameSession.ts'
@@ -12,13 +12,11 @@ import { LocalStorageManager } from './LocalStorageManager.ts'
 
 export class MinecraftClient {
   blocksRegistry: ClientBlockRegisty = createClientBlockRegistry()
-  config: SharedConfig = createConfig()
-
   eventQueue: MinecraftEventQueue = new MinecraftEventQueue('Client')
   gameSession: GameSession | null = null
   gui: GUI | null = null
-
   localStorageManager: LocalStorageManager = new LocalStorageManager()
+  scheduler: Scheduler = new Scheduler()
 
   constructor() {
     this.gui = new GUI(this)
@@ -112,7 +110,7 @@ export class MinecraftClient {
 
     this.gameSession = new GameSession(this, {
       initialChunksFromServer: serverStartedResponse.payload.loadedChunks,
-      player: playerJoinResponse.payload.playerData,
+      initialPlayerFromServer: playerJoinResponse.payload.playerData,
     })
 
     this.gameSession.addOnDisposeCallback(unsubscribe)

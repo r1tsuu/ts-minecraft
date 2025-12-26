@@ -4,6 +4,7 @@ import type { MinecraftClient } from '../MinecraftClient.ts'
 import type { GUIActions, GUIConditions, GUIState as GUIState } from './state.ts'
 
 import { MinecraftEventQueue } from '../../queue/MinecraftQueue.ts'
+import { Scheduler } from '../../shared/Scheduler.ts'
 import { synchronize } from './synchronize.ts'
 
 export class GUI {
@@ -12,7 +13,6 @@ export class GUI {
   private actions: GUIActions
   private conditions: GUIConditions
   private dispositions: Function[] = []
-  private gameInterval!: number
   private resumeButton: HTMLButtonElement
   private worldNameInput: HTMLInputElement
   private worldSeedInput: HTMLInputElement
@@ -43,7 +43,7 @@ export class GUI {
     this.conditions = this.createConditions()
 
     this.setupEventListeners()
-    this.startGameInterval()
+    minecraft.scheduler.registerInstance(this)
 
     synchronize(this.state, this.actions, this.conditions)
   }
@@ -54,8 +54,7 @@ export class GUI {
     }
 
     MinecraftEventQueue.unregisterHandlers(this)
-
-    clearInterval(this.gameInterval)
+    this.minecraft.scheduler.unregisterInstance(this)
   }
 
   getCanvas(): HTMLCanvasElement {
@@ -81,9 +80,42 @@ export class GUI {
       })
   }
 
+  @Scheduler.Every(200)
+  protected updateGameUI(): void {
+    if (!this.minecraft.gameSession || this.state.isPaused) return
+
+    if (!this.state.initializedGameUI) {
+      this.setState({ initializedGameUI: true })
+    }
+
+    this.setState(
+      {
+        fps: this.minecraft.gameSession.frameCounter.fps.toFixed(0),
+        positionX: this.minecraft.gameSession.player.position.x.toFixed(),
+        positionY: this.minecraft.gameSession.player.position.y.toFixed(),
+        positionZ: this.minecraft.gameSession.player.position.z.toFixed(),
+        rotationPitch: MathUtils.radToDeg(this.minecraft.gameSession.player.rotation.x).toFixed(),
+        rotationYaw: MathUtils.radToDeg(this.minecraft.gameSession.player.rotation.y).toFixed(),
+      },
+      ['#fps', '#position', '#rotation'],
+    )
+
+    let performance: 'average' | 'bad' | 'good'
+
+    if (this.minecraft.gameSession.frameCounter.fps < 30) {
+      performance = 'bad'
+    } else if (this.minecraft.gameSession.frameCounter.fps < 60) {
+      performance = 'average'
+    } else {
+      performance = 'good'
+    }
+
+    document.getElementById('fps_value')!.setAttribute('data-performance', performance)
+  }
+
   private createActions(): GUIActions {
     return {
-      backToMenu: async () => {
+      backToMenu: () => {
         this.minecraft.eventQueue.emit('Client.ExitWorld', {})
         this.setState({
           activePage: 'start',
@@ -188,15 +220,12 @@ export class GUI {
         this.resumeButton.disabled = false
       }, 1000)
 
-      this.minecraft.gameSession.player.isMovingBackward = false
-      this.minecraft.gameSession.player.isMovingForward = false
-      this.minecraft.gameSession.player.isMovingLeft = false
-      this.minecraft.gameSession.player.isMovingRight = false
-
       this.setState({
         isPaused: true,
         pauseText: 'Click to Resume',
       })
+
+      this.minecraft.eventQueue.emit('Client.PauseToggle', {})
       return
     }
   }
@@ -211,6 +240,7 @@ export class GUI {
         isPaused: false,
         pauseText: 'Press Escape to Pause',
       })
+      this.minecraft.eventQueue.emit('Client.PauseToggle', {})
     } catch (e) {
       console.warn('Pointer lock request failed', e)
     }
@@ -223,39 +253,5 @@ export class GUI {
     this.dispositions.push(() => {
       document.removeEventListener('pointerlockchange', this.onPointerLockChange)
     })
-  }
-
-  private startGameInterval(): void {
-    this.gameInterval = setInterval(() => {
-      if (this.minecraft.gameSession && !this.state.isPaused) {
-        if (!this.state.initializedGameUI) {
-          this.setState({ initializedGameUI: true })
-        }
-
-        this.setState(
-          {
-            fps: this.minecraft.gameSession.frameCounter.fps.toFixed(0),
-            positionX: this.minecraft.gameSession.player.position.x.toFixed(),
-            positionY: this.minecraft.gameSession.player.position.y.toFixed(),
-            positionZ: this.minecraft.gameSession.player.position.z.toFixed(),
-            rotationPitch: MathUtils.radToDeg(this.minecraft.gameSession.player.pitch).toFixed(),
-            rotationYaw: MathUtils.radToDeg(this.minecraft.gameSession.player.yaw).toFixed(),
-          },
-          ['#fps', '#position', '#rotation'],
-        )
-
-        let performance: 'average' | 'bad' | 'good'
-
-        if (this.minecraft.gameSession.frameCounter.fps < 30) {
-          performance = 'bad'
-        } else if (this.minecraft.gameSession.frameCounter.fps < 60) {
-          performance = 'average'
-        } else {
-          performance = 'good'
-        }
-
-        document.getElementById('fps_value')!.setAttribute('data-performance', performance)
-      }
-    }, 300)
   }
 }

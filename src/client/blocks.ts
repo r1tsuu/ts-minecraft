@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-import { type BlockName, BlocksRegistry } from '../blocks/BlocksRegistry.ts'
+import { type BlockName, BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import dirtTextureImg from '../static/dirt.png?no-inline'
 import grassBlockSideTextureImg from '../static/grass_block_side.png?no-inline'
 import grassBlockTopTextureImg from '../static/grass_block_top.png?no-inline'
