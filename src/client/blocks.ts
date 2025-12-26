@@ -4,53 +4,51 @@ import { type BlockName, BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import dirtTextureImg from '../static/dirt.png?no-inline'
 import grassBlockSideTextureImg from '../static/grass_block_side.png?no-inline'
 import grassBlockTopTextureImg from '../static/grass_block_top.png?no-inline'
-
-export type ClientBlockRegisty = ReturnType<typeof createClientBlockRegistry>
+import { ClientContainer } from './ClientContainer.ts'
 
 type BlockClientData = {
   material: THREE.Material | THREE.Material[]
 }
 
-export const createClientBlockRegistry = () => {
-  const registry = new BlocksRegistry()
-  const clientRegistry = new Map<number, BlockClientData>()
-  const textureLoader = new THREE.TextureLoader()
+export class ClientBlocksRegistry {
+  registry: Map<number, BlockClientData> = new Map()
 
-  const dirtTexture = textureLoader.load(dirtTextureImg)
-  const grassTexture = textureLoader.load(grassBlockSideTextureImg)
-  const grassTopTexture = textureLoader.load(grassBlockTopTextureImg)
+  constructor() {
+    const blocksRegistry = ClientContainer.resolve(BlocksRegistry).unwrap()
 
-  const nameMaterialMap: Record<BlockName, THREE.Material | THREE.Material[]> = {
-    dirt: new THREE.MeshStandardMaterial({
-      map: dirtTexture,
-    }),
-    grass: [
-      new THREE.MeshStandardMaterial({ map: grassTexture }), // sides
-      new THREE.MeshStandardMaterial({ map: grassTexture }), // sides
-      new THREE.MeshStandardMaterial({ map: grassTopTexture }), // top
-      new THREE.MeshStandardMaterial({ map: dirtTexture }), // dirt
-      new THREE.MeshStandardMaterial({ map: grassTexture }), // sides
-      new THREE.MeshStandardMaterial({ map: grassTexture }), // sides
-    ],
-    stone: new THREE.MeshStandardMaterial({
-      color: 0x888888,
-    }),
-  }
+    const textureLoader = new THREE.TextureLoader()
 
-  for (const [id, { name }] of registry.registry) {
-    const material = nameMaterialMap[name]
+    const dirtTexture = textureLoader.load(dirtTextureImg)
+    const grassTexture = textureLoader.load(grassBlockSideTextureImg)
+    const grassTopTexture = textureLoader.load(grassBlockTopTextureImg)
 
-    if (!material) {
-      throw new Error(
-        `No material defined for block name: ${name}. Please update the client block registry.`,
-      )
+    const nameMaterialMap: Record<BlockName, THREE.Material | THREE.Material[]> = {
+      dirt: new THREE.MeshStandardMaterial({
+        map: dirtTexture,
+      }),
+      grass: [
+        new THREE.MeshStandardMaterial({ map: grassTexture }), // sides
+        new THREE.MeshStandardMaterial({ map: grassTexture }), // sides
+        new THREE.MeshStandardMaterial({ map: grassTopTexture }), // top
+        new THREE.MeshStandardMaterial({ map: dirtTexture }), // dirt
+        new THREE.MeshStandardMaterial({ map: grassTexture }), // sides
+        new THREE.MeshStandardMaterial({ map: grassTexture }), // sides
+      ],
+      stone: new THREE.MeshStandardMaterial({
+        color: 0x888888,
+      }),
     }
 
-    clientRegistry.set(id, { material })
-  }
+    for (const [id, { name }] of blocksRegistry.registry) {
+      const material = nameMaterialMap[name]
 
-  return {
-    clientRegistry,
-    registry,
+      if (!material) {
+        throw new Error(
+          `No material defined for block name: ${name}. Please update the client block registry.`,
+        )
+      }
+
+      this.registry.set(id, { material })
+    }
   }
 }

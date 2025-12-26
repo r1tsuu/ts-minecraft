@@ -1,10 +1,12 @@
-import { MathUtils } from 'three'
+import * as THREE from 'three'
 
-import type { MinecraftClient } from '../MinecraftClient.ts'
 import type { GUIActions, GUIConditions, GUIState as GUIState } from './state.ts'
 
 import { MinecraftEventQueue } from '../../queue/MinecraftQueue.ts'
 import { Scheduler } from '../../shared/Scheduler.ts'
+import { ClientContainer } from '../ClientContainer.ts'
+import { GameSession } from '../GameSession.ts'
+import { LocalStorageManager } from '../LocalStorageManager.ts'
 import { synchronize } from './synchronize.ts'
 
 export class GUI {
@@ -17,9 +19,7 @@ export class GUI {
   private worldNameInput: HTMLInputElement
   private worldSeedInput: HTMLInputElement
 
-  constructor(private readonly minecraft: MinecraftClient) {
-    this.minecraft = minecraft
-
+  constructor() {
     this.state = {
       activePage: 'start',
       fps: 'Loading...',
@@ -32,7 +32,7 @@ export class GUI {
       positionZ: '',
       rotationPitch: '',
       rotationYaw: '',
-      worldList: minecraft.localStorageManager.getListWorlds(),
+      worldList: ClientContainer.resolve(LocalStorageManager).unwrap().getListWorlds(),
     }
 
     this.worldNameInput = document.querySelector('input[name="worldName"]') as HTMLInputElement
@@ -43,7 +43,7 @@ export class GUI {
     this.conditions = this.createConditions()
 
     this.setupEventListeners()
-    minecraft.scheduler.registerInstance(this)
+    ClientContainer.resolve(Scheduler).unwrap().registerInstance(this)
 
     synchronize(this.state, this.actions, this.conditions)
   }
@@ -54,7 +54,7 @@ export class GUI {
     }
 
     MinecraftEventQueue.unregisterHandlers(this)
-    this.minecraft.scheduler.unregisterInstance(this)
+    ClientContainer.resolve(Scheduler).unwrap().unregisterInstance(this)
   }
 
   getCanvas(): HTMLCanvasElement {
@@ -72,9 +72,9 @@ export class GUI {
       activePage: 'game',
       loadingWorldName: ' ',
     })
-    this.minecraft
-      .getGameSession()
-      .renderer.domElement.requestPointerLock()
+
+    this.getCanvas()
+      .requestPointerLock()
       .catch((e) => {
         console.warn('Pointer lock request failed', e)
       })
@@ -82,29 +82,32 @@ export class GUI {
 
   @Scheduler.Every(200)
   protected updateGameUI(): void {
-    if (!this.minecraft.gameSession || this.state.isPaused) return
+    const gameSession = ClientContainer.resolve(GameSession)
+    if (gameSession.isNone() || this.state.isPaused) return
 
     if (!this.state.initializedGameUI) {
       this.setState({ initializedGameUI: true })
     }
 
+    const player = gameSession.value.getCurrentPlayer()
     this.setState(
       {
-        fps: this.minecraft.gameSession.frameCounter.fps.toFixed(0),
-        positionX: this.minecraft.gameSession.player.position.x.toFixed(),
-        positionY: this.minecraft.gameSession.player.position.y.toFixed(),
-        positionZ: this.minecraft.gameSession.player.position.z.toFixed(),
-        rotationPitch: MathUtils.radToDeg(this.minecraft.gameSession.player.rotation.x).toFixed(),
-        rotationYaw: MathUtils.radToDeg(this.minecraft.gameSession.player.rotation.y).toFixed(),
+        fps: gameSession.value.frameCounter.fps.toFixed(0),
+        positionX: player.position.x.toFixed(),
+        positionY: player.position.y.toFixed(),
+        positionZ: player.position.z.toFixed(),
+        rotationPitch: THREE.MathUtils.radToDeg(player.rotation.x).toFixed(),
+        rotationYaw: THREE.MathUtils.radToDeg(player.rotation.y).toFixed(),
       },
+
       ['#fps', '#position', '#rotation'],
     )
 
     let performance: 'average' | 'bad' | 'good'
 
-    if (this.minecraft.gameSession.frameCounter.fps < 30) {
+    if (gameSession.value.frameCounter.fps < 30) {
       performance = 'bad'
-    } else if (this.minecraft.gameSession.frameCounter.fps < 60) {
+    } else if (gameSession.value.frameCounter.fps < 60) {
       performance = 'average'
     } else {
       performance = 'good'
@@ -114,9 +117,11 @@ export class GUI {
   }
 
   private createActions(): GUIActions {
+    const eventQueue = ClientContainer.resolve(MinecraftEventQueue).unwrap()
+    const localStorageManager = ClientContainer.resolve(LocalStorageManager).unwrap()
     return {
       backToMenu: () => {
-        this.minecraft.eventQueue.emit('Client.ExitWorld', {})
+        eventQueue.emit('Client.ExitWorld', {})
         this.setState({
           activePage: 'start',
           fps: 'Loading...',
@@ -138,7 +143,7 @@ export class GUI {
         const name = this.worldNameInput.value.trim() || 'New World'
         const seed = this.worldSeedInput.value.trim() || crypto.randomUUID()
         button.disabled = true
-        const world = this.minecraft.localStorageManager.addWorld(name, seed)
+        const world = localStorageManager.addWorld(name, seed)
         this.setState({
           worldList: [
             ...this.state.worldList,
@@ -157,7 +162,7 @@ export class GUI {
       deleteWorld: async ({ event }) => {
         const index = this.getIndexFromEvent(event)
         const world = this.state.worldList[index]
-        this.minecraft.localStorageManager.deleteWorld(world.uuid)
+        localStorageManager.deleteWorld(world.uuid)
         this.setState({
           worldList: this.state.worldList.filter((w) => w.uuid !== world.uuid),
         })
@@ -170,7 +175,7 @@ export class GUI {
           loadingWorldName: world.name,
         })
 
-        this.minecraft.eventQueue.emit('Client.JoinWorld', { worldUUID: world.uuid })
+        eventQueue.emit('Client.JoinWorld', { worldUUID: world.uuid })
       },
       resumeGame: async () => {
         await this.resumeGame()
@@ -185,8 +190,8 @@ export class GUI {
 
   private createConditions(): GUIConditions {
     return {
-      showCrosshair: () => this.minecraft.gameSession !== null && !this.state.isPaused,
-      showGameUI: () => this.minecraft.gameSession !== null,
+      showCrosshair: () => ClientContainer.resolve(GameSession).isSome() && !this.state.isPaused,
+      showGameUI: () => ClientContainer.resolve(GameSession).isSome(),
       showOverlay: () => ['menuWorlds', 'start', 'worldLoading'].includes(this.state.activePage),
       showPauseMenu: () => this.state.isPaused,
       showWorldsNotFound: () => this.state.worldList.length === 0,
@@ -210,11 +215,14 @@ export class GUI {
   }
 
   private onPointerLockChange = (): void => {
-    if (!this.minecraft.gameSession) return
+    const gameSession = ClientContainer.resolve(GameSession)
+    const eventQueue = ClientContainer.resolve(MinecraftEventQueue).unwrap()
 
-    const isLocked = document.pointerLockElement === this.minecraft.gameSession.renderer.domElement
+    if (gameSession.isNone()) return
 
-    if (!isLocked && !this.state.isPaused && this.minecraft.gameSession) {
+    const isLocked = document.pointerLockElement === this.getCanvas()
+
+    if (!isLocked && !this.state.isPaused && gameSession) {
       this.resumeButton.disabled = true
       setTimeout(() => {
         this.resumeButton.disabled = false
@@ -225,22 +233,25 @@ export class GUI {
         pauseText: 'Click to Resume',
       })
 
-      this.minecraft.eventQueue.emit('Client.PauseToggle', {})
+      eventQueue.emit('Client.PauseToggle', {})
       return
     }
   }
 
   private async resumeGame(): Promise<void> {
-    if (!this.minecraft.gameSession) return
+    const gameSession = ClientContainer.resolve(GameSession)
+    if (gameSession.isNone()) return
+
+    const eventQueue = ClientContainer.resolve(MinecraftEventQueue).unwrap()
     if (!this.state.isPaused) return
 
     try {
-      await this.minecraft.gameSession.renderer.domElement.requestPointerLock()
+      await this.getCanvas().requestPointerLock()
       this.setState({
         isPaused: false,
         pauseText: 'Press Escape to Pause',
       })
-      this.minecraft.eventQueue.emit('Client.PauseToggle', {})
+      eventQueue.emit('Client.PauseToggle', {})
     } catch (e) {
       console.warn('Pointer lock request failed', e)
     }
@@ -248,7 +259,7 @@ export class GUI {
 
   private setupEventListeners(): void {
     document.addEventListener('pointerlockchange', this.onPointerLockChange)
-    this.minecraft.eventQueue.registerHandlers(this)
+    ClientContainer.resolve(MinecraftEventQueue).unwrap().registerHandlers(this)
 
     this.dispositions.push(() => {
       document.removeEventListener('pointerlockchange', this.onPointerLockChange)

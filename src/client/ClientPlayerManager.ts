@@ -1,11 +1,13 @@
-import type { MinecraftClient } from './MinecraftClient.ts'
-
 import { MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import { Config } from '../shared/Config.ts'
+import { ClientContainer } from './ClientContainer.ts'
+import { GameSession } from './GameSession.ts'
+import { InputManager } from './InputManager.ts'
 
 export class ClientPlayerManager {
-  constructor(private readonly minecraft: MinecraftClient) {
-    this.minecraft.eventQueue.registerHandlers(this)
+  constructor() {
+    const eventQueue = ClientContainer.resolve(MinecraftEventQueue).unwrap()
+    eventQueue.registerHandlers(this)
   }
 
   dispose(): void {
@@ -13,12 +15,12 @@ export class ClientPlayerManager {
   }
 
   update(): void {
-    const gameSession = this.minecraft.getGameSession()
-    const inputManager = this.minecraft.getGameSession().inputManager
+    const gameSession = ClientContainer.resolve(GameSession).unwrap()
+    const inputManager = ClientContainer.resolve(InputManager).unwrap()
 
     const mouseMove = inputManager.getMouseDelta()
 
-    const player = gameSession.player
+    const player = gameSession.getCurrentPlayer()
 
     player.rotation.y -= mouseMove.deltaX * Config.MOUSE_SENSITIVITY
     player.rotation.x -= mouseMove.deltaY * Config.MOUSE_SENSITIVITY
@@ -62,11 +64,11 @@ export class ClientPlayerManager {
 
   @MinecraftEventQueue.Handler('Client.PauseToggle')
   protected onPauseToggle(): void {
-    const gameSession = this.minecraft.getGameSession()
+    const player = ClientContainer.resolve(GameSession).unwrap().getCurrentPlayer()
 
-    gameSession.player.moving.left = false
-    gameSession.player.moving.right = false
-    gameSession.player.moving.backward = false
-    gameSession.player.moving.forward = false
+    player.moving.left = false
+    player.moving.right = false
+    player.moving.backward = false
+    player.moving.forward = false
   }
 }

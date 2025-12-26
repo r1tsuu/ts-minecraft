@@ -2,20 +2,19 @@ import * as THREE from 'three'
 
 import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatabase.ts'
 import type { UUID } from '../types.ts'
-import type { MinecraftClient } from './MinecraftClient.ts'
 
 import { MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import { Config } from '../shared/Config.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
+import { ClientContainer } from './ClientContainer.ts'
 import { ClientPlayerManager } from './ClientPlayerManager.ts'
+import { GUI } from './gui/GUI.ts'
 import { InputManager } from './InputManager.ts'
 import { Player } from './Player.ts'
 import { Raycaster } from './Raycaster.ts'
 import { World } from './World.ts'
 
 export class GameSession {
-  camera: THREE.PerspectiveCamera
-  clientPlayerManager: ClientPlayerManager
   frameCounter = {
     fps: 0,
     lastFrames: 0,
@@ -23,13 +22,9 @@ export class GameSession {
     totalFrames: 0,
     totalTime: 0,
   }
-  inputManager: InputManager
+
   paused = false
-  player: Player
-  raycaster: Raycaster
-  renderer: THREE.WebGLRenderer
-  scene: THREE.Scene = new THREE.Scene()
-  world: World
+  playerUUID: UUID
 
   private additionalOnDisposeCallbacks: Array<() => void> = []
   private delta: number = 0
@@ -39,28 +34,26 @@ export class GameSession {
   private lastTimeout: null | number = null
   private onResize: () => void
 
-  private playerUUID: UUID
-
   constructor(
-    private readonly minecraft: MinecraftClient,
-    {
-      initialChunksFromServer,
-      initialPlayerFromServer,
-    }: {
-      initialChunksFromServer: DatabaseChunkData[]
-      initialPlayerFromServer: DatabasePlayerData
-    },
+    initialChunksFromServer: DatabaseChunkData[],
+    initialPlayerFromServer: DatabasePlayerData,
   ) {
     this.playerUUID = initialPlayerFromServer.uuid
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: false,
-      canvas: minecraft.getGUI().getCanvas(),
-      powerPreference: 'high-performance',
-    })
-    this.renderer.setSize(window.innerWidth, window.innerHeight)
+
+    ClientContainer.registerSingleton(new THREE.Scene())
+
+    const renderer = ClientContainer.registerSingleton(
+      new THREE.WebGLRenderer({
+        antialias: false,
+        canvas: ClientContainer.resolve(GUI).unwrap().getCanvas(),
+        powerPreference: 'high-performance',
+      }),
+    )
+
+    renderer.setSize(window.innerWidth, window.innerHeight)
 
     this.onResize = () => {
-      this.renderer.setSize(window.innerWidth, window.innerHeight)
+      renderer.setSize(window.innerWidth, window.innerHeight)
     }
 
     window.addEventListener('resize', this.onResize)
@@ -68,38 +61,39 @@ export class GameSession {
       window.removeEventListener('resize', this.onResize)
     })
 
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.0
-    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
+    renderer.outputColorSpace = THREE.SRGBColorSpace
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 1.0
 
-    this.camera.position.set(0, 40, 0)
-    this.camera.lookAt(30, 35, 30)
-
-    this.player = new Player(
-      initialPlayerFromServer.uuid,
-      THREE.Vector3.fromRaw(initialPlayerFromServer.position),
-      THREE.Vector3.fromRaw(initialPlayerFromServer.velocity),
-      new THREE.Euler(
-        initialPlayerFromServer.rotation.x,
-        initialPlayerFromServer.rotation.y,
-        0,
-        Config.EULER_ORDER,
-      ),
-      minecraft,
+    const camera = ClientContainer.registerSingleton(
+      new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000),
     )
 
-    this.world = new World(this.player, minecraft.eventQueue, this.scene, {
-      blockRegistry: minecraft.blocksRegistry,
-      initialChunksFromServer,
-    })
+    camera.position.set(0, 40, 0)
+    camera.lookAt(30, 35, 30)
 
-    this.clientPlayerManager = new ClientPlayerManager(minecraft)
-    this.inputManager = new InputManager(this)
+    ClientContainer.register(
+      new Player(
+        initialPlayerFromServer.uuid,
+        THREE.Vector3.fromRaw(initialPlayerFromServer.position),
+        THREE.Vector3.fromRaw(initialPlayerFromServer.velocity),
+        new THREE.Euler(
+          initialPlayerFromServer.rotation.x,
+          initialPlayerFromServer.rotation.y,
+          0,
+          Config.EULER_ORDER,
+        ),
+      ),
+      initialPlayerFromServer.uuid,
+    )
 
-    this.raycaster = new Raycaster(this.camera, this.player, this.scene, this.world)
-    minecraft.scheduler.registerInstance(this)
-    minecraft.eventQueue.registerHandlers(this)
+    ClientContainer.registerSingleton(new World(initialChunksFromServer))
+    ClientContainer.registerSingleton(new ClientPlayerManager())
+    ClientContainer.registerSingleton(new InputManager())
+    ClientContainer.registerSingleton(new Raycaster())
+
+    ClientContainer.resolve(Scheduler).unwrap().registerInstance(this)
+    ClientContainer.resolve(MinecraftEventQueue).unwrap().registerHandlers(this)
   }
 
   addOnDisposeCallback(callback: () => void): void {
@@ -108,11 +102,21 @@ export class GameSession {
 
   dispose(): void {
     window.removeEventListener('resize', this.onResize)
-    this.world.dispose()
-    this.renderer.dispose()
-    this.scene.clear()
-    this.clientPlayerManager.dispose()
-    this.inputManager.dispose()
+
+    ClientContainer.resolve(World).unwrap().dispose()
+    ClientContainer.resolve(THREE.WebGLRenderer).unwrap().dispose()
+    ClientContainer.resolve(THREE.Scene).unwrap().clear()
+    ClientContainer.resolve(ClientPlayerManager).unwrap().dispose()
+    ClientContainer.resolve(InputManager).unwrap().dispose()
+
+    ClientContainer.unregister(World)
+    ClientContainer.unregister(THREE.WebGLRenderer)
+    ClientContainer.unregister(THREE.Scene)
+    ClientContainer.unregister(ClientPlayerManager)
+    ClientContainer.unregister(InputManager)
+    ClientContainer.unregister(THREE.PerspectiveCamera)
+    ClientContainer.unregister(Raycaster)
+    ClientContainer.unregister(this.playerUUID)
 
     if (this.lastTimeout) {
       clearTimeout(this.lastTimeout)
@@ -122,7 +126,7 @@ export class GameSession {
       callback()
     }
 
-    this.minecraft.scheduler.unregisterInstance(this)
+    ClientContainer.resolve(Scheduler).unwrap().unregisterInstance(this)
     MinecraftEventQueue.unregisterHandlers(this)
 
     this.disposed = true
@@ -142,6 +146,10 @@ export class GameSession {
     requestAnimationFrame(frame)
   }
 
+  getCurrentPlayer(): Player {
+    return ClientContainer.resolve<Player>(this.playerUUID).unwrap()
+  }
+
   getDelta(): number {
     return this.delta
   }
@@ -157,21 +165,24 @@ export class GameSession {
       return
     }
 
-    await this.minecraft.eventQueue.emitAndWaitResponse(
-      'Client.RequestSyncPlayer',
-      {
-        playerData: {
-          position: this.player.position.toRaw(),
-          rotation: {
-            x: this.player.rotation.x,
-            y: this.player.rotation.y,
+    const player = this.getCurrentPlayer()
+    await ClientContainer.resolve(MinecraftEventQueue)
+      .unwrap()
+      .emitAndWaitResponse(
+        'Client.RequestSyncPlayer',
+        {
+          playerData: {
+            position: player.position.toRaw(),
+            rotation: {
+              x: player.rotation.x,
+              y: player.rotation.y,
+            },
+            uuid: this.playerUUID,
+            velocity: player.velocity.toRaw(),
           },
-          uuid: this.playerUUID,
-          velocity: this.player.velocity.toRaw(),
         },
-      },
-      'Server.ResponseSyncPlayer',
-    )
+        'Server.ResponseSyncPlayer',
+      )
   }
 
   private handleGameFrame() {
@@ -202,19 +213,24 @@ export class GameSession {
     /**
      * UPDATE GAME STATE HERE
      */
-    this.clientPlayerManager.update()
-    this.player.update()
-    this.world.update()
-    this.raycaster.update()
+    ClientContainer.resolve(ClientPlayerManager).unwrap().update()
+    const player = ClientContainer.resolve<Player>(this.playerUUID).unwrap()
+    player.update()
+    ClientContainer.resolve(World).unwrap().update()
+    ClientContainer.resolve(Raycaster).unwrap().update()
 
-    this.camera.position.copy(this.player.position)
-    this.camera.rotation.copy(this.player.rotation)
+    const camera = ClientContainer.resolve(THREE.PerspectiveCamera).unwrap()
+
+    camera.position.copy(player.position)
+    camera.rotation.copy(player.rotation)
 
     /**
      * RENDERING CODE HERE
      */
-    this.renderer.render(this.scene, this.camera)
+    ClientContainer.resolve(THREE.WebGLRenderer)
+      .unwrap()
+      .render(ClientContainer.resolve(THREE.Scene).unwrap(), camera)
 
-    this.inputManager.resetMouseDelta()
+    ClientContainer.resolve(InputManager).unwrap().resetMouseDelta()
   }
 }

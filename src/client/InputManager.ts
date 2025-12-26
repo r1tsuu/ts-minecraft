@@ -1,4 +1,5 @@
-import type { GameSession } from './GameSession.ts'
+import { ClientContainer } from './ClientContainer.ts'
+import { GameSession } from './GameSession.ts'
 
 const GameKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space'] as const
 
@@ -29,7 +30,7 @@ export class InputManager {
     isPressedRight: false,
   }
 
-  constructor(private readonly gameSession: GameSession) {
+  constructor() {
     const onKeyDown = this.onKeyDown.bind(this)
     const onKeyUp = this.onKeyUp.bind(this)
     const onMouseDown = this.onMouseDown.bind(this)
@@ -76,7 +77,7 @@ export class InputManager {
   }
 
   private onKeyDown = (event: KeyboardEvent) => {
-    if (this.gameSession.paused) {
+    if (ClientContainer.resolve(GameSession).unwrap().paused) {
       this.resetKeyboardState()
       return
     }
@@ -91,7 +92,7 @@ export class InputManager {
   }
 
   private onKeyUp = (event: KeyboardEvent) => {
-    if (this.gameSession.paused) {
+    if (ClientContainer.resolve(GameSession).unwrap().paused) {
       this.resetKeyboardState()
       return
     }
@@ -105,7 +106,7 @@ export class InputManager {
   }
 
   private onMouseDown = (event: MouseEvent) => {
-    if (this.gameSession.paused) {
+    if (ClientContainer.resolve(GameSession).unwrap().paused) {
       return
     }
 
@@ -117,7 +118,7 @@ export class InputManager {
   }
 
   private onMouseMove = (event: MouseEvent) => {
-    if (this.gameSession.paused) {
+    if (ClientContainer.resolve(GameSession).unwrap().paused) {
       return
     }
 
@@ -126,7 +127,7 @@ export class InputManager {
   }
 
   private onMouseUp = (event: MouseEvent) => {
-    if (this.gameSession.paused) {
+    if (ClientContainer.resolve(GameSession).unwrap().paused) {
       return
     }
 

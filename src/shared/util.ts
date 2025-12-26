@@ -126,3 +126,48 @@ THREE.Vector3.fromRaw = function (rawVector: RawVector3): THREE.Vector3 {
 }
 
 export const UP_VECTOR = new THREE.Vector3(0, 1, 0)
+
+export type OptionType<T> = {
+  isNone(): this is OptionNone
+  isSome(): this is OptionSome<T>
+  unwrap(): T
+  unwrapOr(defaultValue: T): T
+} & (OptionNone | OptionSome<T>)
+
+interface OptionNone {
+  readonly kind: 'none'
+  value: undefined
+}
+
+interface OptionSome<T> {
+  readonly kind: 'some'
+  value: T
+}
+
+export const option = <T>(value: T | undefined): OptionType<T> => {
+  if (value === undefined) {
+    return {
+      // @ts-expect-error
+      isNone: () => true,
+      // @ts-expect-error
+      isSome: () => false,
+      kind: 'none',
+      unwrap: () => {
+        throw new Error('Called unwrap on None option')
+      },
+      unwrapOr: (defaultValue: T) => defaultValue,
+      value: undefined,
+    }
+  } else {
+    return {
+      // @ts-expect-error
+      isNone: () => false,
+      // @ts-expect-error
+      isSome: () => true,
+      kind: 'some',
+      unwrap: () => value,
+      unwrapOr: () => value,
+      value,
+    }
+  }
+}

@@ -1,9 +1,10 @@
 import * as THREE from 'three'
 
-import type { MinecraftClient } from './MinecraftClient.ts'
-
 import { Config } from '../shared/Config.ts'
 import { UP_VECTOR } from '../shared/util.ts'
+import { ClientContainer } from './ClientContainer.ts'
+import { GameSession } from './GameSession.ts'
+import { World } from './World.ts'
 
 export class Player {
   moving: {
@@ -25,7 +26,6 @@ export class Player {
     readonly position: THREE.Vector3,
     readonly velocity: THREE.Vector3,
     readonly rotation: THREE.Euler,
-    private readonly minecraft: MinecraftClient,
   ) {}
 
   /**
@@ -41,7 +41,7 @@ export class Player {
   }
 
   update(): void {
-    const gameSession = this.minecraft.getGameSession()
+    const gameSession = ClientContainer.resolve(GameSession).unwrap()
     const delta = gameSession.getDelta()
     this.velocity.y -= Config.GRAVITY * delta
     const direction = new THREE.Vector3()
@@ -71,13 +71,13 @@ export class Player {
 
     const horizontalVelocity = move.multiplyScalar(Config.PLAYER_WALK_SPEED * delta)
 
+    const world = ClientContainer.resolve(World).unwrap()
+
     if (horizontalVelocity.x !== 0) {
       const attemptedPosition = this.position.clone()
       attemptedPosition.x += horizontalVelocity.x
 
-      if (
-        !gameSession.world.checkCollisionWithBox(this.getPlayerBoxAtPosition(attemptedPosition))
-      ) {
+      if (!world.checkCollisionWithBox(this.getPlayerBoxAtPosition(attemptedPosition))) {
         this.position.x = attemptedPosition.x
       }
     }
@@ -86,9 +86,7 @@ export class Player {
       const attemptedPosition = this.position.clone()
       attemptedPosition.z += horizontalVelocity.z
 
-      if (
-        !gameSession.world.checkCollisionWithBox(this.getPlayerBoxAtPosition(attemptedPosition))
-      ) {
+      if (!world.checkCollisionWithBox(this.getPlayerBoxAtPosition(attemptedPosition))) {
         this.position.z = attemptedPosition.z
       }
     }
@@ -97,7 +95,7 @@ export class Player {
       const attemptedPosition = this.position.clone()
       attemptedPosition.y += this.velocity.y * delta
 
-      if (gameSession.world.checkCollisionWithBox(this.getPlayerBoxAtPosition(attemptedPosition))) {
+      if (world.checkCollisionWithBox(this.getPlayerBoxAtPosition(attemptedPosition))) {
         if (this.velocity.y > 0) {
           // Hitting ceiling
           this.velocity.y = 0
@@ -116,7 +114,7 @@ export class Player {
         const groundCheck = this.position.clone()
         groundCheck.y -= 0.05
 
-        if (gameSession.world.checkCollisionWithBox(this.getPlayerBoxAtPosition(groundCheck))) {
+        if (world.checkCollisionWithBox(this.getPlayerBoxAtPosition(groundCheck))) {
           this.canJump = true
         } else {
           this.canJump = false

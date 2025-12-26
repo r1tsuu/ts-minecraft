@@ -2,12 +2,13 @@ import * as THREE from 'three'
 
 import type { DatabaseChunkData } from '../server/WorldDatabase.ts'
 import type { BlockInWorld, Chunk } from '../types.ts'
-import type { ClientBlockRegisty } from './blocks.ts'
-import type { Player } from './Player.ts'
 
 import { MinecraftEvent, MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import { Config } from '../shared/Config.ts'
 import { getBlockIndex, getBlockKey } from '../shared/util.ts'
+import { ClientBlocksRegistry } from './blocks.ts'
+import { ClientContainer } from './ClientContainer.ts'
+import { GameSession } from './GameSession.ts'
 
 const chunkKey = (x: number, z: number) => `${x},${z}`
 
@@ -18,31 +19,22 @@ export class World {
   chunks = new Map<string, Chunk>()
   requestingChunksState: 'idle' | 'requesting' = 'idle'
 
-  constructor(
-    private readonly player: Player,
-    private readonly eventQueue: MinecraftEventQueue,
-    private readonly scene: THREE.Scene,
-    {
-      blockRegistry,
-      initialChunksFromServer,
-    }: {
-      blockRegistry: ClientBlockRegisty
-      initialChunksFromServer: DatabaseChunkData[]
-    },
-  ) {
+  constructor(initialChunksFromServer: DatabaseChunkData[]) {
     const backgroundColor = 0x87ceeb
-    this.scene.fog = new THREE.Fog(backgroundColor, 1, 96)
-    this.scene.background = new THREE.Color(backgroundColor)
+    const scene = ClientContainer.resolve(THREE.Scene).unwrap()
+
+    scene.fog = new THREE.Fog(backgroundColor, 1, 96)
+    scene.background = new THREE.Color(backgroundColor)
 
     const sunLight = new THREE.DirectionalLight(0xffffff, 3)
     sunLight.position.set(500, 500, 500)
-    this.scene.add(sunLight)
+    scene.add(sunLight)
     const sunLight2 = new THREE.DirectionalLight(0xffffff, 3)
     sunLight2.position.set(-500, 500, -500)
-    this.scene.add(sunLight2)
+    scene.add(sunLight2)
 
     const reflectionLight = new THREE.AmbientLight(0x404040, 0.5)
-    this.scene.add(reflectionLight)
+    scene.add(reflectionLight)
 
     const MAX_COUNT =
       (Config.RENDER_DISTANCE *
@@ -54,16 +46,18 @@ export class World {
 
     const geometry = new THREE.BoxGeometry()
 
-    for (const [id, block] of blockRegistry.clientRegistry) {
+    const clientRegistry = ClientContainer.resolve(ClientBlocksRegistry).unwrap()
+
+    for (const [id, block] of clientRegistry.registry) {
       const mesh = new THREE.InstancedMesh(geometry, block.material, MAX_COUNT)
       mesh.frustumCulled = false
-      this.scene.add(mesh)
+      scene.add(mesh)
       this.blockMeshes.set(id, mesh)
       this.blockMeshesCount.set(id, 0)
       this.blocksMeshesFreeIndexes.set(id, [])
     }
 
-    this.eventQueue.registerHandlers(this)
+    ClientContainer.resolve(MinecraftEventQueue).unwrap().registerHandlers(this)
     this.syncChunksFromServer(initialChunksFromServer)
   }
 
@@ -99,6 +93,8 @@ export class World {
   }
 
   dispose(): void {
+    const scene = ClientContainer.resolve(THREE.Scene).unwrap()
+
     for (const mesh of this.blockMeshes.values()) {
       mesh.geometry.dispose()
       if (Array.isArray(mesh.material)) {
@@ -108,7 +104,7 @@ export class World {
       } else {
         mesh.material.dispose()
       }
-      this.scene.remove(mesh)
+      scene.remove(mesh)
     }
 
     this.blockMeshes.clear()
@@ -144,8 +140,9 @@ export class World {
   }
 
   update(): void {
-    const playerChunkX = Math.floor(this.player.position.x / Config.CHUNK_SIZE)
-    const playerChunkZ = Math.floor(this.player.position.z / Config.CHUNK_SIZE)
+    const player = ClientContainer.resolve(GameSession).unwrap().getCurrentPlayer()
+    const playerChunkX = Math.floor(player.position.x / Config.CHUNK_SIZE)
+    const playerChunkZ = Math.floor(player.position.z / Config.CHUNK_SIZE)
 
     const needed = new Set<string>()
     const chunksToLoad: string[] = []
@@ -166,7 +163,9 @@ export class World {
 
     if (chunksToLoad.length) {
       if (this.requestingChunksState === 'idle') {
-        this.eventQueue.emit('Client.RequestChunksLoad', {
+        const eventQueue = ClientContainer.resolve(MinecraftEventQueue).unwrap()
+
+        eventQueue.emit('Client.RequestChunksLoad', {
           chunks: chunksToLoad.map((key) => {
             const [chunkX, chunkZ] = key.split(',').map(Number)
             return { chunkX, chunkZ }

@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 
-import type { Player } from './Player.ts'
-import type { World } from './World.ts'
+import { ClientContainer } from './ClientContainer.ts'
+import { GameSession } from './GameSession.ts'
+import { World } from './World.ts'
 
 const FAR = 5
 
@@ -21,21 +22,22 @@ export class Raycaster {
     (FAR * 2 + 1) ** 3,
   )
 
-  constructor(
-    private camera: THREE.PerspectiveCamera,
-    private player: Player,
-    private scene: THREE.Scene,
-    private world: World,
-  ) {
-    this.scene.add(this.raycastingMesh)
+  constructor() {
+    const scene = ClientContainer.resolve(THREE.Scene).unwrap()
+    scene.add(this.raycastingMesh)
   }
 
   update() {
     if (this.lastUpdated !== null && Date.now() - this.lastUpdated < 20) return
 
-    this.scene.remove(this.mesh)
+    const scene = ClientContainer.resolve(THREE.Scene).unwrap()
+    const camera = ClientContainer.resolve(THREE.PerspectiveCamera).unwrap()
+    const player = ClientContainer.resolve(GameSession).unwrap().getCurrentPlayer()
+    const world = ClientContainer.resolve(World).unwrap()
 
-    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera)
+    scene.remove(this.mesh)
+
+    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), camera)
 
     let index = 0
     const matrix = new THREE.Matrix4()
@@ -43,11 +45,11 @@ export class Raycaster {
     for (let x = -FAR; x <= FAR; x++) {
       for (let y = -FAR; y <= FAR; y++) {
         for (let z = -FAR; z <= FAR; z++) {
-          const worldX = Math.floor(this.player.position.x + x)
-          const worldY = Math.floor(this.player.position.y + y)
-          const worldZ = Math.floor(this.player.position.z + z)
+          const worldX = Math.floor(player.position.x + x)
+          const worldY = Math.floor(player.position.y + y)
+          const worldZ = Math.floor(player.position.z + z)
 
-          if (!this.world.getBlock(worldX, worldY, worldZ)) continue
+          if (!world.getBlock(worldX, worldY, worldZ)) continue
 
           matrix.setPosition(worldX, worldY, worldZ)
           this.raycastingMesh.setMatrixAt(index, matrix)
@@ -71,7 +73,7 @@ export class Raycaster {
       intersects.object.getMatrixAt(intersects.instanceId, matrix)
       const poistion = new THREE.Vector3().setFromMatrixPosition(matrix)
       this.mesh.position.set(poistion.x, poistion.y, poistion.z)
-      this.scene.add(this.mesh)
+      scene.add(this.mesh)
     }
 
     this.lastUpdated = Date.now()
