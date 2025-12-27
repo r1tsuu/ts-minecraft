@@ -25,8 +25,8 @@ export class TerrainGenerator {
         const worldX = chunkX * Config.CHUNK_SIZE + x
         const worldZ = chunkZ * Config.CHUNK_SIZE + z
 
-        const baseY = 30
-        const heightVariation = 12
+        const baseY = 10
+        const heightVariation = 5
         const amplitude = heightVariation / 2
         const frequency = 0.005
 
