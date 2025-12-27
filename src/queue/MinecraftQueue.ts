@@ -5,6 +5,7 @@
 import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatabase.ts'
 import type { ChunkCoordinates, UUID } from '../types.ts'
 
+import { ClientContainer } from '../client/ClientContainer.ts'
 import { type AnyEvent, Event } from './Event.ts'
 import { EventQueue } from './EventQueue.ts'
 
@@ -68,6 +69,45 @@ export class MinecraftEventQueue extends EventQueue<MinecraftEventsData, Minecra
   }
 
   /**
+   * Decorator to mark a class as a Minecraft client event listener.
+   * Automatically registers and unregisters event handlers.
+   * @example
+   * ```ts
+   * @MinecraftEventQueue.ClientListener()
+   * class MyClientClass {
+   *   @MinecraftEventQueue.Handler('Client.JoinWorld')
+   *   onJoinWorld(event: MinecraftEvent<'Client.JoinWorld'>) {
+   *     console.log('Player joined world with UUID:', event.payload.worldUUID)
+   *   }
+   * }
+   * ```
+   */
+  static ClientListener(): ClassDecorator {
+    // @ts-expect-error
+    return function <T extends new (...args: any[]) => any>(Target: T): T {
+      return class extends Target {
+        constructor(...args: any[]) {
+          super(...args)
+
+          const queue = ClientContainer.resolve(MinecraftEventQueue).unwrap()
+
+          queue.registerHandlers(this)
+
+          const originalDispose = this.dispose?.bind(this)
+
+          this.dispose = () => {
+            originalDispose?.()
+            MinecraftEventQueue.unregisterHandlers(this)
+            console.log(`Unregistered Minecraft client event handlers for ${Target.name}`)
+          }
+
+          console.log(`Registered Minecraft client event handlers for ${Target.name}`)
+        }
+      }
+    }
+  }
+
+  /**
    * Decorator to mark a method as an event handler for Minecraft events.
    * @example
    * ```ts
@@ -81,5 +121,11 @@ export class MinecraftEventQueue extends EventQueue<MinecraftEventsData, Minecra
    */
   static Handler<T extends '*' | ({} & string) | MinecraftEventType>(eventType: T) {
     return EventQueue.Handler<T>(eventType)
+  }
+
+  static ServerListener(): ClassDecorator {
+    return function () {
+      // ServerContainer.resolve(MinecraftEventQueue).unwrap().registerHandlers(target) --- IGNORE ---
+    }
   }
 }

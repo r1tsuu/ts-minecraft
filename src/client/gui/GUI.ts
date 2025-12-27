@@ -9,6 +9,7 @@ import { GameSession } from '../GameSession.ts'
 import { LocalStorageManager } from '../LocalStorageManager.ts'
 import { synchronize } from './synchronize.ts'
 
+@MinecraftEventQueue.ClientListener()
 export class GUI {
   state: GUIState
 
@@ -53,7 +54,6 @@ export class GUI {
       dispose()
     }
 
-    MinecraftEventQueue.unregisterHandlers(this)
     ClientContainer.resolve(Scheduler).unwrap().unregisterInstance(this)
   }
 
@@ -222,11 +222,13 @@ export class GUI {
 
     const isLocked = document.pointerLockElement === this.getCanvas()
 
-    if (!isLocked && !this.state.isPaused && gameSession) {
+    if (!isLocked && !this.state.isPaused) {
       this.resumeButton.disabled = true
       setTimeout(() => {
         this.resumeButton.disabled = false
       }, 1000)
+
+      console.log('Game paused due to pointer lock loss')
 
       this.setState({
         isPaused: true,

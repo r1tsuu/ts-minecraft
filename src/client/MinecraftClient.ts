@@ -1,3 +1,5 @@
+import type { ContainerScope } from '../shared/Container.ts'
+
 import {
   type AnyMinecraftEvent,
   type MinecraftEvent,
@@ -12,38 +14,26 @@ import { GameSession } from './GameSession.ts'
 import { GUI } from './gui/GUI.ts'
 import { LocalStorageManager } from './LocalStorageManager.ts'
 
+@MinecraftEventQueue.ClientListener()
 export class MinecraftClient {
+  private scope: ContainerScope
   constructor() {
     ClientContainer.registerSingleton(this)
-    ClientContainer.registerSingleton(new BlocksRegistry())
-    ClientContainer.registerSingleton(new ClientBlocksRegistry())
-    ClientContainer.registerSingleton(new MinecraftEventQueue('Client'))
-    ClientContainer.registerSingleton(new Scheduler())
-    ClientContainer.registerSingleton(new LocalStorageManager())
-    ClientContainer.registerSingleton(new GUI())
-    ClientContainer.resolve(MinecraftEventQueue).unwrap().registerHandlers(this)
+    const scope = ClientContainer.createScope(this)
+    scope.registerSingleton(new MinecraftEventQueue('Client'))
+    scope.registerSingleton(new BlocksRegistry())
+    scope.registerSingleton(new ClientBlocksRegistry())
+    scope.registerSingleton(new Scheduler())
+    scope.registerSingleton(new LocalStorageManager())
+    scope.registerSingleton(new GUI())
+
+    this.scope = scope
   }
 
   dispose(): void {
-    MinecraftEventQueue.unregisterHandlers(this)
-
-    const gameSession = ClientContainer.resolve(GameSession)
-
-    if (gameSession.isSome()) {
-      gameSession.value.dispose()
-      ClientContainer.unregister(GameSession)
+    for (const instance of this.scope.listChildren()) {
+      instance.dispose()
     }
-
-    const gui = ClientContainer.resolve(GUI)
-    if (gui.isSome()) {
-      gui.value.dispose()
-      ClientContainer.unregister(GUI)
-    }
-
-    ClientContainer.unregister(MinecraftEventQueue)
-    ClientContainer.unregister(Scheduler)
-    ClientContainer.unregister(LocalStorageManager)
-    ClientContainer.unregister(MinecraftClient)
   }
 
   @MinecraftEventQueue.Handler('Client.ExitWorld')
@@ -105,7 +95,7 @@ export class MinecraftClient {
 
     console.log('Player join response:', playerJoinResponse)
 
-    const gameSession = ClientContainer.registerSingleton(
+    const gameSession = this.scope.registerSingleton(
       new GameSession(
         serverStartedResponse.payload.loadedChunks,
         playerJoinResponse.payload.playerData,
