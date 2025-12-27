@@ -1,12 +1,12 @@
 /* ===========================================================
- * Minecraft-specific queue
+ * Minecraft-specific bus
  * =========================================================== */
 
 import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatabase.ts'
 import type { ChunkCoordinates, UUID } from '../types.ts'
 
-import { type AnyEvent, Event } from '../queue/Event.ts'
-import { EventQueue } from '../queue/EventQueue.ts'
+import { type AnyEvent, Event } from './Event.ts'
+import { EventBus } from './EventBus.ts'
 
 export type AnyMinecraftEvent = AnyEvent<MinecraftEventsData, MinecraftEventMetadata>
 
@@ -53,7 +53,7 @@ export class MinecraftEvent<T extends ({} & string) | MinecraftEventType> extend
   MinecraftEventMetadata
 > {}
 
-export class MinecraftEventQueue extends EventQueue<MinecraftEventsData, MinecraftEventMetadata> {
+export class MinecraftEventBus extends EventBus<MinecraftEventsData, MinecraftEventMetadata> {
   constructor(environment: 'Client' | 'Server') {
     super()
 
@@ -61,7 +61,7 @@ export class MinecraftEventQueue extends EventQueue<MinecraftEventsData, Minecra
       this.registerEventType(eventType.type)
     }
 
-    this.addBeforeEmitHook((event) => {
+    this.addPrePublishHook((event) => {
       event.metadata.environment = event.metadata.environment ?? environment
       event.metadata.isForwarded = event.metadata.isForwarded ?? false
     })
@@ -72,7 +72,7 @@ export class MinecraftEventQueue extends EventQueue<MinecraftEventsData, Minecra
    * @example
    * ```ts
    * class MyClass {
-   *   @MinecraftEventQueue.Handler('Client.JoinWorld')
+   *   @MinecraftEventBus.Handler('Client.JoinWorld')
    *   onJoinWorld(event: MinecraftEvent<'Client.JoinWorld'>) {
    *     console.log('Player joined world with UUID:', event.payload.worldUUID)
    *   }
@@ -80,6 +80,6 @@ export class MinecraftEventQueue extends EventQueue<MinecraftEventsData, Minecra
    * ```
    */
   static Handler<T extends '*' | ({} & string) | MinecraftEventType>(eventType: T) {
-    return EventQueue.Handler<T>(eventType)
+    return EventBus.Handler<T>(eventType)
   }
 }

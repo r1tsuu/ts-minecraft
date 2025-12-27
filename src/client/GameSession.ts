@@ -4,7 +4,7 @@ import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatab
 import type { ContainerScope } from '../shared/Container.ts'
 
 import { Config } from '../shared/Config.ts'
-import { MinecraftEventQueue } from '../shared/MinecraftEventQueue.ts'
+import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
 import { isComponent, type UUID } from '../types.ts'
 import { ClientContainer } from './ClientContainer.ts'
@@ -15,7 +15,7 @@ import { Player } from './Player.ts'
 import { Raycaster } from './Raycaster.ts'
 import { World } from './World.ts'
 
-@MinecraftEventQueue.ClientListener()
+@MinecraftEventBus.ClientListener()
 @Scheduler.ClientSchedulable()
 export class GameSession {
   frameCounter = {
@@ -134,7 +134,7 @@ export class GameSession {
     return this.delta
   }
 
-  @MinecraftEventQueue.Handler('Client.PauseToggle')
+  @MinecraftEventBus.Handler('Client.PauseToggle')
   protected onPauseToggle(): void {
     this.paused = !this.paused
   }
@@ -146,9 +146,9 @@ export class GameSession {
     }
 
     const player = this.getCurrentPlayer()
-    await ClientContainer.resolve(MinecraftEventQueue)
+    await ClientContainer.resolve(MinecraftEventBus)
       .unwrap()
-      .emitAndWaitResponse(
+      .request(
         'Client.RequestSyncPlayer',
         {
           playerData: {

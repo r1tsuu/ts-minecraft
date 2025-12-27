@@ -1,12 +1,12 @@
 import type { Component } from '../types.ts'
 
 import { Config } from '../shared/Config.ts'
-import { MinecraftEventQueue } from '../shared/MinecraftEventQueue.ts'
+import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
 import { InputManager } from './InputManager.ts'
 
-@MinecraftEventQueue.ClientListener()
+@MinecraftEventBus.ClientListener()
 export class ClientPlayerManager implements Component {
   dispose(): void {}
 
@@ -58,7 +58,7 @@ export class ClientPlayerManager implements Component {
     }
   }
 
-  @MinecraftEventQueue.Handler('Client.PauseToggle')
+  @MinecraftEventBus.Handler('Client.PauseToggle')
   protected onPauseToggle(): void {
     const player = ClientContainer.resolve(GameSession).unwrap().getCurrentPlayer()
 

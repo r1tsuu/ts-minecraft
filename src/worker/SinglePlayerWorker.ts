@@ -1,9 +1,9 @@
-import { type AnyMinecraftEvent, MinecraftEventQueue } from '../shared/MinecraftEventQueue.ts'
 import { MinecraftServer } from '../server/MinecraftServer.ts'
+import { type AnyMinecraftEvent, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 
 let localServer: MinecraftServer | null = null
 
-const eventQueue = new MinecraftEventQueue('Server')
+const eventBus = new MinecraftEventBus('Server')
 
 const shouldForwardEventToClient = (event: AnyMinecraftEvent) => {
   if (event.metadata.environment === 'Client') {
@@ -24,7 +24,7 @@ const shouldForwardEventToClient = (event: AnyMinecraftEvent) => {
   return false
 }
 
-eventQueue.on('*', (event) => {
+eventBus.subscribe('*', (event) => {
   if (shouldForwardEventToClient(event)) {
     postMessage(event.intoRaw())
   }
@@ -39,9 +39,9 @@ onmessage = async (message: MessageEvent<AnyMinecraftEvent>) => {
 
     console.log(`Starting local server...`, message)
 
-    localServer = await MinecraftServer.create(eventQueue, message.data.payload.worldDatabaseName)
+    localServer = await MinecraftServer.create(eventBus, message.data.payload.worldDatabaseName)
 
-    eventQueue.emit(
+    eventBus.publish(
       'SinglePlayerWorker.ServerStarted',
       {
         loadedChunks: localServer.loadedChunks,
@@ -55,7 +55,7 @@ onmessage = async (message: MessageEvent<AnyMinecraftEvent>) => {
   }
 
   if (localServer !== null) {
-    eventQueue.emit(message.data.type, message.data.payload, message.data.eventUUID, {
+    eventBus.publish(message.data.type, message.data.payload, message.data.eventUUID, {
       environment: message.data.metadata.environment,
       isForwarded: true,
     })
@@ -64,4 +64,4 @@ onmessage = async (message: MessageEvent<AnyMinecraftEvent>) => {
   }
 }
 
-eventQueue.emit('SinglePlayerWorker.WorkerReady', {})
+eventBus.publish('SinglePlayerWorker.WorkerReady', {})

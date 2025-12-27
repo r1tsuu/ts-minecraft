@@ -4,8 +4,8 @@ import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import {
   type AnyMinecraftEvent,
   type MinecraftEvent,
-  MinecraftEventQueue,
-} from '../shared/MinecraftEventQueue.ts'
+  MinecraftEventBus,
+} from '../shared/MinecraftEventBus.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
 import SinglePlayerWorker from '../worker/SinglePlayerWorker.ts?worker'
 import { ClientBlocksRegistry } from './blocks.ts'
@@ -14,13 +14,13 @@ import { GameSession } from './GameSession.ts'
 import { GUI } from './gui/GUI.ts'
 import { LocalStorageManager } from './LocalStorageManager.ts'
 
-@MinecraftEventQueue.ClientListener()
+@MinecraftEventBus.ClientListener()
 export class MinecraftClient {
   private scope: ContainerScope
   constructor() {
     ClientContainer.registerSingleton(this)
     const scope = ClientContainer.createScope(this)
-    scope.registerSingleton(new MinecraftEventQueue('Client'))
+    scope.registerSingleton(new MinecraftEventBus('Client'))
     scope.registerSingleton(new BlocksRegistry())
     scope.registerSingleton(new ClientBlocksRegistry())
     scope.registerSingleton(new Scheduler())
@@ -36,7 +36,7 @@ export class MinecraftClient {
     }
   }
 
-  @MinecraftEventQueue.Handler('Client.ExitWorld')
+  @MinecraftEventBus.Handler('Client.ExitWorld')
   protected onExitWorld(): void {
     const gameSession = ClientContainer.resolve(GameSession)
 
@@ -46,7 +46,7 @@ export class MinecraftClient {
     }
   }
 
-  @MinecraftEventQueue.Handler('Client.JoinWorld')
+  @MinecraftEventBus.Handler('Client.JoinWorld')
   protected async onJoinWorld(event: MinecraftEvent<'Client.JoinWorld'>): Promise<void> {
     if (ClientContainer.resolve(GameSession).isSome()) {
       console.warn(`Received ${event.type} but already in a world.`)
@@ -55,9 +55,9 @@ export class MinecraftClient {
 
     const singlePlayerWorker = new SinglePlayerWorker()
 
-    const eventQueue = ClientContainer.resolve(MinecraftEventQueue).unwrap()
+    const eventBus = ClientContainer.resolve(MinecraftEventBus).unwrap()
 
-    const unsubscribe = eventQueue.on('*', (event) => {
+    const unsubscribe = eventBus.subscribe('*', (event) => {
       if (this.shouldForwardEventToServer(event)) {
         singlePlayerWorker.postMessage(event.intoRaw())
       }
@@ -65,7 +65,7 @@ export class MinecraftClient {
 
     singlePlayerWorker.onmessage = (message: MessageEvent<AnyMinecraftEvent>) => {
       if (message.data.metadata.environment === 'Server') {
-        eventQueue.emit(message.data.type, message.data.payload, message.data.eventUUID, {
+        eventBus.publish(message.data.type, message.data.payload, message.data.eventUUID, {
           environment: message.data.metadata.environment,
           isForwarded: true,
         })
@@ -73,9 +73,9 @@ export class MinecraftClient {
     }
 
     console.log('Waiting for single player worker to be ready...')
-    await eventQueue.waitUntilOn('SinglePlayerWorker.WorkerReady')
+    await eventBus.waitFor('SinglePlayerWorker.WorkerReady')
     console.log('Single player worker is ready.')
-    const serverStartedResponse = await eventQueue.emitAndWaitResponse(
+    const serverStartedResponse = await eventBus.request(
       'Client.StartLocalServer',
       {
         worldDatabaseName: `world_${event.payload.worldUUID}`,
@@ -85,7 +85,7 @@ export class MinecraftClient {
 
     console.log('Server started response:', serverStartedResponse)
 
-    const playerJoinResponse = await eventQueue.emitAndWaitResponse(
+    const playerJoinResponse = await eventBus.request(
       'Client.RequestPlayerJoin',
       {
         playerUUID: ClientContainer.resolve(LocalStorageManager).unwrap().getPlayerUUID(),
@@ -106,7 +106,7 @@ export class MinecraftClient {
     gameSession.addOnDisposeCallback(() => singlePlayerWorker.terminate())
     gameSession.enterGameLoop()
 
-    eventQueue.respond(event, 'Client.JoinedWorld', {})
+    eventBus.reply(event, 'Client.JoinedWorld', {})
   }
 
   private shouldForwardEventToServer(event: AnyMinecraftEvent): boolean {

@@ -2,7 +2,7 @@ import type { BlockInWorld, ChunkCoordinates } from '../types.ts'
 
 import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { Config } from '../shared/Config.ts'
-import { type MinecraftEvent, MinecraftEventQueue } from '../shared/MinecraftEventQueue.ts'
+import { type MinecraftEvent, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
 import {
   findByXYZ,
@@ -28,7 +28,7 @@ export class MinecraftServer {
 
   private constructor(
     private readonly database: WorldDatabase,
-    private readonly eventQueue: MinecraftEventQueue,
+    private readonly eventBus: MinecraftEventBus,
     private readonly meta: DatabaseWorldMetaData,
     private players: DatabasePlayerData[],
   ) {
@@ -37,14 +37,14 @@ export class MinecraftServer {
   }
 
   static async create(
-    eventQueue: MinecraftEventQueue,
+    eventBus: MinecraftEventBus,
     worldDatabaseName: string,
   ): Promise<MinecraftServer> {
     const database = await WorldDatabase.create(worldDatabaseName)
     const players: DatabasePlayerData[] = await database.fetchPlayers()
     const meta = await database.fetchWorldMeta()
 
-    const server = new MinecraftServer(database, eventQueue, meta, players)
+    const server = new MinecraftServer(database, eventBus, meta, players)
 
     await server.initialize()
 
@@ -52,7 +52,7 @@ export class MinecraftServer {
   }
 
   async dispose(): Promise<void> {
-    this.eventQueue.unregisterHandlers(this)
+    this.eventBus.unregisterHandlers(this)
     this.scheduler.unregisterInstance(this)
     await this.database.dispose()
     this.loadedChunks = []
@@ -60,7 +60,7 @@ export class MinecraftServer {
     this.players = []
   }
 
-  @MinecraftEventQueue.Handler('Client.RequestChunksLoad')
+  @MinecraftEventBus.Handler('Client.RequestChunksLoad')
   protected async onRequestChunksLoad(
     event: MinecraftEvent<'Client.RequestChunksLoad'>,
   ): Promise<void> {
@@ -104,12 +104,12 @@ export class MinecraftServer {
 
     await this.syncMeta()
 
-    await this.eventQueue.respond(event, 'Server.ResponseChunksLoad', {
+    await this.eventBus.reply(event, 'Server.ResponseChunksLoad', {
       chunks: response,
     })
   }
 
-  @MinecraftEventQueue.Handler('Client.RequestPlayerJoin')
+  @MinecraftEventBus.Handler('Client.RequestPlayerJoin')
   protected async onRequestPlayerJoin(event: MinecraftEvent<'Client.RequestPlayerJoin'>) {
     let playerData = this.players.find((player) => player.uuid === event.payload.playerUUID)
 
@@ -146,12 +146,12 @@ export class MinecraftServer {
       this.players.push(playerData)
     }
 
-    this.eventQueue.respond(event, 'Server.ResponsePlayerJoin', {
+    this.eventBus.reply(event, 'Server.ResponsePlayerJoin', {
       playerData,
     })
   }
 
-  @MinecraftEventQueue.Handler('Client.RequestSyncPlayer')
+  @MinecraftEventBus.Handler('Client.RequestSyncPlayer')
   protected async onRequestSyncPlayer(
     event: MinecraftEvent<'Client.RequestSyncPlayer'>,
   ): Promise<void> {
@@ -162,7 +162,7 @@ export class MinecraftServer {
       await this.database.updatePlayer(player)
     }
 
-    await this.eventQueue.respond(event, 'Server.ResponseSyncPlayer', {})
+    await this.eventBus.reply(event, 'Server.ResponseSyncPlayer', {})
   }
 
   // @Scheduler.Every(Config.TICK_RATE, {
@@ -200,7 +200,7 @@ export class MinecraftServer {
 
     await this.syncMeta()
 
-    this.eventQueue.registerHandlers(this)
+    this.eventBus.registerHandlers(this)
     this.scheduler.registerInstance(this)
   }
 

@@ -4,7 +4,7 @@ import type { DatabaseChunkData } from '../server/WorldDatabase.ts'
 import type { BlockInWorld, Chunk } from '../types.ts'
 
 import { Config } from '../shared/Config.ts'
-import { MinecraftEvent, MinecraftEventQueue } from '../shared/MinecraftEventQueue.ts'
+import { MinecraftEvent, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { getBlockIndex, getBlockKey } from '../shared/util.ts'
 import { ClientBlocksRegistry } from './blocks.ts'
 import { ClientContainer } from './ClientContainer.ts'
@@ -12,7 +12,7 @@ import { GameSession } from './GameSession.ts'
 
 const chunkKey = (x: number, z: number) => `${x},${z}`
 
-@MinecraftEventQueue.ClientListener()
+@MinecraftEventBus.ClientListener()
 export class World {
   blockMeshes = new Map<number, THREE.InstancedMesh>()
   blockMeshesCount = new Map<number, number>()
@@ -162,9 +162,9 @@ export class World {
 
     if (chunksToLoad.length) {
       if (this.requestingChunksState === 'idle') {
-        const eventQueue = ClientContainer.resolve(MinecraftEventQueue).unwrap()
+        const eventBus = ClientContainer.resolve(MinecraftEventBus).unwrap()
 
-        eventQueue.emit('Client.RequestChunksLoad', {
+        eventBus.publish('Client.RequestChunksLoad', {
           chunks: chunksToLoad.map((key) => {
             const [chunkX, chunkZ] = key.split(',').map(Number)
             return { chunkX, chunkZ }
@@ -252,7 +252,7 @@ export class World {
     }
   }
 
-  @MinecraftEventQueue.Handler('Server.ResponseChunksLoad')
+  @MinecraftEventBus.Handler('Server.ResponseChunksLoad')
   protected onResponseChunksLoad(event: MinecraftEvent<'Server.ResponseChunksLoad'>): void {
     this.syncChunksFromServer(event.payload.chunks)
     this.requestingChunksState = 'idle'

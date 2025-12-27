@@ -2,14 +2,14 @@ import * as THREE from 'three'
 
 import type { GUIActions, GUIConditions, GUIState as GUIState } from './state.ts'
 
-import { MinecraftEventQueue } from '../../shared/MinecraftEventQueue.ts'
+import { MinecraftEventBus } from '../../shared/MinecraftEventBus.ts'
 import { Scheduler } from '../../shared/Scheduler.ts'
 import { ClientContainer } from '../ClientContainer.ts'
 import { GameSession } from '../GameSession.ts'
 import { LocalStorageManager } from '../LocalStorageManager.ts'
 import { synchronize } from './synchronize.ts'
 
-@MinecraftEventQueue.ClientListener()
+@MinecraftEventBus.ClientListener()
 @Scheduler.ClientSchedulable()
 export class GUI {
   state: GUIState
@@ -64,7 +64,7 @@ export class GUI {
     synchronize(this.state, this.actions, this.conditions, affectedQuerySelectors)
   }
 
-  @MinecraftEventQueue.Handler('Client.JoinedWorld')
+  @MinecraftEventBus.Handler('Client.JoinedWorld')
   protected onJoinedWorld(): void {
     this.setState({
       activePage: 'game',
@@ -118,11 +118,11 @@ export class GUI {
   }
 
   private createActions(): GUIActions {
-    const eventQueue = ClientContainer.resolve(MinecraftEventQueue).unwrap()
+    const eventBus = ClientContainer.resolve(MinecraftEventBus).unwrap()
     const localStorageManager = ClientContainer.resolve(LocalStorageManager).unwrap()
     return {
       backToMenu: () => {
-        eventQueue.emit('Client.ExitWorld', {})
+        eventBus.publish('Client.ExitWorld', {})
         this.setState({
           activePage: 'start',
           fps: 'Loading...',
@@ -177,7 +177,7 @@ export class GUI {
           loadingWorldName: world.name,
         })
 
-        eventQueue.emit('Client.JoinWorld', { worldUUID: world.uuid })
+        eventBus.publish('Client.JoinWorld', { worldUUID: world.uuid })
       },
       resumeGame: async () => {
         await this.resumeGame()
@@ -218,7 +218,7 @@ export class GUI {
 
   private onPointerLockChange = (): void => {
     const gameSession = ClientContainer.resolve(GameSession)
-    const eventQueue = ClientContainer.resolve(MinecraftEventQueue).unwrap()
+    const eventBus = ClientContainer.resolve(MinecraftEventBus).unwrap()
 
     if (gameSession.isNone()) return
 
@@ -237,7 +237,7 @@ export class GUI {
         pauseText: 'Click to Resume',
       })
 
-      eventQueue.emit('Client.PauseToggle', {})
+      eventBus.publish('Client.PauseToggle', {})
       return
     }
   }
@@ -251,7 +251,7 @@ export class GUI {
     const gameSession = ClientContainer.resolve(GameSession)
     if (gameSession.isNone()) return
 
-    const eventQueue = ClientContainer.resolve(MinecraftEventQueue).unwrap()
+    const eventBus = ClientContainer.resolve(MinecraftEventBus).unwrap()
     if (!this.state.isPaused) return
 
     try {
@@ -260,7 +260,7 @@ export class GUI {
         isPaused: false,
         pauseText: 'Press Escape to Pause',
       })
-      eventQueue.emit('Client.PauseToggle', {})
+      eventBus.publish('Client.PauseToggle', {})
     } catch (e) {
       console.warn('Pointer lock request failed', e)
     }
