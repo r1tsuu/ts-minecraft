@@ -183,3 +183,9 @@ export const Throttle = (ms: number) => {
     return descriptor
   }
 }
+
+export type ClassConstructor<T extends object> = new (...args: any[]) => T
+
+export const getObjectConstructor = <T extends object>(obj: T): ClassConstructor<T> => {
+  return obj.constructor as ClassConstructor<T>
+}
