@@ -50,6 +50,7 @@ export class Container {
     // @ts-expect-error
     return new Proxy(this, {
       get: (target, prop, receiver) => {
+        // Handle scope-specific methods
         if (prop === 'listChildren') {
           return () => {
             const children = this.singletonChildrenMap.get(this.getConstructor(parent)) ?? []
@@ -59,12 +60,14 @@ export class Container {
           }
         }
 
+        // Override registerSingleton to include parent
         if (prop === 'registerSingleton') {
           return (instance: any) => {
             return (target as any)[prop](instance, parent)
           }
         }
 
+        // Override register to include parent
         if (prop === 'register') {
           return (instance: any, options: any = {}) => {
             return (target as any)[prop](instance, { parent, ...options })

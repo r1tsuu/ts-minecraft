@@ -144,6 +144,19 @@ interface OptionSome<T> {
   value: T
 }
 
+/**
+ * Creates an OptionType from a value that may be undefined.
+ * @param value The value to wrap in an OptionType.
+ * @returns An OptionType representing the presence or absence of the value.
+ * @example
+ * const someOption = option(42)
+ * console.log(someOption.isSome()) // true
+ * console.log(someOption.unwrap()) // 42
+ *
+ * const noneOption = option(undefined)
+ * console.log(noneOption.isNone()) // true
+ * console.log(noneOption.unwrapOr(100)) // 100
+ */
 export const option = <T>(value: T | undefined): OptionType<T> => {
   if (value === undefined) {
     return {
@@ -158,16 +171,16 @@ export const option = <T>(value: T | undefined): OptionType<T> => {
       unwrapOr: (defaultValue: T) => defaultValue,
       value: undefined,
     }
-  } else {
-    return {
-      // @ts-expect-error
-      isNone: () => false,
-      // @ts-expect-error
-      isSome: () => true,
-      kind: 'some',
-      unwrap: () => value,
-      unwrapOr: () => value,
-      value,
-    }
+  }
+
+  return {
+    // @ts-expect-error
+    isNone: () => false,
+    // @ts-expect-error
+    isSome: () => true,
+    kind: 'some',
+    unwrap: () => value,
+    unwrapOr: () => value,
+    value,
   }
 }
