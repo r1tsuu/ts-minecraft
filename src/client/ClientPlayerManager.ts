@@ -1,15 +1,13 @@
-import type { Component } from '../types.ts'
-
+import { Component } from '../shared/Component.ts'
 import { Config } from '../shared/Config.ts'
 import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
 import { InputManager } from './InputManager.ts'
 
+@Component()
 @MinecraftEventBus.ClientListener()
 export class ClientPlayerManager implements Component {
-  dispose(): void {}
-
   update(): void {
     const gameSession = ClientContainer.resolve(GameSession).unwrap()
     const inputManager = ClientContainer.resolve(InputManager).unwrap()

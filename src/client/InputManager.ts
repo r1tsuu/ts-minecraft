@@ -1,3 +1,4 @@
+import { Component } from '../shared/Component.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
 
@@ -9,7 +10,10 @@ const isGameKey = (key: string): key is KeyboardKey => {
 
 export type KeyboardKey = (typeof GameKeys)[number]
 
-export class InputManager {
+@Component()
+export class InputManager implements Component {
+  private dispositions: (() => void)[] = []
+
   private keyboardState = GameKeys.reduce<Record<KeyboardKey, { isPressed: boolean }>>(
     (acc, key) => {
       acc[key] = { isPressed: false }
@@ -43,16 +47,20 @@ export class InputManager {
     window.addEventListener('mouseup', onMouseUp)
     window.addEventListener('mousemove', onMouseMove)
 
-    this.dispose = () => {
+    this.dispositions.push(() => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('mousedown', onMouseDown)
       window.removeEventListener('mouseup', onMouseUp)
       window.removeEventListener('mousemove', onMouseMove)
-    }
+    })
   }
 
-  dispose: () => void = () => {}
+  dispose(): void {
+    for (const dispose of this.dispositions) {
+      dispose()
+    }
+  }
 
   getMouseDelta() {
     return {

@@ -1,6 +1,7 @@
 import type { ContainerScope } from '../shared/Container.ts'
 
 import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
+import { isComponent } from '../shared/Component.ts'
 import {
   type AnyMinecraftEvent,
   type MinecraftEvent,
@@ -32,7 +33,9 @@ export class MinecraftClient {
 
   dispose(): void {
     for (const instance of this.scope.listChildren()) {
-      instance.dispose()
+      if (isComponent(instance)) {
+        instance.dispose()
+      }
     }
   }
 

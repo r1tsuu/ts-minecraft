@@ -2,6 +2,7 @@ import * as THREE from 'three'
 
 import type { GUIActions, GUIConditions, GUIState as GUIState } from './state.ts'
 
+import { Component } from '../../shared/Component.ts'
 import { MinecraftEventBus } from '../../shared/MinecraftEventBus.ts'
 import { Scheduler } from '../../shared/Scheduler.ts'
 import { ClientContainer } from '../ClientContainer.ts'
@@ -9,9 +10,10 @@ import { GameSession } from '../GameSession.ts'
 import { LocalStorageManager } from '../LocalStorageManager.ts'
 import { synchronize } from './synchronize.ts'
 
+@Component()
 @MinecraftEventBus.ClientListener()
 @Scheduler.ClientSchedulable()
-export class GUI {
+export class GUI implements Component {
   state: GUIState
 
   private actions: GUIActions

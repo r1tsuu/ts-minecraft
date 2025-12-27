@@ -1,12 +1,14 @@
 import * as THREE from 'three'
 
+import { Component } from '../shared/Component.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
 import { World } from './World.ts'
 
 const FAR = 5
 
-export class Raycaster {
+@Component()
+export class Raycaster implements Component {
   private lastUpdated: null | number = null
   private mesh: THREE.Mesh = new THREE.Mesh(
     new THREE.BoxGeometry(1.01, 1.01, 1.01),

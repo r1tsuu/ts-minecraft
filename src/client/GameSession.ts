@@ -3,10 +3,11 @@ import * as THREE from 'three'
 import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatabase.ts'
 import type { ContainerScope } from '../shared/Container.ts'
 
+import { Component, isComponent } from '../shared/Component.ts'
 import { Config } from '../shared/Config.ts'
 import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
-import { isComponent, type UUID } from '../types.ts'
+import { type UUID } from '../types.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { ClientPlayerManager } from './ClientPlayerManager.ts'
 import { GUI } from './gui/GUI.ts'
@@ -15,9 +16,10 @@ import { Player } from './Player.ts'
 import { Raycaster } from './Raycaster.ts'
 import { World } from './World.ts'
 
+@Component()
 @MinecraftEventBus.ClientListener()
 @Scheduler.ClientSchedulable()
-export class GameSession {
+export class GameSession implements Component {
   frameCounter = {
     fps: 0,
     lastFrames: 0,
@@ -96,7 +98,7 @@ export class GameSession {
 
   dispose(): void {
     for (const child of this.scope.listChildren()) {
-      if (isComponent(child)) {
+      if (isComponent(child) || child instanceof THREE.WebGLRenderer) {
         child.dispose()
       }
     }
@@ -194,7 +196,7 @@ export class GameSession {
      * UPDATE GAME STATE HERE
      */
     for (const child of this.scope.listChildren()) {
-      if (typeof child.update === 'function') {
+      if (isComponent(child)) {
         child.update()
       }
     }

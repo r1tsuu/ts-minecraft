@@ -1,12 +1,14 @@
 import * as THREE from 'three'
 
+import { Component } from '../shared/Component.ts'
 import { Config } from '../shared/Config.ts'
 import { UP_VECTOR } from '../shared/util.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
 import { World } from './World.ts'
 
-export class Player {
+@Component()
+export class Player implements Component {
   moving: {
     backward: boolean
     forward: boolean

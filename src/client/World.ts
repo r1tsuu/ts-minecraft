@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import type { DatabaseChunkData } from '../server/WorldDatabase.ts'
 import type { BlockInWorld, Chunk } from '../types.ts'
 
+import { Component } from '../shared/Component.ts'
 import { Config } from '../shared/Config.ts'
 import { MinecraftEvent, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { getBlockIndex, getBlockKey } from '../shared/util.ts'
@@ -12,8 +13,9 @@ import { GameSession } from './GameSession.ts'
 
 const chunkKey = (x: number, z: number) => `${x},${z}`
 
+@Component()
 @MinecraftEventBus.ClientListener()
-export class World {
+export class World implements Component {
   blockMeshes = new Map<number, THREE.InstancedMesh>()
   blockMeshesCount = new Map<number, number>()
   blocksMeshesFreeIndexes = new Map<number, number[]>()
