@@ -63,13 +63,17 @@ export class World implements Component {
         Config.WORLD_HEIGHT) /
       2
 
+    // Share a single geometry instance across all block types for better memory efficiency
     const geometry = new THREE.BoxGeometry()
+    geometry.computeBoundingBox()
+    geometry.computeBoundingSphere()
 
     const clientRegistry = ClientContainer.resolve(ClientBlocksRegistry).unwrap()
 
     for (const [id, block] of clientRegistry.registry) {
       const mesh = new THREE.InstancedMesh(geometry, block.material, MAX_COUNT)
-      mesh.frustumCulled = false
+      // mesh.frustumCulled = false // Enable frustum culling for performance
+      mesh.count = 0 // Start with 0 instances
       scene.add(mesh)
       this.blockMeshes.set(id, mesh)
       this.blockMeshesCount.set(id, 0)
@@ -148,8 +152,14 @@ export class World implements Component {
   dispose(): void {
     const scene = ClientContainer.resolve(THREE.Scene).unwrap()
 
+    // Dispose shared geometry only once
+    let geometryDisposed = false
+
     for (const mesh of this.blockMeshes.values()) {
-      mesh.geometry.dispose()
+      if (!geometryDisposed) {
+        mesh.geometry.dispose()
+        geometryDisposed = true
+      }
       if (Array.isArray(mesh.material)) {
         for (const mat of mesh.material) {
           mat.dispose()
@@ -223,6 +233,13 @@ export class World implements Component {
       mesh.setMatrixAt(blockMeshIndex, hideMatrix)
       mesh.instanceMatrix.needsUpdate = true // Ensure immediate update
       this.blocksMeshesFreeIndexes.get(blockTypeID)!.push(blockMeshIndex)
+
+      // Update instance count if this was the last instance
+      const currentCount = this.blockMeshesCount.get(blockTypeID) || 0
+      if (blockMeshIndex === currentCount - 1) {
+        this.blockMeshesCount.set(blockTypeID, currentCount - 1)
+        mesh.count = currentCount - 1
+      }
     }
 
     chunk.blocks.delete(blockKey)
@@ -375,6 +392,7 @@ export class World implements Component {
   private updateChunkMeshes(): void {
     const meshesNeedUpdate = new Set<THREE.InstancedMesh>()
     const matrix = new THREE.Matrix4()
+    const meshInstanceCounts = new Map<number, number>()
 
     for (const chunkKey of this.chunksNeedingRender) {
       const chunk = this.chunks.get(chunkKey)
@@ -417,11 +435,24 @@ export class World implements Component {
         meshesNeedUpdate.add(mesh)
         mesh.setMatrixAt(index, matrix)
         chunk.blocksMeshesIndexes.set(blockKey, index)
+
+        // Track the highest index for this mesh type
+        const currentMax = meshInstanceCounts.get(blockTypeID) || 0
+        meshInstanceCounts.set(blockTypeID, Math.max(currentMax, index + 1))
       }
     }
 
+    // Batch update all meshes
     for (const mesh of meshesNeedUpdate) {
       mesh.instanceMatrix.needsUpdate = true
+    }
+
+    // Update instance counts for better frustum culling
+    for (const [blockTypeID] of meshInstanceCounts) {
+      const mesh = this.blockMeshes.get(blockTypeID)
+      if (mesh) {
+        mesh.count = this.blockMeshesCount.get(blockTypeID) || 0
+      }
     }
 
     this.chunksNeedingRender.clear()

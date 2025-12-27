@@ -61,6 +61,8 @@ export class GameSession implements Component {
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 1.0
+    renderer.shadowMap.enabled = false // Disable shadows for performance
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)) // Cap pixel ratio
 
     const camera = scope.registerSingleton(
       new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000),
