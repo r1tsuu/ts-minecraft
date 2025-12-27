@@ -24,6 +24,32 @@ export const getBlockIndex = (x: number, y: number, z: number): number => {
   return x + Config.CHUNK_SIZE * (z + Config.CHUNK_SIZE * y)
 }
 
+export const getChunkCoordinates = ({ x, z }: { x: number; z: number }) => {
+  const chunkX = Math.floor(x / Config.CHUNK_SIZE)
+  const chunkZ = Math.floor(z / Config.CHUNK_SIZE)
+
+  return {
+    chunkX,
+    chunkZ,
+  }
+}
+
+export const getLocalCoordinatesInChunk = ({
+  x,
+  z,
+}: {
+  x: number
+  z: number
+}): { localX: number; localZ: number } => {
+  const localX = x % Config.CHUNK_SIZE
+  const localZ = z % Config.CHUNK_SIZE
+
+  return {
+    localX: localX < 0 ? localX + Config.CHUNK_SIZE : localX,
+    localZ: localZ < 0 ? localZ + Config.CHUNK_SIZE : localZ,
+  }
+}
+
 export const findByXZ = <T extends { x: number; z: number }>(
   array: T[],
   x: number,
@@ -182,5 +208,36 @@ export const option = <T>(value: T | undefined): OptionType<T> => {
     unwrap: () => value,
     unwrapOr: () => value,
     value,
+  }
+}
+
+/**
+ * Method decorator that throttles the execution of the decorated method.
+ * The method will only be allowed to execute once every `ms` milliseconds.
+ * Subsequent calls within the throttle period will be ignored.
+ * @param ms The number of milliseconds to throttle the method.
+ * @returns A method decorator that applies the throttling behavior.
+ * @example
+ * class Example {
+ *   @Throttle(1000)
+ *   logMessage() {
+ *    console.log('This message is throttled to once every second.')
+ *  }
+ * }
+ */
+export const Throttle = (ms: number) => {
+  return (_instance: any, _methodName: string, descriptor: PropertyDescriptor) => {
+    const originalMethod = descriptor.value
+    let lastInvocation = 0
+
+    descriptor.value = function (...args: any[]) {
+      const now = Date.now()
+      if (now - lastInvocation >= ms) {
+        lastInvocation = now
+        return originalMethod.apply(this, args)
+      }
+    }
+
+    return descriptor
   }
 }

@@ -6,7 +6,7 @@ import type { BlockInWorld, Chunk } from '../types.ts'
 import { Component } from '../shared/Component.ts'
 import { Config } from '../shared/Config.ts'
 import { MinecraftEvent, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
-import { getBlockIndex, getBlockKey } from '../shared/util.ts'
+import { getBlockIndex, getBlockKey, getChunkCoordinates } from '../shared/util.ts'
 import { ClientBlocksRegistry } from './blocks.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
@@ -21,6 +21,12 @@ export class World implements Component {
   blocksMeshesFreeIndexes = new Map<number, number[]>()
   chunks = new Map<string, Chunk>()
   requestingChunksState: 'idle' | 'requesting' = 'idle'
+
+  // Track which chunks need rendering to avoid checking all chunks every frame
+  private chunksNeedingRender = new Set<string>()
+  // Cache the last player chunk position to avoid unnecessary chunk loading checks
+  private lastPlayerChunkX: null | number = null
+  private lastPlayerChunkZ: null | number = null
 
   constructor(initialChunksFromServer: DatabaseChunkData[]) {
     const backgroundColor = 0x87ceeb
@@ -61,6 +67,39 @@ export class World implements Component {
     }
 
     this.syncChunksFromServer(initialChunksFromServer)
+  }
+
+  addBlock(x: number, y: number, z: number, typeID: number): void {
+    const { chunkX, chunkZ } = getChunkCoordinates({ x, z })
+    const key = chunkKey(chunkX, chunkZ)
+    const chunk = this.chunks.get(key)
+
+    if (!chunk) {
+      console.warn(`Trying to add block to non-existing chunk at ${chunkX},${chunkZ}`)
+      return
+    }
+
+    const localX = x - chunkX * Config.CHUNK_SIZE
+    const localZ = z - chunkZ * Config.CHUNK_SIZE
+
+    const blockKey = getBlockKey(localX, y, localZ)
+
+    if (chunk.blocks.has(blockKey)) {
+      console.warn(`Block already exists at ${x},${y},${z}`)
+      return
+    }
+
+    const block: BlockInWorld = {
+      typeID,
+      x: localX,
+      y,
+      z: localZ,
+    }
+
+    chunk.blocks.set(blockKey, block)
+    chunk.blocksUint[getBlockIndex(localX, y, localZ)] = typeID
+    chunk.needsRenderUpdate = true
+    this.chunksNeedingRender.add(key)
   }
 
   checkCollisionWithBox(box: THREE.Box3): boolean {
@@ -113,11 +152,11 @@ export class World implements Component {
     this.blockMeshesCount.clear()
     this.blocksMeshesFreeIndexes.clear()
     this.chunks.clear()
+    this.chunksNeedingRender.clear()
   }
 
   getBlock(x: number, y: number, z: number): null | number {
-    const chunkX = Math.floor(x / Config.CHUNK_SIZE)
-    const chunkZ = Math.floor(z / Config.CHUNK_SIZE)
+    const { chunkX, chunkZ } = getChunkCoordinates({ x, z })
     const key = chunkKey(chunkX, chunkZ)
     const chunk = this.chunks.get(key)
 
@@ -140,117 +179,102 @@ export class World implements Component {
     return block
   }
 
+  removeBlock(x: number, y: number, z: number): void {
+    const { chunkX, chunkZ } = getChunkCoordinates({ x, z })
+    const key = chunkKey(chunkX, chunkZ)
+    const chunk = this.chunks.get(key)
+
+    if (!chunk) {
+      return
+    }
+
+    const localX = x - chunkX * Config.CHUNK_SIZE
+    const localZ = z - chunkZ * Config.CHUNK_SIZE
+
+    const blockKey = getBlockKey(localX, y, localZ)
+    const block = chunk.blocks.get(blockKey)
+
+    if (!block) {
+      console.warn(`Trying to remove non-existing block at ${x},${y},${z}`)
+      return
+    }
+
+    const blockTypeID = block.typeID
+    if (!blockTypeID) return
+
+    const blockMeshIndex = chunk.blocksMeshesIndexes.get(blockKey)
+
+    if (blockMeshIndex !== undefined) {
+      const mesh = this.blockMeshes.get(blockTypeID)!
+      // Set to a matrix with scale 0 to effectively hide the block
+      const hideMatrix = new THREE.Matrix4().makeScale(0, 0, 0)
+      mesh.setMatrixAt(blockMeshIndex, hideMatrix)
+      mesh.instanceMatrix.needsUpdate = true // Ensure immediate update
+      this.blocksMeshesFreeIndexes.get(blockTypeID)!.push(blockMeshIndex)
+    }
+
+    chunk.blocks.delete(blockKey)
+    chunk.blocksMeshesIndexes.delete(blockKey)
+    chunk.blocksUint[getBlockIndex(localX, y, localZ)] = 0
+    chunk.needsRenderUpdate = true
+    this.chunksNeedingRender.add(key)
+  }
+
   update(): void {
     const player = ClientContainer.resolve(GameSession).unwrap().getCurrentPlayer()
     const playerChunkX = Math.floor(player.position.x / Config.CHUNK_SIZE)
     const playerChunkZ = Math.floor(player.position.z / Config.CHUNK_SIZE)
 
-    const needed = new Set<string>()
-    const chunksToLoad: string[] = []
+    // Only check for new chunks if player moved to a different chunk
+    const playerChunkChanged =
+      this.lastPlayerChunkX !== playerChunkX || this.lastPlayerChunkZ !== playerChunkZ
 
-    for (let dx = -Config.RENDER_DISTANCE; dx <= Config.RENDER_DISTANCE; dx++) {
-      for (let dz = -Config.RENDER_DISTANCE; dz <= Config.RENDER_DISTANCE; dz++) {
-        const cx = playerChunkX + dx
-        const cz = playerChunkZ + dz
-        const key = chunkKey(cx, cz)
+    if (playerChunkChanged) {
+      this.lastPlayerChunkX = playerChunkX
+      this.lastPlayerChunkZ = playerChunkZ
 
-        needed.add(key)
+      const needed = new Set<string>()
+      const chunksToLoad: string[] = []
 
-        if (!this.chunks.has(key)) {
-          chunksToLoad.push(key)
-        }
-      }
-    }
+      for (let dx = -Config.RENDER_DISTANCE; dx <= Config.RENDER_DISTANCE; dx++) {
+        for (let dz = -Config.RENDER_DISTANCE; dz <= Config.RENDER_DISTANCE; dz++) {
+          const cx = playerChunkX + dx
+          const cz = playerChunkZ + dz
+          const key = chunkKey(cx, cz)
 
-    if (chunksToLoad.length) {
-      if (this.requestingChunksState === 'idle') {
-        const eventBus = ClientContainer.resolve(MinecraftEventBus).unwrap()
+          needed.add(key)
 
-        eventBus.publish('Client.RequestChunksLoad', {
-          chunks: chunksToLoad.map((key) => {
-            const [chunkX, chunkZ] = key.split(',').map(Number)
-            return { chunkX, chunkZ }
-          }),
-        })
-        this.requestingChunksState = 'requesting'
-      }
-    }
-
-    const meshesNeedUpdate = new Set<THREE.InstancedMesh>()
-
-    // Unload chunks outside render distance
-    for (const key of this.chunks.keys()) {
-      if (!needed.has(key)) {
-        const chunk = this.chunks.get(key)!
-        for (const block of chunk.blocks.values()) {
-          const blockTypeID = block.typeID
-          if (!blockTypeID) continue
-          const count = this.blockMeshesCount.get(blockTypeID)
-          if (count === undefined) {
-            throw new Error(`Mesh count for block ID ${blockTypeID} not found`)
-          }
-
-          const blockMeshIndex = chunk.blocksMeshesIndexes.get(
-            getBlockKey(block.x, block.y, block.z),
-          )!
-
-          if (blockMeshIndex !== undefined) {
-            const mesh = this.blockMeshes.get(blockTypeID)!
-            mesh.setMatrixAt(blockMeshIndex, new THREE.Matrix4())
-            this.blocksMeshesFreeIndexes.get(blockTypeID)!.push(blockMeshIndex)
-            meshesNeedUpdate.add(mesh)
+          if (!this.chunks.has(key)) {
+            chunksToLoad.push(key)
           }
         }
+      }
 
-        this.chunks.delete(key)
+      if (chunksToLoad.length) {
+        if (this.requestingChunksState === 'idle') {
+          const eventBus = ClientContainer.resolve(MinecraftEventBus).unwrap()
+
+          eventBus.publish('Client.RequestChunksLoad', {
+            chunks: chunksToLoad.map((key) => {
+              const [chunkX, chunkZ] = key.split(',').map(Number)
+              return { chunkX, chunkZ }
+            }),
+          })
+          this.requestingChunksState = 'requesting'
+        }
+      }
+
+      // Unload chunks outside render distance
+      for (const key of this.chunks.keys()) {
+        if (!needed.has(key)) {
+          this.unloadChunk(key)
+        }
       }
     }
 
-    const matrix = new THREE.Matrix4()
-
-    for (const chunk of this.chunks.values()) {
-      if (!chunk.needsRenderUpdate) continue
-
-      chunk.needsRenderUpdate = false
-
-      for (const block of chunk.blocks.values()) {
-        const blockTypeID = block.typeID
-        if (!blockTypeID) continue
-
-        const freeList = this.blocksMeshesFreeIndexes.get(blockTypeID)!
-
-        const mesh = this.blockMeshes.get(blockTypeID)
-
-        if (!mesh) {
-          throw new Error(`Mesh for block ID ${blockTypeID} not found`)
-        }
-
-        matrix.setPosition(
-          chunk.chunkX * Config.CHUNK_SIZE + block.x,
-          block.y,
-          chunk.chunkZ * Config.CHUNK_SIZE + block.z,
-        )
-
-        let index: number
-        if (freeList.length > 0) {
-          index = freeList.pop()!
-        } else {
-          index = this.blockMeshesCount.get(blockTypeID)!
-          this.blockMeshesCount.set(blockTypeID, index + 1)
-        }
-
-        if (index === undefined) {
-          throw new Error(`Mesh count for block ID ${blockTypeID} not found`)
-        }
-
-        meshesNeedUpdate.add(mesh)
-        mesh.setMatrixAt(index, matrix)
-        chunk.blocksMeshesIndexes.set(getBlockKey(block.x, block.y, block.z), index)
-      }
-    }
-
-    for (const mesh of meshesNeedUpdate) {
-      mesh.instanceMatrix.needsUpdate = true
+    // Only update meshes for chunks that need rendering
+    if (this.chunksNeedingRender.size > 0) {
+      this.updateChunkMeshes()
     }
   }
 
@@ -282,6 +306,92 @@ export class World implements Component {
         needsRenderUpdate: true,
         uuid: chunk.uuid,
       })
+
+      this.chunksNeedingRender.add(key)
     }
+  }
+
+  private unloadChunk(key: string): void {
+    const chunk = this.chunks.get(key)
+    if (!chunk) return
+
+    const meshesNeedUpdate = new Set<THREE.InstancedMesh>()
+
+    for (const block of chunk.blocks.values()) {
+      const blockTypeID = block.typeID
+      if (!blockTypeID) continue
+
+      const blockMeshIndex = chunk.blocksMeshesIndexes.get(getBlockKey(block.x, block.y, block.z))
+
+      if (blockMeshIndex !== undefined) {
+        const mesh = this.blockMeshes.get(blockTypeID)!
+        const hideMatrix = new THREE.Matrix4().makeScale(0, 0, 0)
+        mesh.setMatrixAt(blockMeshIndex, hideMatrix)
+        this.blocksMeshesFreeIndexes.get(blockTypeID)!.push(blockMeshIndex)
+        meshesNeedUpdate.add(mesh)
+      }
+    }
+
+    for (const mesh of meshesNeedUpdate) {
+      mesh.instanceMatrix.needsUpdate = true
+    }
+
+    this.chunks.delete(key)
+    this.chunksNeedingRender.delete(key)
+  }
+
+  private updateChunkMeshes(): void {
+    const meshesNeedUpdate = new Set<THREE.InstancedMesh>()
+    const matrix = new THREE.Matrix4()
+
+    for (const chunkKey of this.chunksNeedingRender) {
+      const chunk = this.chunks.get(chunkKey)
+      if (!chunk || !chunk.needsRenderUpdate) continue
+
+      chunk.needsRenderUpdate = false
+
+      for (const block of chunk.blocks.values()) {
+        const blockTypeID = block.typeID
+        if (!blockTypeID) continue
+
+        const blockKey = getBlockKey(block.x, block.y, block.z)
+
+        // Skip if this block already has a mesh index (already rendered)
+        if (chunk.blocksMeshesIndexes.has(blockKey)) {
+          continue
+        }
+
+        const freeList = this.blocksMeshesFreeIndexes.get(blockTypeID)!
+        const mesh = this.blockMeshes.get(blockTypeID)
+
+        if (!mesh) {
+          throw new Error(`Mesh for block ID ${blockTypeID} not found`)
+        }
+
+        matrix.setPosition(
+          chunk.chunkX * Config.CHUNK_SIZE + block.x,
+          block.y,
+          chunk.chunkZ * Config.CHUNK_SIZE + block.z,
+        )
+
+        let index: number
+        if (freeList.length > 0) {
+          index = freeList.pop()!
+        } else {
+          index = this.blockMeshesCount.get(blockTypeID)!
+          this.blockMeshesCount.set(blockTypeID, index + 1)
+        }
+
+        meshesNeedUpdate.add(mesh)
+        mesh.setMatrixAt(index, matrix)
+        chunk.blocksMeshesIndexes.set(blockKey, index)
+      }
+    }
+
+    for (const mesh of meshesNeedUpdate) {
+      mesh.instanceMatrix.needsUpdate = true
+    }
+
+    this.chunksNeedingRender.clear()
   }
 }

@@ -1,13 +1,51 @@
+import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { Component } from '../shared/Component.ts'
 import { Config } from '../shared/Config.ts'
 import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
+import { Throttle } from '../shared/util.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
 import { InputManager } from './InputManager.ts'
+import { Raycaster } from './Raycaster.ts'
+import { World } from './World.ts'
 
 @Component()
 @MinecraftEventBus.ClientListener()
 export class ClientPlayerManager implements Component {
+  private static THROTTLE_DELAY_MS = 500
+
+  @Throttle(ClientPlayerManager.THROTTLE_DELAY_MS)
+  handleBlockPlace(): void {
+    const world = ClientContainer.resolve(World).unwrap()
+    const raycaster = ClientContainer.resolve(Raycaster).unwrap()
+    const blocksRegistry = ClientContainer.resolve(BlocksRegistry).unwrap()
+
+    if (raycaster.lookingAtBlock && raycaster.lookingAtNormal) {
+      const blockToPlace = blocksRegistry.getBlockIdByName('grass')
+
+      world.addBlock(
+        raycaster.lookingAtBlock.x + raycaster.lookingAtNormal.x,
+        raycaster.lookingAtBlock.y + raycaster.lookingAtNormal.y,
+        raycaster.lookingAtBlock.z + raycaster.lookingAtNormal.z,
+        blockToPlace,
+      )
+    }
+  }
+
+  @Throttle(ClientPlayerManager.THROTTLE_DELAY_MS)
+  handleBlockRemove(): void {
+    const world = ClientContainer.resolve(World).unwrap()
+    const raycaster = ClientContainer.resolve(Raycaster).unwrap()
+
+    if (raycaster.lookingAtBlock) {
+      world.removeBlock(
+        raycaster.lookingAtBlock.x,
+        raycaster.lookingAtBlock.y,
+        raycaster.lookingAtBlock.z,
+      )
+    }
+  }
+
   update(): void {
     const gameSession = ClientContainer.resolve(GameSession).unwrap()
     const inputManager = ClientContainer.resolve(InputManager).unwrap()
@@ -53,6 +91,14 @@ export class ClientPlayerManager implements Component {
 
     if (inputManager.isKeyPressed('Space')) {
       player.tryJump()
+    }
+
+    if (inputManager.isPressedLeftMouse()) {
+      this.handleBlockRemove()
+    }
+
+    if (inputManager.isPressedRightMouse()) {
+      this.handleBlockPlace()
     }
   }
 

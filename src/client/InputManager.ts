@@ -73,6 +73,14 @@ export class InputManager implements Component {
     return this.keyboardState[key].isPressed
   }
 
+  isPressedLeftMouse(): boolean {
+    return this.mouseState.isPressedLeft
+  }
+
+  isPressedRightMouse(): boolean {
+    return this.mouseState.isPressedRight
+  }
+
   resetKeyboardState() {
     for (const key of GameKeys) {
       this.keyboardState[key].isPressed = false
