@@ -1,4 +1,4 @@
-import type { Option } from '../shared/util.ts'
+import type { Option } from '../shared/Option.ts'
 import type { ChunkIndex, UUID } from '../types.ts'
 import type { DatabasePlayerData } from './WorldDatabase.ts'
 

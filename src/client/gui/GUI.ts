@@ -88,17 +88,20 @@ export class GUI implements Component {
 
   @Scheduler.Every(200)
   protected updateGameUI(): void {
-    const gameSession = ClientContainer.resolve(GameSession)
-    if (gameSession.isNone() || this.state.isPaused) return
+    const maybeGameSession = ClientContainer.resolve(GameSession)
+
+    if (!maybeGameSession.isSome() || this.state.isPaused) return
 
     if (!this.state.initializedGameUI) {
       this.setState({ initializedGameUI: true })
     }
 
-    const player = gameSession.value.getCurrentPlayer()
+    const gameSession = maybeGameSession.value()
+
+    const player = gameSession.getCurrentPlayer()
     this.setState(
       {
-        fps: gameSession.value.frameCounter.fps.toFixed(0),
+        fps: gameSession.frameCounter.fps.toFixed(0),
         positionX: player.position.x.toFixed(),
         positionY: player.position.y.toFixed(),
         positionZ: player.position.z.toFixed(),
@@ -111,9 +114,9 @@ export class GUI implements Component {
 
     let performance: 'average' | 'bad' | 'good'
 
-    if (gameSession.value.frameCounter.fps < 30) {
+    if (gameSession.frameCounter.fps < 30) {
       performance = 'bad'
-    } else if (gameSession.value.frameCounter.fps < 60) {
+    } else if (gameSession.frameCounter.fps < 60) {
       performance = 'average'
     } else {
       performance = 'good'
