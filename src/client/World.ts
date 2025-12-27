@@ -12,6 +12,7 @@ import { GameSession } from './GameSession.ts'
 
 const chunkKey = (x: number, z: number) => `${x},${z}`
 
+@MinecraftEventQueue.ClientListener()
 export class World {
   blockMeshes = new Map<number, THREE.InstancedMesh>()
   blockMeshesCount = new Map<number, number>()
@@ -57,7 +58,6 @@ export class World {
       this.blocksMeshesFreeIndexes.set(id, [])
     }
 
-    ClientContainer.resolve(MinecraftEventQueue).unwrap().registerHandlers(this)
     this.syncChunksFromServer(initialChunksFromServer)
   }
 
@@ -111,7 +111,6 @@ export class World {
     this.blockMeshesCount.clear()
     this.blocksMeshesFreeIndexes.clear()
     this.chunks.clear()
-    MinecraftEventQueue.unregisterHandlers(this)
   }
 
   getBlock(x: number, y: number, z: number): null | number {

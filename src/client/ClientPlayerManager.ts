@@ -1,18 +1,14 @@
+import type { Component } from '../types.ts'
+
 import { MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import { Config } from '../shared/Config.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
 import { InputManager } from './InputManager.ts'
 
-export class ClientPlayerManager {
-  constructor() {
-    const eventQueue = ClientContainer.resolve(MinecraftEventQueue).unwrap()
-    eventQueue.registerHandlers(this)
-  }
-
-  dispose(): void {
-    MinecraftEventQueue.unregisterHandlers(this)
-  }
+@MinecraftEventQueue.ClientListener()
+export class ClientPlayerManager implements Component {
+  dispose(): void {}
 
   update(): void {
     const gameSession = ClientContainer.resolve(GameSession).unwrap()

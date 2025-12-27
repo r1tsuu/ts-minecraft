@@ -1,11 +1,12 @@
 import * as THREE from 'three'
 
 import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatabase.ts'
-import type { UUID } from '../types.ts'
+import type { ContainerScope } from '../shared/Container.ts'
 
 import { MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import { Config } from '../shared/Config.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
+import { isComponent, type UUID } from '../types.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { ClientPlayerManager } from './ClientPlayerManager.ts'
 import { GUI } from './gui/GUI.ts'
@@ -14,6 +15,8 @@ import { Player } from './Player.ts'
 import { Raycaster } from './Raycaster.ts'
 import { World } from './World.ts'
 
+@MinecraftEventQueue.ClientListener()
+@Scheduler.ClientSchedulable()
 export class GameSession {
   frameCounter = {
     fps: 0,
@@ -32,7 +35,7 @@ export class GameSession {
   private gameLoopClock = new THREE.Clock()
   private isGameLoopClockStopped = false
   private lastTimeout: null | number = null
-  private onResize: () => void
+  private scope: ContainerScope
 
   constructor(
     initialChunksFromServer: DatabaseChunkData[],
@@ -40,9 +43,12 @@ export class GameSession {
   ) {
     this.playerUUID = initialPlayerFromServer.uuid
 
-    ClientContainer.registerSingleton(new THREE.Scene())
+    const scope = ClientContainer.createScope(this)
+    this.scope = scope
 
-    const renderer = ClientContainer.registerSingleton(
+    scope.registerSingleton(new THREE.Scene())
+
+    const renderer = scope.registerSingleton(
       new THREE.WebGLRenderer({
         antialias: false,
         canvas: ClientContainer.resolve(GUI).unwrap().getCanvas(),
@@ -50,29 +56,18 @@ export class GameSession {
       }),
     )
 
-    renderer.setSize(window.innerWidth, window.innerHeight)
-
-    this.onResize = () => {
-      renderer.setSize(window.innerWidth, window.innerHeight)
-    }
-
-    window.addEventListener('resize', this.onResize)
-    this.additionalOnDisposeCallbacks.push(() => {
-      window.removeEventListener('resize', this.onResize)
-    })
-
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 1.0
 
-    const camera = ClientContainer.registerSingleton(
+    const camera = scope.registerSingleton(
       new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000),
     )
 
     camera.position.set(0, 40, 0)
     camera.lookAt(30, 35, 30)
 
-    ClientContainer.register(
+    scope.register(
       new Player(
         initialPlayerFromServer.uuid,
         THREE.Vector3.fromRaw(initialPlayerFromServer.position),
@@ -84,16 +79,15 @@ export class GameSession {
           Config.EULER_ORDER,
         ),
       ),
-      initialPlayerFromServer.uuid,
+      {
+        uuid: initialPlayerFromServer.uuid,
+      },
     )
 
-    ClientContainer.registerSingleton(new World(initialChunksFromServer))
-    ClientContainer.registerSingleton(new ClientPlayerManager())
-    ClientContainer.registerSingleton(new InputManager())
-    ClientContainer.registerSingleton(new Raycaster())
-
-    ClientContainer.resolve(Scheduler).unwrap().registerInstance(this)
-    ClientContainer.resolve(MinecraftEventQueue).unwrap().registerHandlers(this)
+    scope.registerSingleton(new World(initialChunksFromServer))
+    scope.registerSingleton(new ClientPlayerManager())
+    scope.registerSingleton(new InputManager())
+    scope.registerSingleton(new Raycaster())
   }
 
   addOnDisposeCallback(callback: () => void): void {
@@ -101,22 +95,11 @@ export class GameSession {
   }
 
   dispose(): void {
-    window.removeEventListener('resize', this.onResize)
-
-    ClientContainer.resolve(World).unwrap().dispose()
-    ClientContainer.resolve(THREE.WebGLRenderer).unwrap().dispose()
-    ClientContainer.resolve(THREE.Scene).unwrap().clear()
-    ClientContainer.resolve(ClientPlayerManager).unwrap().dispose()
-    ClientContainer.resolve(InputManager).unwrap().dispose()
-
-    ClientContainer.unregister(World)
-    ClientContainer.unregister(THREE.WebGLRenderer)
-    ClientContainer.unregister(THREE.Scene)
-    ClientContainer.unregister(ClientPlayerManager)
-    ClientContainer.unregister(InputManager)
-    ClientContainer.unregister(THREE.PerspectiveCamera)
-    ClientContainer.unregister(Raycaster)
-    ClientContainer.unregister(this.playerUUID)
+    for (const child of this.scope.listChildren()) {
+      if (isComponent(child)) {
+        child.dispose()
+      }
+    }
 
     if (this.lastTimeout) {
       clearTimeout(this.lastTimeout)
@@ -125,9 +108,6 @@ export class GameSession {
     for (const callback of this.additionalOnDisposeCallbacks) {
       callback()
     }
-
-    ClientContainer.resolve(Scheduler).unwrap().unregisterInstance(this)
-    MinecraftEventQueue.unregisterHandlers(this)
 
     this.disposed = true
   }

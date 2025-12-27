@@ -9,6 +9,8 @@ import { GameSession } from '../GameSession.ts'
 import { LocalStorageManager } from '../LocalStorageManager.ts'
 import { synchronize } from './synchronize.ts'
 
+@MinecraftEventQueue.ClientListener()
+@Scheduler.ClientSchedulable()
 export class GUI {
   state: GUIState
 
@@ -43,7 +45,6 @@ export class GUI {
     this.conditions = this.createConditions()
 
     this.setupEventListeners()
-    ClientContainer.resolve(Scheduler).unwrap().registerInstance(this)
 
     synchronize(this.state, this.actions, this.conditions)
   }
@@ -52,9 +53,6 @@ export class GUI {
     for (const dispose of this.dispositions) {
       dispose()
     }
-
-    MinecraftEventQueue.unregisterHandlers(this)
-    ClientContainer.resolve(Scheduler).unwrap().unregisterInstance(this)
   }
 
   getCanvas(): HTMLCanvasElement {
@@ -78,6 +76,9 @@ export class GUI {
       .catch((e) => {
         console.warn('Pointer lock request failed', e)
       })
+
+    this.onResizeSyncRenderer()
+    window.addEventListener('resize', this.onResizeSyncRenderer)
   }
 
   @Scheduler.Every(200)
@@ -133,6 +134,7 @@ export class GUI {
           rotationPitch: '',
           rotationYaw: '',
         })
+        window.removeEventListener('resize', this.onResizeSyncRenderer)
       },
       backToStart: () => {
         this.setState({ activePage: 'start' })
@@ -222,11 +224,13 @@ export class GUI {
 
     const isLocked = document.pointerLockElement === this.getCanvas()
 
-    if (!isLocked && !this.state.isPaused && gameSession) {
+    if (!isLocked && !this.state.isPaused) {
       this.resumeButton.disabled = true
       setTimeout(() => {
         this.resumeButton.disabled = false
       }, 1000)
+
+      console.log('Game paused due to pointer lock loss')
 
       this.setState({
         isPaused: true,
@@ -236,6 +240,11 @@ export class GUI {
       eventQueue.emit('Client.PauseToggle', {})
       return
     }
+  }
+
+  private onResizeSyncRenderer = () => {
+    const renderer = ClientContainer.resolve(THREE.WebGLRenderer).unwrap()
+    renderer.setSize(window.innerWidth, window.innerHeight)
   }
 
   private async resumeGame(): Promise<void> {
@@ -259,7 +268,6 @@ export class GUI {
 
   private setupEventListeners(): void {
     document.addEventListener('pointerlockchange', this.onPointerLockChange)
-    ClientContainer.resolve(MinecraftEventQueue).unwrap().registerHandlers(this)
 
     this.dispositions.push(() => {
       document.removeEventListener('pointerlockchange', this.onPointerLockChange)

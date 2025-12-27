@@ -1,3 +1,5 @@
+import type { Container } from './Container.ts'
+
 interface ScheduleEveryMetadata {
   /**
    * If true, allows the task to be scheduled again even if the previous execution is still running.
@@ -63,6 +65,44 @@ export class Scheduler {
       target.constructor[SCHEDULER_EVERY_KEY].push(metadata)
 
       return descriptor
+    }
+  }
+
+  /**
+   * Decorator to mark a class as schedulable.
+   * Helper function that uses the provided container to register the schedulable.
+   * @param container The container to use for registration.
+   * @returns A class decorator.
+   * @example
+   * ```typescript
+   * @Scheduler.Schedulable(ClientContainer)
+   * class MySchedulableClass {
+   *   @Scheduler.Every(1000)
+   *   myScheduledMethod() {
+   *     console.log('This method runs every second.');
+   *   }
+   * }
+   * ```
+   */
+  static Schedulable(container: Container): ClassDecorator {
+    // @ts-expect-error
+    return function <T extends new (...args: any[]) => any>(Target: T): T {
+      return class extends Target {
+        constructor(...args: any[]) {
+          super(...args)
+          const scheduler = container.resolve(Scheduler).unwrap()
+          scheduler.registerInstance(this)
+          console.log(`Registered scheduled tasks for ${Target.name}`)
+
+          const originalDispose = this.dispose?.bind(this)
+
+          this.dispose = () => {
+            originalDispose?.()
+            scheduler.unregisterInstance(this)
+            console.log(`Unregistered scheduled tasks for ${Target.name}`)
+          }
+        }
+      }
     }
   }
 

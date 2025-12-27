@@ -42,14 +42,19 @@ export type ClientPlayerData = {
   yaw: number
 }
 
+export interface Component {
+  dispose(): void
+  update?: () => void
+}
+
+export const isComponent = (obj: any): obj is Component => {
+  return typeof obj.dispose === 'function'
+}
+
 export type RawVector3 = {
   x: number
   y: number
   z: number
-}
-
-export interface Updatable {
-  update(delta: number): void
 }
 
 export type UUID = `${string}-${string}-${string}-${string}-${string}`
