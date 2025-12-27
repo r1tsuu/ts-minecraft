@@ -9,7 +9,7 @@ import {
 } from '../shared/MinecraftEventBus.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
 import SinglePlayerWorker from '../worker/SinglePlayerWorker.ts?worker'
-import { ClientBlocksRegistry } from './blocks.ts'
+import { ClientBlocksRegistry } from './ClientBlocksRegistry.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
 import { GUI } from './gui/GUI.ts'

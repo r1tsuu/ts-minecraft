@@ -12,7 +12,7 @@ import {
 } from '../shared/MinecraftEventBus.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
 import { getBlockIndex, getBlockKey, getChunkCoordinates } from '../shared/util.ts'
-import { ClientBlocksRegistry } from './blocks.ts'
+import { ClientBlocksRegistry } from './ClientBlocksRegistry.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
 
