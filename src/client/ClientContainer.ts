@@ -7,8 +7,8 @@
  * decorators for registering client schedulables and event listeners.
  */
 /* eslint-disable @typescript-eslint/no-namespace */
-import { MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import { Container } from '../shared/Container.ts'
+import { MinecraftEventQueue } from '../shared/MinecraftEventQueue.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
 
 export const ClientContainer = new Container()
@@ -29,7 +29,7 @@ declare module '../shared/Scheduler.ts' {
   }
 }
 
-declare module '../queue/MinecraftQueue.ts' {
+declare module '../shared/MinecraftEventQueue.ts' {
   namespace MinecraftEventQueue {
     /**
      * Decorator to mark a class as a Minecraft client event listener.

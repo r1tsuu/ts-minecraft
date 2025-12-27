@@ -1,11 +1,11 @@
 import type { ContainerScope } from '../shared/Container.ts'
 
+import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import {
   type AnyMinecraftEvent,
   type MinecraftEvent,
   MinecraftEventQueue,
-} from '../queue/MinecraftQueue.ts'
-import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
+} from '../shared/MinecraftEventQueue.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
 import SinglePlayerWorker from '../worker/SinglePlayerWorker.ts?worker'
 import { ClientBlocksRegistry } from './blocks.ts'

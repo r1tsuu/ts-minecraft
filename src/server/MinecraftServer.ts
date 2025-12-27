@@ -1,8 +1,8 @@
 import type { BlockInWorld, ChunkCoordinates } from '../types.ts'
 
-import { type MinecraftEvent, MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { Config } from '../shared/Config.ts'
+import { type MinecraftEvent, MinecraftEventQueue } from '../shared/MinecraftEventQueue.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
 import {
   findByXYZ,

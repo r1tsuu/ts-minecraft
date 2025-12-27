@@ -2,7 +2,7 @@ import * as THREE from 'three'
 
 import type { GUIActions, GUIConditions, GUIState as GUIState } from './state.ts'
 
-import { MinecraftEventQueue } from '../../queue/MinecraftQueue.ts'
+import { MinecraftEventQueue } from '../../shared/MinecraftEventQueue.ts'
 import { Scheduler } from '../../shared/Scheduler.ts'
 import { ClientContainer } from '../ClientContainer.ts'
 import { GameSession } from '../GameSession.ts'

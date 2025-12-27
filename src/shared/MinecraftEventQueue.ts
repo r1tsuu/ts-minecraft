@@ -5,8 +5,8 @@
 import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatabase.ts'
 import type { ChunkCoordinates, UUID } from '../types.ts'
 
-import { type AnyEvent, Event } from './Event.ts'
-import { EventQueue } from './EventQueue.ts'
+import { type AnyEvent, Event } from '../queue/Event.ts'
+import { EventQueue } from '../queue/EventQueue.ts'
 
 export type AnyMinecraftEvent = AnyEvent<MinecraftEventsData, MinecraftEventMetadata>
 

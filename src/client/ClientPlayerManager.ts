@@ -1,7 +1,7 @@
 import type { Component } from '../types.ts'
 
-import { MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import { Config } from '../shared/Config.ts'
+import { MinecraftEventQueue } from '../shared/MinecraftEventQueue.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
 import { InputManager } from './InputManager.ts'

@@ -1,4 +1,4 @@
-import { type AnyMinecraftEvent, MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
+import { type AnyMinecraftEvent, MinecraftEventQueue } from '../shared/MinecraftEventQueue.ts'
 import { MinecraftServer } from '../server/MinecraftServer.ts'
 
 let localServer: MinecraftServer | null = null
