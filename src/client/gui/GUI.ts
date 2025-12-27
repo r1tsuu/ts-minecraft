@@ -15,7 +15,6 @@ import { synchronize } from './synchronize.ts'
 @Scheduler.ClientSchedulable()
 export class GUI implements Component {
   state: GUIState
-
   private actions: GUIActions
   private conditions: GUIConditions
   private dispositions: Function[] = []
@@ -46,7 +45,11 @@ export class GUI implements Component {
     this.actions = this.createActions()
     this.conditions = this.createConditions()
 
-    this.setupEventListeners()
+    document.addEventListener('pointerlockchange', this.onPointerLockChange)
+
+    this.dispositions.push(() => {
+      document.removeEventListener('pointerlockchange', this.onPointerLockChange)
+    })
 
     synchronize(this.state, this.actions, this.conditions)
   }
@@ -266,13 +269,5 @@ export class GUI implements Component {
     } catch (e) {
       console.warn('Pointer lock request failed', e)
     }
-  }
-
-  private setupEventListeners(): void {
-    document.addEventListener('pointerlockchange', this.onPointerLockChange)
-
-    this.dispositions.push(() => {
-      document.removeEventListener('pointerlockchange', this.onPointerLockChange)
-    })
   }
 }

@@ -1,6 +1,6 @@
 import type { UUID } from '../types.ts'
 
-import { option, type OptionType } from './util.ts'
+import { Option } from './Option.ts'
 
 export type ContainerScope = {
   /**
@@ -162,17 +162,17 @@ export class Container {
    * const resolvedSingleton = container.resolve(MySingletonClass).unwrap()
    * console.log(resolvedSingleton === singleton) // true
    */
-  resolve<T>(id: number | UUID): OptionType<T>
-  resolve<T>(singletonConstructor: new (...args: any[]) => T): OptionType<T>
-  resolve<T>(idOrSingletonConstructor: any): OptionType<T> {
+  resolve<T>(id: number | UUID): Option<T>
+  resolve<T>(singletonConstructor: new (...args: any[]) => T): Option<T>
+  resolve<T>(idOrSingletonConstructor: any): Option<T> {
     if (
       typeof idOrSingletonConstructor === 'number' ||
       typeof idOrSingletonConstructor === 'string'
     ) {
-      return option(this.instances.get(idOrSingletonConstructor as number | UUID))
+      return Option.from(this.instances.get(idOrSingletonConstructor as number | UUID))
     }
 
-    return option(
+    return Option.from(
       this.singletonInstances.get(idOrSingletonConstructor as new (...args: any[]) => T),
     )
   }

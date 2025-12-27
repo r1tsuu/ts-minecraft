@@ -153,64 +153,6 @@ THREE.Vector3.fromRaw = function (rawVector: RawVector3): THREE.Vector3 {
 
 export const UP_VECTOR = new THREE.Vector3(0, 1, 0)
 
-export type OptionType<T> = {
-  isNone(): this is OptionNone
-  isSome(): this is OptionSome<T>
-  unwrap(): T
-  unwrapOr(defaultValue: T): T
-} & (OptionNone | OptionSome<T>)
-
-interface OptionNone {
-  readonly kind: 'none'
-  value: undefined
-}
-
-interface OptionSome<T> {
-  readonly kind: 'some'
-  value: T
-}
-
-/**
- * Creates an OptionType from a value that may be undefined.
- * @param value The value to wrap in an OptionType.
- * @returns An OptionType representing the presence or absence of the value.
- * @example
- * const someOption = option(42)
- * console.log(someOption.isSome()) // true
- * console.log(someOption.unwrap()) // 42
- *
- * const noneOption = option(undefined)
- * console.log(noneOption.isNone()) // true
- * console.log(noneOption.unwrapOr(100)) // 100
- */
-export const option = <T>(value: T | undefined): OptionType<T> => {
-  if (value === undefined) {
-    return {
-      // @ts-expect-error
-      isNone: () => true,
-      // @ts-expect-error
-      isSome: () => false,
-      kind: 'none',
-      unwrap: () => {
-        throw new Error('Called unwrap on None option')
-      },
-      unwrapOr: (defaultValue: T) => defaultValue,
-      value: undefined,
-    }
-  }
-
-  return {
-    // @ts-expect-error
-    isNone: () => false,
-    // @ts-expect-error
-    isSome: () => true,
-    kind: 'some',
-    unwrap: () => value,
-    unwrapOr: () => value,
-    value,
-  }
-}
-
 /**
  * Method decorator that throttles the execution of the decorated method.
  * The method will only be allowed to execute once every `ms` milliseconds.

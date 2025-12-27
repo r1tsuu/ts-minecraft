@@ -25,6 +25,12 @@ export type ChunkCoordinates = {
   chunkZ: number
 }
 
+export type ChunkIndex = {
+  readonly __brand: 'ChunkIndex'
+  x: number
+  z: number
+}
+
 export type ClientPlayerData = {
   canJump: boolean
   direction: THREE.Vector3
@@ -49,3 +55,10 @@ export type RawVector3 = {
 }
 
 export type UUID = `${string}-${string}-${string}-${string}-${string}`
+
+export const chunkIndex = (x: number, z: number): ChunkIndex => {
+  return {
+    x,
+    z,
+  } as ChunkIndex
+}
