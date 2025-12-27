@@ -1,3 +1,11 @@
+/**
+ * ClientContainer.ts
+ * This file defines the ClientContainer, which is a specialized container for managing
+ * client-specific components.
+ *
+ * It also extends the Scheduler and MinecraftEventQueue namespaces to include
+ * decorators for registering client schedulables and event listeners.
+ */
 /* eslint-disable @typescript-eslint/no-namespace */
 import { MinecraftEventQueue } from '../queue/MinecraftQueue.ts'
 import { Container } from '../shared/Container.ts'
@@ -5,13 +13,11 @@ import { Scheduler } from '../shared/Scheduler.ts'
 
 export const ClientContainer = new Container()
 
-Scheduler.ClientSchedulable = function (): ClassDecorator {
-  return Scheduler.Schedulable(ClientContainer)
-}
+Scheduler.ClientSchedulable = () =>
+  Scheduler.Schedulable(() => ClientContainer.resolve(Scheduler).unwrap())
 
-MinecraftEventQueue.ClientListener = function (): ClassDecorator {
-  return MinecraftEventQueue.Listener(ClientContainer)
-}
+MinecraftEventQueue.ClientListener = () =>
+  MinecraftEventQueue.Listener(() => ClientContainer.resolve(MinecraftEventQueue).unwrap())
 
 declare module '../shared/Scheduler.ts' {
   namespace Scheduler {

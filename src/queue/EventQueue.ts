@@ -40,6 +40,18 @@ export class EventQueue<
     }
   >()
 
+  /**
+   * Decorator to mark a method as an event handler.
+   * @example
+   * ```ts
+   * class MyClass {
+   *  @EventQueue.Handler('Client.JoinWorld')
+   *  onJoinWorld(event: MinecraftEvent<'Client.JoinWorld'>) {
+   *    console.log('Player joined world with UUID:', event.payload.worldUUID)
+   *  }
+   * }
+   * ```
+   */
   static Handler<T extends string>(eventType: T) {
     return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
       console.log(
@@ -61,19 +73,41 @@ export class EventQueue<
   }
 
   /**
-   * Unregisters all event handlers for an instance
-   * Call this in the dispose() method
-   *
-   * @param instance - The class instance to unregister handlers for
+   * Decorator to mark a class as a Event Queue listener.
+   * Ensures automatic registration and unregistration of event handlers.
+   * @example
+   * ```ts
+   * @EventQueue.Listener(() => ClientContainer.resolve(MinecraftEventQueue).unwrap())
+   * class MyClass {
+   *  @EventQueue.Handler('Client.JoinWorld')
+   *  onJoinWorld(event: MinecraftEvent<'Client.JoinWorld'>) {
+   *    console.log('Player joined world with UUID:', event.payload.worldUUID)
+   *  }
+   * }
    */
-  static unregisterHandlers<T extends Record<string, any>>(instance: T): void {
-    const unsubscribers = (instance as any)[EVENT_HANDLERS_KEY] || []
+  static Listener(
+    resolveQueue: () => Pick<EventQueue<any, any>, 'registerHandlers' | 'unregisterHandlers'>,
+  ): ClassDecorator {
+    // @ts-expect-error
+    return function <T extends new (...args: any[]) => any>(Target: T): T {
+      return class extends Target {
+        constructor(...args: any[]) {
+          super(...args)
 
-    for (const unsubscribe of unsubscribers) {
-      unsubscribe()
+          const queue = resolveQueue()
+          queue.registerHandlers(this)
+          const originalDispose = this.dispose?.bind(this)
+
+          this.dispose = () => {
+            originalDispose?.()
+            queue.unregisterHandlers(this)
+            console.log(`Unregistered Minecraft client event handlers for ${Target.name}`)
+          }
+
+          console.log(`Registered Minecraft client event handlers for ${Target.name}`)
+        }
+      }
     }
-
-    ;(instance as any)[EVENT_HANDLERS_KEY] = []
   }
 
   addBeforeEmitHook(hook: (event: AnyEvent<Events, Meta>) => Promise<void> | void): void {
@@ -198,6 +232,22 @@ export class EventQueue<
   ): Promise<void> {
     this.emit(type, payload, originalEvent.eventUUID)
     await this.waitUntilOn(type, originalEvent.eventUUID)
+  }
+
+  /**
+   * Unregisters all event handlers for an instance
+   * Call this in the dispose() method
+   *
+   * @param instance - The class instance to unregister handlers for
+   */
+  unregisterHandlers<T extends Record<string, any>>(instance: T): void {
+    const unsubscribers = (instance as any)[EVENT_HANDLERS_KEY] || []
+
+    for (const unsubscribe of unsubscribers) {
+      unsubscribe()
+    }
+
+    ;(instance as any)[EVENT_HANDLERS_KEY] = []
   }
 
   waitUntilOn<K extends ({} & string) | EventKey<Events>>(

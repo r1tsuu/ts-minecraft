@@ -3,7 +3,6 @@
  * =========================================================== */
 
 import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatabase.ts'
-import type { Container } from '../shared/Container.ts'
 import type { ChunkCoordinates, UUID } from '../types.ts'
 
 import { type AnyEvent, Event } from './Event.ts'
@@ -82,47 +81,5 @@ export class MinecraftEventQueue extends EventQueue<MinecraftEventsData, Minecra
    */
   static Handler<T extends '*' | ({} & string) | MinecraftEventType>(eventType: T) {
     return EventQueue.Handler<T>(eventType)
-  }
-
-  /**
-   * Decorator to mark a class as a Minecraft event listener.
-   * Automatically registers and unregisters event handlers.
-   * @example
-   * ```ts
-   * @MinecraftEventQueue.Listener(ClientContainer)
-   * class MyClass {
-   *   @MinecraftEventQueue.Handler('Client.JoinWorld')
-   *   onJoinWorld(event: MinecraftEvent<'Client.JoinWorld'>) {
-   *     console.log('Player joined world with UUID:', event.payload.worldUUID)
-   *   }
-   * }
-   * ```
-   */
-  static Listener(container: Container): ClassDecorator {
-    // @ts-expect-error
-    return function <T extends new (...args: any[]) => any>(Target: T): T {
-      return class extends Target {
-        constructor(...args: any[]) {
-          super(...args)
-
-          container.resolve(MinecraftEventQueue).unwrap().registerHandlers(this)
-          const originalDispose = this.dispose?.bind(this)
-
-          this.dispose = () => {
-            originalDispose?.()
-            MinecraftEventQueue.unregisterHandlers(this)
-            console.log(`Unregistered Minecraft client event handlers for ${Target.name}`)
-          }
-
-          console.log(`Registered Minecraft client event handlers for ${Target.name}`)
-        }
-      }
-    }
-  }
-
-  static ServerListener(): ClassDecorator {
-    return function () {
-      // ServerContainer.resolve(MinecraftEventQueue).unwrap().registerHandlers(target) --- IGNORE ---
-    }
   }
 }
