@@ -52,7 +52,7 @@ export class MinecraftServer {
   }
 
   async dispose(): Promise<void> {
-    MinecraftEventQueue.unregisterHandlers(this)
+    this.eventQueue.unregisterHandlers(this)
     this.scheduler.unregisterInstance(this)
     await this.database.dispose()
     this.loadedChunks = []
