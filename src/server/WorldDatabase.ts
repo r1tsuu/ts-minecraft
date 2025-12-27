@@ -193,6 +193,18 @@ export class WorldDatabase {
     return this.db.selectFrom('worldMeta').selectAll().executeTakeFirstOrThrow()
   }
 
+  async updateChunks(chunks: DatabaseChunkData[]) {
+    for (const chunk of chunks) {
+      await this.db
+        .updateTable('chunks')
+        .set({
+          data: json(chunk.data),
+        })
+        .where('uuid', '=', chunk.uuid)
+        .execute()
+    }
+  }
+
   async updatePlayer(player: DatabasePlayerData) {
     await this.db
       .updateTable('players')

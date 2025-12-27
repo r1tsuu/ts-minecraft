@@ -101,6 +101,11 @@ export class GameSession implements Component {
       if (isComponent(child) || child instanceof THREE.WebGLRenderer) {
         child.dispose()
       }
+
+      if (child instanceof THREE.Scene) {
+        console.log('Disposing scene and its children')
+        child.clear()
+      }
     }
 
     if (this.lastTimeout) {

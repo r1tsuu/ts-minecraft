@@ -5,7 +5,12 @@ import type { BlockInWorld, Chunk } from '../types.ts'
 
 import { Component } from '../shared/Component.ts'
 import { Config } from '../shared/Config.ts'
-import { MinecraftEvent, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
+import {
+  MinecraftEvent,
+  MinecraftEventBus,
+  type MinecraftEventPayload,
+} from '../shared/MinecraftEventBus.ts'
+import { Scheduler } from '../shared/Scheduler.ts'
 import { getBlockIndex, getBlockKey, getChunkCoordinates } from '../shared/util.ts'
 import { ClientBlocksRegistry } from './blocks.ts'
 import { ClientContainer } from './ClientContainer.ts'
@@ -15,6 +20,7 @@ const chunkKey = (x: number, z: number) => `${x},${z}`
 
 @Component()
 @MinecraftEventBus.ClientListener()
+@Scheduler.ClientSchedulable()
 export class World implements Component {
   blockMeshes = new Map<number, THREE.InstancedMesh>()
   blockMeshesCount = new Map<number, number>()
@@ -24,9 +30,13 @@ export class World implements Component {
 
   // Track which chunks need rendering to avoid checking all chunks every frame
   private chunksNeedingRender = new Set<string>()
+
   // Cache the last player chunk position to avoid unnecessary chunk loading checks
   private lastPlayerChunkX: null | number = null
   private lastPlayerChunkZ: null | number = null
+
+  private syncUpdatedBlocksQueue: MinecraftEventPayload<'Client.RequestSyncUpdatedBlocks'>['updatedBlocks'] =
+    []
 
   constructor(initialChunksFromServer: DatabaseChunkData[]) {
     const backgroundColor = 0x87ceeb
@@ -100,6 +110,8 @@ export class World implements Component {
     chunk.blocksUint[getBlockIndex(localX, y, localZ)] = typeID
     chunk.needsRenderUpdate = true
     this.chunksNeedingRender.add(key)
+
+    this.syncUpdatedBlocksQueue.push({ blockID: typeID, position: { x, y, z }, type: 'add' })
   }
 
   checkCollisionWithBox(box: THREE.Box3): boolean {
@@ -218,6 +230,12 @@ export class World implements Component {
     chunk.blocksUint[getBlockIndex(localX, y, localZ)] = 0
     chunk.needsRenderUpdate = true
     this.chunksNeedingRender.add(key)
+
+    this.syncUpdatedBlocksQueue.push({
+      blockID: blockTypeID,
+      position: { x, y, z },
+      type: 'remove',
+    })
   }
 
   update(): void {
@@ -282,6 +300,20 @@ export class World implements Component {
   protected onResponseChunksLoad(event: MinecraftEvent<'Server.ResponseChunksLoad'>): void {
     this.syncChunksFromServer(event.payload.chunks)
     this.requestingChunksState = 'idle'
+  }
+
+  @Scheduler.Every(1000)
+  protected sendSyncUpdatedBlocks(): void {
+    if (this.syncUpdatedBlocksQueue.length === 0) {
+      return
+    }
+
+    const eventBus = ClientContainer.resolve(MinecraftEventBus).unwrap()
+    eventBus.publish('Client.RequestSyncUpdatedBlocks', {
+      updatedBlocks: this.syncUpdatedBlocksQueue,
+    })
+
+    this.syncUpdatedBlocksQueue = []
   }
 
   private syncChunksFromServer(chunks: DatabaseChunkData[]): void {

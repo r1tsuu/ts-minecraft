@@ -3,7 +3,7 @@
  * =========================================================== */
 
 import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatabase.ts'
-import type { ChunkCoordinates, UUID } from '../types.ts'
+import type { ChunkCoordinates, RawVector3, UUID } from '../types.ts'
 
 import { type AnyEvent, Event } from './Event.ts'
 import { EventBus } from './EventBus.ts'
@@ -33,15 +33,25 @@ const eventTypes = [
   e<{ chunks: ChunkCoordinates[] }>()('Client.RequestChunksLoad'),
   e<{ playerUUID: UUID }>()('Client.RequestPlayerJoin'),
   e<{ playerData: DatabasePlayerData }>()('Client.RequestSyncPlayer'),
+  e<{
+    updatedBlocks: {
+      blockID: number
+      position: RawVector3
+      type: 'add' | 'remove'
+    }[]
+  }>()('Client.RequestSyncUpdatedBlocks'),
   e<{ worldDatabaseName: string }>()('Client.StartLocalServer'),
   e<{ chunks: DatabaseChunkData[] }>()('Server.ResponseChunksLoad'),
   e<{ playerData: DatabasePlayerData }>()('Server.ResponsePlayerJoin'),
+  e<{}>()('Server.ResponseSyncUpdatedBlocks'),
   e<{}>()('Server.ResponseSyncPlayer'),
   e<{ currentTick: number }>()('Server.ServerTick'),
   e<{ loadedChunks: DatabaseChunkData[] }>()('SinglePlayerWorker.ServerStarted'),
   e<{}>()('SinglePlayerWorker.WorkerReady'),
   e<{}>()('Client.PauseToggle'),
 ]
+
+export type MinecraftEventPayload<T extends MinecraftEventType> = MinecraftEventsData[T]
 
 type MinecraftEventsData = {
   [K in (typeof eventTypes)[number] as K['type']]: K['payload']

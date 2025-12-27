@@ -7,6 +7,7 @@ import { Scheduler } from '../shared/Scheduler.ts'
 import {
   findByXYZ,
   findChunkByXZ,
+  getChunkCoordinates,
   getChunksCoordinatesInRadius,
   rawVector3,
   zeroRawVector3,
@@ -25,6 +26,8 @@ export class MinecraftServer {
   loadedChunks: DatabaseChunkData[] = []
   scheduler = new Scheduler()
   terrainGenerator: TerrainGenerator
+
+  private updatedChunks: Set<DatabaseChunkData> = new Set()
 
   private constructor(
     private readonly database: WorldDatabase,
@@ -163,6 +166,68 @@ export class MinecraftServer {
     }
 
     await this.eventBus.reply(event, 'Server.ResponseSyncPlayer', {})
+  }
+
+  @MinecraftEventBus.Handler('Client.RequestSyncUpdatedBlocks')
+  protected async onRequestSyncUpdatedBlocks(
+    event: MinecraftEvent<'Client.RequestSyncUpdatedBlocks'>,
+  ): Promise<void> {
+    for (const blockUpdate of event.payload.updatedBlocks) {
+      const chunkCoordinates = getChunkCoordinates({
+        x: blockUpdate.position.x,
+        z: blockUpdate.position.z,
+      })
+
+      const chunk = findChunkByXZ(
+        this.loadedChunks,
+        chunkCoordinates.chunkX,
+        chunkCoordinates.chunkZ,
+      )
+
+      if (chunk) {
+        const localX = blockUpdate.position.x - chunkCoordinates.chunkX * Config.CHUNK_SIZE
+        const localZ = blockUpdate.position.z - chunkCoordinates.chunkZ * Config.CHUNK_SIZE
+
+        if (blockUpdate.type === 'add') {
+          chunk.data.blocks.push({
+            typeID: blockUpdate.blockID,
+            x: blockUpdate.position.x,
+            y: blockUpdate.position.y,
+            z: blockUpdate.position.z,
+          })
+          this.updatedChunks.add(chunk)
+          continue
+        }
+
+        if (blockUpdate.type === 'remove') {
+          const block = findByXYZ(chunk.data.blocks, localX, blockUpdate.position.y, localZ)
+          if (block) {
+            const index = chunk.data.blocks.indexOf(block)
+            if (index !== -1) {
+              chunk.data.blocks.splice(index, 1)
+              this.updatedChunks.add(chunk)
+              continue
+            }
+          }
+        }
+      }
+    }
+
+    this.eventBus.publish('Server.ResponseSyncUpdatedBlocks', {})
+  }
+
+  @Scheduler.Every(1000)
+  protected async syncUpdatedChunks(): Promise<void> {
+    if (this.updatedChunks.size === 0) {
+      return
+    }
+
+    console.log(`Syncing ${this.updatedChunks.size} updated chunks to database...`)
+
+    const chunksToUpdate = Array.from(this.updatedChunks)
+    this.updatedChunks.clear()
+
+    await this.database.updateChunks(chunksToUpdate)
   }
 
   // @Scheduler.Every(Config.TICK_RATE, {

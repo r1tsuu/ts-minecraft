@@ -193,6 +193,8 @@ export class Container {
         for (const child of children) {
           this.unregister(child)
         }
+
+        this.singletonChildrenMap.delete(constructor)
       } else {
         throw new Error(`No singleton instance registered for ${constructor.name}`)
       }
