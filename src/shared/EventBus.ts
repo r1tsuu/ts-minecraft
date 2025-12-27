@@ -26,6 +26,20 @@ type EventKey<Events extends Record<string, unknown>> = keyof Events & string
 type RegistryKey<Events extends Record<string, unknown>> = EventKey<Events> | WildcardKey
 type WildcardKey = typeof WILDCARD
 
+/**
+ * EventBus class for managing event publishing and subscription.
+ * Supports event metadata and pre-publish hooks.
+ * @example
+ * ```ts
+ * const eventBus = new EventBus<MinecraftEventsData, MinecraftEventMetadata>()
+ * eventBus.registerEventType('Client.JoinWorld')
+ * eventBus.subscribe('Client.JoinWorld', (event) => {
+ *   console.log('Player joined world with UUID:', event.payload.worldUUID)
+ * })
+ * eventBus.publish('Client.JoinWorld', { worldUUID: 'some-uuid' })
+ * ```
+ * Note: Event types _must_ be registered using `registerEventType` before publishing or subscribing.
+ */
 export class EventBus<
   Events extends Record<string, Record<string, unknown>>,
   Meta extends Record<string, unknown> = {},

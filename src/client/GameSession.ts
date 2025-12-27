@@ -29,13 +29,13 @@ export class GameSession {
   paused = false
   playerUUID: UUID
 
+  scope: ContainerScope
   private additionalOnDisposeCallbacks: Array<() => void> = []
   private delta: number = 0
   private disposed = false
   private gameLoopClock = new THREE.Clock()
   private isGameLoopClockStopped = false
   private lastTimeout: null | number = null
-  private scope: ContainerScope
 
   constructor(
     initialChunksFromServer: DatabaseChunkData[],
@@ -193,14 +193,15 @@ export class GameSession {
     /**
      * UPDATE GAME STATE HERE
      */
-    ClientContainer.resolve(ClientPlayerManager).unwrap().update()
-    const player = ClientContainer.resolve<Player>(this.playerUUID).unwrap()
-    player.update()
-    ClientContainer.resolve(World).unwrap().update()
-    ClientContainer.resolve(Raycaster).unwrap().update()
+    for (const child of this.scope.listChildren()) {
+      if (typeof child.update === 'function') {
+        child.update()
+      }
+    }
 
+    // Sync camera with player
     const camera = ClientContainer.resolve(THREE.PerspectiveCamera).unwrap()
-
+    const player = this.getCurrentPlayer()
     camera.position.copy(player.position)
     camera.rotation.copy(player.rotation)
 
