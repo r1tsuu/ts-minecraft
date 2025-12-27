@@ -31,7 +31,7 @@ export class EventQueue<
   Meta extends Record<string, unknown> = {},
 > {
   private beforeEmitHooks: ((event: AnyEvent<Events, Meta>) => void)[] = []
-  private eventTypesRegistry = new Map<string, {}>()
+  private eventTypesRegistry = new Set<string>()
 
   private registry = new Map<
     RegistryKey<Events>,
@@ -110,7 +110,7 @@ export class EventQueue<
     }
   }
 
-  addBeforeEmitHook(hook: (event: AnyEvent<Events, Meta>) => Promise<void> | void): void {
+  addBeforeEmitHook(hook: (event: AnyEvent<Events, Meta>) => void): void {
     this.beforeEmitHooks.push(hook)
   }
 
@@ -150,14 +150,22 @@ export class EventQueue<
     type: K,
     payload: K extends keyof Events ? Events[K] : any,
     typeUntil: UntilK,
-    eventUUID?: UUID,
-    metadata?: Meta,
+    options: {
+      eventUUID?: UUID
+      metadata?: Meta
+      /**
+       * TODO: AbortSignal to cancel waiting for response
+       */
+      signal?: AbortSignal
+    } = {},
   ): Promise<Event<UntilK, UntilK extends keyof Events ? Events[UntilK] : any>> {
-    if (!eventUUID) {
-      eventUUID = crypto.randomUUID()
+    if (!options.eventUUID) {
+      options.eventUUID = crypto.randomUUID()
     }
-    this.emit(type, payload, eventUUID, metadata)
-    return this.waitUntilOn(typeUntil, eventUUID)
+    this.emit(type, payload, options.eventUUID, options.metadata)
+    return this.waitUntilOn(typeUntil, {
+      eventUUID: options.eventUUID,
+    })
   }
 
   on<K extends ({} & string) | RegistryKey<Events>>(
@@ -183,7 +191,7 @@ export class EventQueue<
   }
 
   registerEventType(type: string): void {
-    this.eventTypesRegistry.set(type, {})
+    this.eventTypesRegistry.add(type)
   }
 
   /**
@@ -218,7 +226,7 @@ export class EventQueue<
     return unsubscribers
   }
 
-  removeBeforeEmitHook(hook: (event: AnyEvent<Events, Meta>) => Promise<void> | void): void {
+  removeBeforeEmitHook(hook: (event: AnyEvent<Events, Meta>) => void): void {
     this.beforeEmitHooks = this.beforeEmitHooks.filter((h) => h !== hook)
   }
 
@@ -231,7 +239,9 @@ export class EventQueue<
     payload: K extends keyof Events ? Events[K] : any,
   ): Promise<void> {
     this.emit(type, payload, originalEvent.eventUUID)
-    await this.waitUntilOn(type, originalEvent.eventUUID)
+    await this.waitUntilOn(type, {
+      eventUUID: originalEvent.eventUUID,
+    })
   }
 
   /**
@@ -252,13 +262,14 @@ export class EventQueue<
 
   waitUntilOn<K extends ({} & string) | EventKey<Events>>(
     type: K,
-    eventUUID?: string,
+    options: {
+      eventUUID?: UUID
+    } = {},
   ): Promise<Event<K, K extends keyof Events ? Events[K] : any, Meta>> {
     return new Promise((resolve) => {
       // @ts-expect-error
       const unsub = this.on(type, (event) => {
-        // console.log('waitUntilOn received event:', event, eventUUID) // DEBUG
-        if (eventUUID && event.eventUUID !== eventUUID) return
+        if (options.eventUUID && event.eventUUID !== options.eventUUID) return
         resolve(event)
         unsub()
       })
