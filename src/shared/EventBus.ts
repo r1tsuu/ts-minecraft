@@ -139,26 +139,42 @@ export class EventBus<
     this.beforeEmitHooks.push(hook)
   }
 
-  /**
-   * Publishes an event to all subscribed listeners.
-   * @param type The type of the event to publish.
-   * @param payload The payload of the event.
-   * @param eventUUID Optional UUID for the event. If not provided, a new UUID will be generated.
-   * @param metadata Optional metadata for the event.
-   * @example
-   * ```ts
-   * eventBus.publish('Client.JoinWorld', { worldUUID: 'some-uuid' })
-   * ```
-   */
+  publish(payloadInstance: object, eventUUID?: UUID, metadata?: Meta): void
   publish<K extends ({} & string) | EventKey<Events>>(
     type: K,
     payload: K extends keyof Events ? Events[K] : any,
     eventUUID?: UUID,
     metadata?: Meta,
+  ): void
+  publish(
+    typeOrPayload: any,
+    payloadOrEventUUID?: any,
+    eventUUIDOrMetadata?: any,
+    metadata?: Meta,
   ): void {
+    let type: string
+    let payload: any
+    let eventUUID: undefined | UUID
+    let meta: Meta | undefined
+
+    if (typeof typeOrPayload !== 'string') {
+      // Called with (payloadInstance, eventUUID?, metadata?)
+      const payloadInstance = typeOrPayload
+      type = (payloadInstance.constructor as any).type
+      payload = payloadInstance
+      eventUUID = payloadOrEventUUID
+      meta = eventUUIDOrMetadata
+    } else {
+      // Called with (type, payload, eventUUID?, metadata?)
+      type = typeOrPayload
+      payload = payloadOrEventUUID
+      eventUUID = eventUUIDOrMetadata
+      meta = metadata
+    }
+
     this.validateEventType(type)
 
-    const event = new Event(type, payload, eventUUID, metadata)
+    const event = new Event(type, payload, eventUUID, meta)
 
     for (const hook of this.beforeEmitHooks) {
       hook(event)
@@ -269,42 +285,94 @@ export class EventBus<
   }
 
   /**
-   * Publishes an event and waits for a specific response event.
-   * @param type The type of the event to publish.
-   * @param payload The payload of the event.
+   * Sends a request event and waits for a response event.
+   * @param type The type of the request event.
+   * @param payload The payload of the request event.
    * @param typeUntil The type of the response event to wait for.
    * @param options Additional options including eventUUID and metadata.
+   * @returns A promise that resolves with the response event.
    * @example
    * ```ts
    * const responseEvent = await eventBus.request(
    *   'Client.RequestJoinWorld',
-   *   { worldUUID: 'some-uuid' },
+   *   { worldName: 'MyWorld' },
+   *   'Server.ResponseJoinWorld'
+   * )
+   * console.log('Join world response:', responseEvent.payload)
+   * ```
+   *
+   * Additionally, you can call with just a payload instance, constructor of which must have a static `type` property:
+   * ```ts
+   * const responseEvent = await eventBus.request(
+   *   new RequestJoinWorldPayload('MyWorld'),
    *   'Server.ResponseJoinWorld'
    * )
    * ```
    */
-  async request<
-    K extends ({} & string) | EventKey<Events>,
-    UntilK extends ({} & string) | EventKey<Events>,
-  >(
-    type: K,
-    payload: K extends keyof Events ? Events[K] : any,
+  request<UntilK extends ({} & string) | EventKey<Events>>(
+    payloadInstance: object,
     typeUntil: UntilK,
-    options: {
+    options?: {
       eventUUID?: UUID
       metadata?: Meta
       /**
        * TODO: AbortSignal to cancel waiting for response
        */
       signal?: AbortSignal
-    } = {},
-  ): Promise<Event<UntilK, UntilK extends keyof Events ? Events[UntilK] : any>> {
-    if (!options.eventUUID) {
-      options.eventUUID = crypto.randomUUID()
+    },
+  ): Promise<Event<UntilK, UntilK extends keyof Events ? Events[UntilK] : any, Meta>>
+  request<
+    K extends ({} & string) | EventKey<Events>,
+    UntilK extends ({} & string) | EventKey<Events>,
+  >(
+    type: K,
+    payload: K extends keyof Events ? Events[K] : any,
+    typeUntil: UntilK,
+    options?: {
+      eventUUID?: UUID
+      metadata?: Meta
+      signal?: AbortSignal
+    },
+  ): Promise<Event<UntilK, UntilK extends keyof Events ? Events[UntilK] : any, Meta>>
+  async request(
+    typeOrPayload: any,
+    payloadOrTypeUntil: any,
+    typeUntilOrOptions?: any,
+    options?: {
+      eventUUID?: UUID
+      metadata?: Meta
+      signal?: AbortSignal
+    },
+  ): Promise<any> {
+    let type: string
+    let payload: any
+    let typeUntil: string
+    let optionsFinal: {
+      eventUUID?: UUID
+      metadata?: Meta
+      signal?: AbortSignal
+    } = {}
+    if (typeof typeOrPayload !== 'string') {
+      // Called with (payloadInstance, typeUntil, options?)
+      const payloadInstance = typeOrPayload
+      type = (payloadInstance.constructor as any).type
+      payload = payloadInstance
+      typeUntil = payloadOrTypeUntil
+      optionsFinal = typeUntilOrOptions || {}
+    } else {
+      // Called with (type, payload, typeUntil, options?)
+      type = typeOrPayload
+      payload = payloadOrTypeUntil
+      typeUntil = typeUntilOrOptions
+      optionsFinal = options || {}
     }
-    this.publish(type, payload, options.eventUUID, options.metadata)
+
+    if (!optionsFinal.eventUUID) {
+      optionsFinal.eventUUID = crypto.randomUUID()
+    }
+    this.publish(type, payload, optionsFinal.eventUUID, optionsFinal.metadata)
     return this.waitFor(typeUntil, {
-      eventUUID: options.eventUUID,
+      eventUUID: optionsFinal.eventUUID,
     })
   }
 

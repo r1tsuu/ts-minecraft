@@ -1,5 +1,6 @@
 import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { isComponent } from '../shared/Component.ts'
+import { RequestPlayerJoinPayload } from '../shared/events/client/RequestPlayerJoinPayload.ts'
 import {
   type AnyMinecraftEvent,
   type MinecraftEvent,

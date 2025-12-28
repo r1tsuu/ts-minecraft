@@ -1,8 +1,7 @@
 import * as THREE from 'three'
 
-import { Entity, RegisterEntity } from './Entity.ts'
+import { Entity } from './Entity.ts'
 
-@RegisterEntity()
 export class Player extends Entity {
   constructor(
     readonly uuid: string,

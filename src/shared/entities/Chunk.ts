@@ -1,6 +1,5 @@
-import { Entity, RegisterEntity } from './Entity.ts'
+import { Entity } from './Entity.ts'
 
-@RegisterEntity()
 export class Chunk extends Entity {
   constructor(
     readonly x: number,

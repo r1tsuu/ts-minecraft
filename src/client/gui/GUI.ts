@@ -185,7 +185,9 @@ export class GUI implements Component {
           loadingWorldName: world.name,
         })
 
-        eventBus.publish('Client.JoinWorld', { worldUUID: world.uuid })
+        eventBus.publish('Client.JoinWorld', {
+          worldUUID: world.uuid,
+        })
       },
       resumeGame: async () => {
         await this.resumeGame()
