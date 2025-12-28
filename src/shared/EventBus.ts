@@ -43,9 +43,10 @@ type WildcardKey = typeof WILDCARD
 export class EventBus<
   Events extends Record<string, Record<string, unknown>>,
   Meta extends Record<string, unknown> = {},
+  EventTypeMeta = {},
 > {
   private beforeEmitHooks: ((event: AnyEvent<Events, Meta>) => void)[] = []
-  private eventTypesRegistry = new Set<string>()
+  private eventTypesRegistry = new Map<string, EventTypeMeta>()
 
   private registry = new Map<
     RegistryKey<Events>,
@@ -188,8 +189,8 @@ export class EventBus<
    * eventBus.registerEventType('Client.JoinWorld')
    * ```
    */
-  registerEventType(type: string): void {
-    this.eventTypesRegistry.add(type)
+  registerEventType(type: string, meta: EventTypeMeta): void {
+    this.eventTypesRegistry.set(type, meta)
   }
 
   /**

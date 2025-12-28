@@ -1,7 +1,7 @@
 import type { UUID } from '../types.ts'
 
 export type AnyEvent<
-  Events extends Record<string, Record<string, unknown>>,
+  Events extends Record<string, any>,
   Meta extends Record<string, unknown> = {},
 > = {
   // @ts-expect-error

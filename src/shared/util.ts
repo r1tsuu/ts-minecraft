@@ -189,3 +189,125 @@ export type ClassConstructor<T extends object> = new (...args: any[]) => T
 export const getObjectConstructor = <T extends object>(obj: T): ClassConstructor<T> => {
   return obj.constructor as ClassConstructor<T>
 }
+
+export function pipe<A>(value: A): A
+export function pipe<A, AS extends boolean, B>(value: A, fn1: (input: A, skip: () => AS) => B): B
+export function pipe<A, B, C>(value: A, fn1: (input: A) => B, fn2: (input: B) => C): C
+export function pipe<A, B, C, D>(
+  value: A,
+  fn1: (input: A) => B,
+  fn2: (input: B) => C,
+  fn3: (input: C) => D,
+): D
+export function pipe<A, B, C, D, E>(
+  value: A,
+  fn1: (input: A) => B,
+  fn2: (input: B) => C,
+  fn3: (input: C) => D,
+  fn4: (input: D) => E,
+): E
+export function pipe(value: any, ...fns: Function[]): unknown {
+  return fns.reduce((acc, fn) => fn(acc), value)
+}
+
+const decodeMap = (decodeFn: (obj: any) => any, obj: any): Map<string, any> => {
+  const result = new Map<string, any>()
+
+  for (const [key, value] of Object.entries(obj)) {
+    result.set(key, decodeFn(value))
+  }
+
+  return result
+}
+
+const encodeMap = (encodeFn: (obj: any) => any, map: Map<string, any>): any => {
+  const result: any = {}
+
+  for (const [key, value] of map.entries()) {
+    result[key] = encodeFn(value)
+  }
+
+  return result
+}
+
+export const mapEncoder = (encodeFn: (obj: any) => any) => {
+  return (map: Map<string, any>): any => {
+    return encodeMap(encodeFn, map)
+  }
+}
+
+export const mapDecoder = (decodeFn: (obj: any) => any) => {
+  return (obj: any): Map<string, any> => {
+    return decodeMap(decodeFn, obj)
+  }
+}
+
+export const encoder = (keys: Record<string, (obj: any) => any>) => {
+  return (obj: any): any => {
+    const result: any = {}
+
+    for (const key of Object.keys(obj)) {
+      const maybeEncodeFn = keys[key]
+      if (!maybeEncodeFn) {
+        result[key] = obj[key]
+        continue
+      }
+
+      const encodeFn = maybeEncodeFn
+      result[key] = encodeFn(obj[key])
+    }
+
+    return result
+  }
+}
+
+export const decoder = (keys: Record<string, (obj: any) => any>) => {
+  return (obj: any): any => {
+    const result: any = {}
+
+    for (const key of Object.keys(obj)) {
+      const maybeDecodeFn = keys[key]
+      if (!maybeDecodeFn) {
+        result[key] = obj[key]
+        continue
+      }
+      result[key] = maybeDecodeFn(obj[key])
+    }
+
+    return result
+  }
+}
+
+/**
+ * Creates a codec with encode and decode functions for the given keys.
+ * @param keys An object where each key maps to a tuple containing the decode and encode functions.
+ * @returns An object with `encode` and `decode` methods.
+ * @example
+ * const userCodec = codec({
+ *   name: [
+ *     (obj) => obj as string, // decode function
+ *     (obj) => obj,          // encode function
+ *   ],
+ *   age: [
+ *     (obj) => parseInt(obj, 10), // decode function
+ *     (obj) => obj.toString(),    // encode function
+ *   ],
+ * })
+ *
+ * const encoded = userCodec.encode({ name: 'Alice', age: 30 })
+ * const decoded = userCodec.decode(encoded)
+ */
+export const codec = (keys: Record<string, [(obj: any) => any, (obj: any) => any]>) => {
+  const encodeFns: Record<string, (obj: any) => any> = {}
+  const decodeFns: Record<string, (obj: any) => any> = {}
+
+  for (const [key, [decodeFn, encodeFn]] of Object.entries(keys)) {
+    encodeFns[key] = encodeFn
+    decodeFns[key] = decodeFn
+  }
+
+  return {
+    decode: decoder(decodeFns),
+    encode: encoder(encodeFns),
+  }
+}

@@ -2,11 +2,24 @@
  * Minecraft-specific bus
  * =========================================================== */
 
-import type { DatabaseChunkData, DatabasePlayerData } from '../server/WorldDatabase.ts'
-import type { ChunkCoordinates, RawVector3, UUID } from '../types.ts'
-
 import { type AnyEvent, Event } from './Event.ts'
 import { EventBus } from './EventBus.ts'
+import { ExitWorldPayload } from './events/client/ExitWorldPayload.ts'
+import { JoinedWorldPayload } from './events/client/JoinedWorldPayload.ts'
+import { JoinWorldPayload } from './events/client/JoinWorldPayload.ts'
+import { PauseTogglePayload } from './events/client/PauseTogglePayload.ts'
+import { RequestChunksLoadPayload } from './events/client/RequestChunksLoadPayload.ts'
+import { RequestPlayerJoinPayload } from './events/client/RequestPlayerJoinPayload.ts'
+import { RequestSyncPlayerPayload } from './events/client/RequestSyncPlayerPayload.ts'
+import { RequestSyncUpdatedBlocksPayload } from './events/client/RequestSyncUpdatedBlocksPayload.ts'
+import { StartLocalServerPayload } from './events/client/StartLocalServerPayload.ts'
+import { ResponseChunksLoadPayload } from './events/server/ResponseChunksLoadPayload.ts'
+import { ResponsePlayerJoinPayload } from './events/server/ResponsePlayerJoinPayload.ts'
+import { ResponseSyncPlayerPayload } from './events/server/ResponseSyncPlayerPayload.ts'
+import { ResponseSyncUpdatedBlocksPayload } from './events/server/ResponseSyncUpdatedBlocksPayload.ts'
+import { ServerTickPayload } from './events/server/ServerTickPayload.ts'
+import { SinglePlayerWorkerServerStartPayload } from './events/single-player-worker/SinglePlayerWorkerServerStartPayload.ts'
+import { WorkerReadyPayload } from './events/single-player-worker/WorkerReadyPayload.ts'
 
 export type AnyMinecraftEvent = AnyEvent<MinecraftEventsData, MinecraftEventMetadata>
 
@@ -17,44 +30,39 @@ type MinecraftEventMetadata = {
   isForwarded: boolean
 }
 
-const e = <Payload>() => {
-  return <EventType extends string>(t: EventType) => {
-    return {
-      payload: {} as Payload,
-      type: t,
-    }
-  }
-}
+// EVENT TYPE DEFINITION START
 
 const eventTypes = [
-  e<{}>()('Client.ExitWorld'),
-  e<{}>()('Client.JoinedWorld'),
-  e<{ worldUUID: UUID }>()('Client.JoinWorld'),
-  e<{ chunks: ChunkCoordinates[] }>()('Client.RequestChunksLoad'),
-  e<{ playerUUID: UUID }>()('Client.RequestPlayerJoin'),
-  e<{ playerData: DatabasePlayerData }>()('Client.RequestSyncPlayer'),
-  e<{
-    updatedBlocks: {
-      blockID: number
-      position: RawVector3
-      type: 'add' | 'remove'
-    }[]
-  }>()('Client.RequestSyncUpdatedBlocks'),
-  e<{ worldDatabaseName: string }>()('Client.StartLocalServer'),
-  e<{ chunks: DatabaseChunkData[] }>()('Server.ResponseChunksLoad'),
-  e<{ playerData: DatabasePlayerData }>()('Server.ResponsePlayerJoin'),
-  e<{}>()('Server.ResponseSyncUpdatedBlocks'),
-  e<{}>()('Server.ResponseSyncPlayer'),
-  e<{ currentTick: number }>()('Server.ServerTick'),
-  e<{ loadedChunks: DatabaseChunkData[] }>()('SinglePlayerWorker.ServerStarted'),
-  e<{}>()('SinglePlayerWorker.WorkerReady'),
-  e<{}>()('Client.PauseToggle'),
+  ExitWorldPayload,
+  JoinedWorldPayload,
+  JoinWorldPayload,
+  RequestChunksLoadPayload,
+  RequestPlayerJoinPayload,
+  RequestSyncPlayerPayload,
+  RequestSyncUpdatedBlocksPayload,
+  StartLocalServerPayload,
+  ResponseChunksLoadPayload,
+  ResponsePlayerJoinPayload,
+  ResponseSyncUpdatedBlocksPayload,
+  ResponseSyncPlayerPayload,
+  ServerTickPayload,
+  SinglePlayerWorkerServerStartPayload,
+  WorkerReadyPayload,
+  PauseTogglePayload,
 ]
+// EVENT TYPE DEFINITION END
 
 export type MinecraftEventPayload<T extends MinecraftEventType> = MinecraftEventsData[T]
 
 type MinecraftEventsData = {
-  [K in (typeof eventTypes)[number] as K['type']]: K['payload']
+  [K in (typeof eventTypes)[number] as K['type']]: InstanceType<K>
+}
+
+type MinecraftEventTypeMeta = {
+  codec: {
+    decode?(obj: any): any
+    encode?(obj: any): any
+  }
 }
 
 export class MinecraftEvent<T extends ({} & string) | MinecraftEventType> extends Event<
@@ -63,12 +71,21 @@ export class MinecraftEvent<T extends ({} & string) | MinecraftEventType> extend
   MinecraftEventMetadata
 > {}
 
-export class MinecraftEventBus extends EventBus<MinecraftEventsData, MinecraftEventMetadata> {
+export class MinecraftEventBus extends EventBus<
+  // @ts-expect-error
+  MinecraftEventsData,
+  MinecraftEventMetadata,
+  MinecraftEventTypeMeta
+> {
   constructor(environment: 'Client' | 'Server') {
     super()
 
     for (const eventType of eventTypes) {
-      this.registerEventType(eventType.type)
+      this.registerEventType(eventType.type, {
+        // @ts-expect-error
+        decode: eventType.decode,
+        encode: eventType.encode,
+      })
     }
 
     this.addPrePublishHook((event) => {

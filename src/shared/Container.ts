@@ -1,228 +1,152 @@
-import type { UUID } from '../types.ts'
-
 import { Option } from './Option.ts'
+import { type ClassConstructor, getObjectConstructor } from './util.ts'
 
-export type ContainerScope = {
-  /**
-   * Lists all child instances registered under the given parent.
-   * @returns An array of child instances.
-   * @example
-   * const gameSessionScope = Container.createScope(gameSession)
-   * const playerManager = gameSessionScope.registerSingleton(new PlayerManager())
-   * const children = gameSessionScope.listChildren()
-   * console.log(children) // [playerManager]
-   */
-  listChildren(): any[]
-} & Container
+type InstanceKey = ClassConstructor<any> | number | string | symbol
 
-type AnyClassConstructor = new (...args: any[]) => any
-
-/**
- * A simple dependency injection container for managing instances and singletons.
- * It supports scoped containers associated with parent instances.
- * @example
- * const container = new Container()
- * const instance = container.register(new MyClass())
- * const singleton = container.registerSingleton(new MySingletonClass())
- * const resolvedInstance = container.resolve(MyClass).unwrap()
- * const resolvedSingleton = container.resolve(MySingletonClass).unwrap()
- * const scopedContainer = container.createScope(parentInstance)
- * const scopedSingleton = scopedContainer.registerSingleton(new ScopedSingletonClass())
- * const children = scopedContainer.listChildren()
- * console.log(children) // [scopedSingleton]
- */
-export class Container {
-  private idCounter = 0
-  private instances = new Map<number | UUID, any>()
-  private instanceToIdMap = new WeakMap<any, number | UUID>()
-  private singletonChildrenMap = new WeakMap<
-    AnyClassConstructor,
-    (AnyClassConstructor | number | UUID)[]
-  >()
-  private singletonInstances = new WeakMap<AnyClassConstructor, any>()
+export class Container<I extends object = object> {
+  private instanceMap = new Map<InstanceKey, I>()
+  private scopes: Set<ContainerScope<I>> = new Set()
 
   /**
    * Creates a scoped container where registrations are associated with the given parent.
-   * @param parent The parent instance to associate registrations with.
-   * @returns A new ContainerScope instance.
    */
-  createScope(parent: any): ContainerScope {
-    // @ts-expect-error
-    return new Proxy(this, {
-      get: (target, prop, receiver) => {
-        // Handle scope-specific methods
-        if (prop === 'listChildren') {
-          return () => {
-            const children = this.singletonChildrenMap.get(this.getConstructor(parent)) ?? []
+  createScope(): ContainerScope<I> {
+    const scope = new ContainerScope(this)
 
-            // @ts-expect-error
-            return children.map((child) => this.resolve(child).unwrap())
-          }
-        }
+    this.scopes.add(scope)
 
-        // Override registerSingleton to include parent
-        if (prop === 'registerSingleton') {
-          return (instance: any) => {
-            return (target as any)[prop](instance, parent)
-          }
-        }
-
-        // Override register to include parent
-        if (prop === 'register') {
-          return (instance: any, options: any = {}) => {
-            return (target as any)[prop](instance, { parent, ...options })
-          }
-        }
-
-        return Reflect.get(target, prop, receiver)
-      },
-    })
+    return scope
   }
 
   /**
-   * Registers an instance in the container.
-   * @param instance The instance to register.
-   * @param options Optional parameters including parent and uuid.
-   * @returns An object containing the assigned ID and the instance.
+   * Iterate over all registered instances in the container.
    * @example
-   * const container = new Container()
-   * const { id, instance } = container.register(new MyClass(), { uuid: 'custom-uuid' })
-   * console.log(id) // 'custom-uuid'
+   * for (const instance of container.iterateInstances()) {
+   *   // do something with instance
+   * }
    */
-  register<T>(
-    instance: T,
-    {
-      parent,
-      uuid,
-    }: {
-      parent?: any
-      uuid?: UUID
-    },
-  ): { id: number | UUID; instance: T } {
-    const id = uuid ?? this.idCounter++
-    this.instances.set(id, instance)
-    this.instanceToIdMap.set(instance, id)
-
-    if (parent) {
-      const parentConstructor = this.getConstructor(parent)
-      if (!this.singletonChildrenMap.has(parentConstructor)) {
-        this.singletonChildrenMap.set(parentConstructor, [])
-      }
-
-      this.singletonChildrenMap.get(parentConstructor)!.push(id)
-    }
-
-    return {
-      id,
-      instance,
-    }
+  iterateInstances(): IterableIterator<I> {
+    return this.instanceMap.values()
   }
 
   /**
-   * Registers a singleton instance in the container.
-   * @param instance The singleton instance to register.
-   * @param parent Optional parent instance to associate with the singleton.
-   * @returns The registered singleton instance.
-   * @throws Error if a singleton of the same type is already registered.
+   * Register an instance in the container with a specific key.
    * @example
-   * const container = new Container()
-   * const singleton = container.registerSingleton(new MySingletonClass())
-   * console.log(singleton) // MySingletonClass instance
+   * container.register(new MyClass(), MyClass)
+   * container.register(new MyClass(), 'my-key')
+   * @returns The registered instance.
    */
-  registerSingleton<T>(instance: T, parent?: any): T {
-    const constructor = this.getConstructor(instance)
+  register<T extends object>(instance: T, key: InstanceKey): T {
+    this.instanceMap.set(key, instance as unknown as I)
+    return instance
+  }
 
-    if (this.singletonInstances.has(constructor)) {
-      throw new Error(`Singleton instance already registered for ${constructor.name}`)
+  /**
+   * Register a singleton instance in the container.
+   * Throws an error if an instance of the same constructor is already registered.
+   * @example
+   * container.registerSingleton(new MyClass()) // uses MyClass as the key
+   * container.registerSingleton(new MyClass(), 'my-key')
+   */
+  registerSingleton<T extends object>(instance: T, key?: InstanceKey): T {
+    let keyToUse: InstanceKey
+
+    if (key) {
+      keyToUse = key
+    } else {
+      keyToUse = getObjectConstructor(instance)
     }
 
-    this.singletonInstances.set(constructor, instance)
-
-    if (parent) {
-      const parentConstructor = this.getConstructor(parent)
-      if (!this.singletonChildrenMap.has(parentConstructor)) {
-        this.singletonChildrenMap.set(parentConstructor, [])
-      }
-
-      this.singletonChildrenMap.get(parentConstructor)!.push(constructor)
+    if (this.instanceMap.has(keyToUse)) {
+      throw new Error(`Singleton instance already registered for ${this.keyToString(keyToUse)}`)
     }
+
+    this.instanceMap.set(keyToUse, instance as unknown as I) // Dont use WeakMap for constructors since
 
     return instance
   }
+
+  removeScope(scope: ContainerScope<I>): void {
+    this.scopes.delete(scope)
+  }
+
   /**
-   * Resolves an instance or singleton from the container.
-   * @param idOrSingletonConstructor The ID or constructor of the instance/singleton to resolve.
-   * @returns An OptionType containing the resolved instance or undefined if not found.
+   * Resolve an instance from the container.
+   * If the instance is not found in the current container, it will
+   * recursively check parent scopes.
+   * Returns an Option wrapping the instance if found, or None if not found.
    * @example
-   * const container = new Container()
-   * const { id, instance } = container.register(new MyClass())
-   * const resolvedInstance = container.resolve(id).unwrap()
-   * console.log(resolvedInstance === instance) // true
-   * const singleton = container.registerSingleton(new MySingletonClass())
-   * const resolvedSingleton = container.resolve(MySingletonClass).unwrap()
-   * console.log(resolvedSingleton === singleton) // true
+   * const myInstance = container.resolve(MyClass).unwrap()
+   * const maybeInstance = container.resolve(MyClass)
+   * if (maybeInstance.isSome()) {
+   *   const instance = maybeInstance.unwrap()
+   * }
+   * const anotherInstance = container.resolve('my-key').unwrap()
    */
-  resolve<T>(id: number | UUID): Option<T>
-  resolve<T>(singletonConstructor: new (...args: any[]) => T): Option<T>
-  resolve<T>(idOrSingletonConstructor: any): Option<T> {
-    if (
-      typeof idOrSingletonConstructor === 'number' ||
-      typeof idOrSingletonConstructor === 'string'
-    ) {
-      return Option.from(this.instances.get(idOrSingletonConstructor as number | UUID))
+  resolve<T extends object>(key: ClassConstructor<T>): Option<T>
+  resolve<T extends object>(key: number | string | symbol): Option<T>
+  resolve<T extends object>(key: InstanceKey): Option<T> {
+    const maybeInstance = Option.from(this.instanceMap.get(key))
+
+    if (maybeInstance.isSome()) {
+      return maybeInstance as unknown as Option<T>
     }
 
-    return Option.from(
-      this.singletonInstances.get(idOrSingletonConstructor as new (...args: any[]) => T),
-    )
-  }
+    for (const scope of this.scopes) {
+      // @ts-expect-error
+      const scopedInstance = scope.resolve<T>(key)
 
-  unregister(instanceOrSingletonConstructor: any): void
-  unregister(id: number | UUID): void
-  unregister(instanceOrSingletonConstructor: any): void {
-    // Unregister singleton
-    if (typeof instanceOrSingletonConstructor === 'function') {
-      const constructor = instanceOrSingletonConstructor as new (...args: any[]) => any
-      const instance = this.singletonInstances.get(constructor)
-
-      if (instance) {
-        this.singletonInstances.delete(constructor)
-
-        const children = this.singletonChildrenMap.get(constructor) || []
-
-        for (const child of children) {
-          this.unregister(child)
-        }
-
-        this.singletonChildrenMap.delete(constructor)
-      } else {
-        throw new Error(`No singleton instance registered for ${constructor.name}`)
+      if (scopedInstance.isSome()) {
+        return scopedInstance
       }
-
-      return
     }
 
-    // Unregister instance by ID
-    if (
-      typeof instanceOrSingletonConstructor === 'number' ||
-      typeof instanceOrSingletonConstructor === 'string'
-    ) {
-      this.instances.delete(instanceOrSingletonConstructor as number | UUID)
-      return
-    }
-
-    // Unregister instance by reference
-    const id = this.instanceToIdMap.get(instanceOrSingletonConstructor)
-
-    if (id !== undefined) {
-      this.instances.delete(id)
-      this.instanceToIdMap.delete(instanceOrSingletonConstructor)
-    } else {
-      throw new Error(`Instance not registered in the container`)
-    }
+    return Option.None()
   }
 
-  private getConstructor(object: any): new (...args: any[]) => any {
-    return object.constructor as new (...args: any[]) => any
+  unregister(key: InstanceKey): void {
+    if (!this.instanceMap.has(key)) {
+      throw new Error(`No instance registered for key: ${this.keyToString(key)}`)
+    }
+
+    this.instanceMap.delete(key)
+  }
+
+  /**
+   * Unregister all instances from the container.
+   * Useful for disposing a scope.
+   */
+  unregisterAll(): void {
+    this.instanceMap.clear()
+  }
+
+  private keyToString(key: InstanceKey): string {
+    if (typeof key === 'function') {
+      return key.name
+    }
+
+    return String(key)
+  }
+}
+
+export class ContainerScope<I extends object = object> extends Container<I> {
+  constructor(private parent: Container<I>) {
+    super()
+  }
+
+  /**
+   * Destroys the scope and unregisters all instances associated with it.
+   * Also removes the scope from its parent container.
+   * @example
+   * const scope = parentContainer.createScope()
+   * // ... use the scope
+   * scope.destroyScope()
+   *
+   * Use it when you want to clean up all instances in the scope and
+   * remove the scope from the parent container.
+   */
+  destroyScope(): void {
+    this.unregisterAll()
+    this.parent.removeScope(this)
   }
 }

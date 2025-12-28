@@ -48,6 +48,11 @@ export type ClientPlayerData = {
   yaw: number
 }
 
+export type RawVector2 = {
+  x: number
+  y: number
+}
+
 export type RawVector3 = {
   x: number
   y: number

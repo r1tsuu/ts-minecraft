@@ -31,13 +31,13 @@ export class GameSession implements Component {
   paused = false
   playerUUID: UUID
 
-  scope: ContainerScope
   private additionalOnDisposeCallbacks: Array<() => void> = []
   private delta: number = 0
   private disposed = false
   private gameLoopClock = new THREE.Clock()
   private isGameLoopClockStopped = false
   private lastTimeout: null | number = null
+  private scope: ContainerScope = ClientContainer.createScope()
 
   constructor(
     initialChunksFromServer: DatabaseChunkData[],
@@ -45,8 +45,7 @@ export class GameSession implements Component {
   ) {
     this.playerUUID = initialPlayerFromServer.uuid
 
-    const scope = ClientContainer.createScope(this)
-    this.scope = scope
+    const scope = this.scope
 
     scope.registerSingleton(new THREE.Scene())
 
@@ -83,9 +82,7 @@ export class GameSession implements Component {
           Config.EULER_ORDER,
         ),
       ),
-      {
-        uuid: initialPlayerFromServer.uuid,
-      },
+      initialPlayerFromServer.uuid,
     )
 
     scope.registerSingleton(new World(initialChunksFromServer))
@@ -99,7 +96,7 @@ export class GameSession implements Component {
   }
 
   dispose(): void {
-    for (const child of this.scope.listChildren()) {
+    for (const child of this.scope.iterateInstances()) {
       if (isComponent(child) || child instanceof THREE.WebGLRenderer) {
         child.dispose()
       }
@@ -117,6 +114,8 @@ export class GameSession implements Component {
     for (const callback of this.additionalOnDisposeCallbacks) {
       callback()
     }
+
+    this.scope.destroyScope()
 
     this.disposed = true
   }
@@ -202,7 +201,7 @@ export class GameSession implements Component {
     /**
      * UPDATE GAME STATE HERE
      */
-    for (const child of this.scope.listChildren()) {
+    for (const child of this.scope.iterateInstances()) {
       if (isComponent(child)) {
         child.update()
       }
