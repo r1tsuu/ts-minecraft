@@ -342,30 +342,6 @@ export function compose(...fns: Function[]) {
   return (input: any) => fns.reduceRight((acc, fn) => fn(acc), input)
 }
 
-// Type-safe pipe function (left-to-right composition)
-// pipe(f, g, h)(x) = h(g(f(x)))
-
-export function pipe<A>(fn: (a: A) => A): (a: A) => A
-export function pipe<A, B>(fn1: (a: A) => B, fn2: (b: B) => A): (a: A) => A
-export function pipe<A, B, C>(fn1: (a: A) => B, fn2: (b: B) => C, fn3: (c: C) => A): (a: A) => A
-export function pipe<A, B, C, D>(
-  fn1: (a: A) => B,
-  fn2: (b: B) => C,
-  fn3: (c: C) => D,
-  fn4: (d: D) => A,
-): (a: A) => A
-export function pipe<A, B, C, D, E>(
-  fn1: (a: A) => B,
-  fn2: (b: B) => C,
-  fn3: (c: C) => D,
-  fn4: (d: D) => E,
-  fn5: (e: E) => A,
-): (a: A) => A
-
-export function pipe(...fns: Function[]) {
-  return (input: any) => fns.reduce((acc, fn) => fn(acc), input)
-}
-
 export const apply = <A, B>(fn: (arg: A) => B, arg: A): B => fn(arg)
 
 export const isIterable = <T>(obj: any): obj is Iterable<T> => {

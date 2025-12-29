@@ -17,7 +17,7 @@ const chunkKey = (x: number, z: number) => `${x},${z}`
 @Component()
 @MinecraftEventBus.ClientListener()
 @Scheduler.ClientSchedulable()
-export class World implements Component {
+export class World_Legacy implements Component {
   blockMeshes = new Map<number, THREE.InstancedMesh>()
   blockMeshesCount = new Map<number, number>()
   blocksMeshesFreeIndexes = new Map<number, number[]>()

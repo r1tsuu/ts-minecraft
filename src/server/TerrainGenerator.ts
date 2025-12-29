@@ -3,6 +3,7 @@ import { SimplexNoise } from 'three/examples/jsm/Addons.js'
 import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { Config } from '../shared/Config.ts'
 import { Chunk, type ChunkCoordinates } from '../shared/entities/Chunk.ts'
+import { range } from '../shared/util.ts'
 import { ServerContainer } from './ServerContainer.ts'
 
 export class TerrainGenerator {
@@ -14,8 +15,8 @@ export class TerrainGenerator {
     const blocksRegistry = ServerContainer.resolve(BlocksRegistry).unwrap()
     const chunk = new Chunk(coords.x, coords.z)
 
-    for (let x = 0; x < Config.CHUNK_SIZE; x++) {
-      for (let z = 0; z < Config.CHUNK_SIZE; z++) {
+    for (const x of range(Config.CHUNK_SIZE)) {
+      for (const z of range(Config.CHUNK_SIZE)) {
         const worldX = coords.x * Config.CHUNK_SIZE + x
         const worldZ = coords.z * Config.CHUNK_SIZE + z
 
@@ -32,7 +33,7 @@ export class TerrainGenerator {
 
         for (let y = 0; y <= height; y++) {
           const block = y === height ? 'grass' : 'dirt'
-          chunk.blocks[Chunk.blockIndex(x, y, z)] = blocksRegistry.getBlockIdByName(block)
+          chunk.setBlock(x, y, z, blocksRegistry.getBlockIdByName(block))
         }
       }
     }

@@ -1,6 +1,6 @@
-import { chain } from '../../Chain.ts'
 import { Player } from '../../entities/Player.ts'
 import { MinecraftEvent } from '../../MinecraftEvent.ts'
+import { pipe } from '../../Pipe.ts'
 
 export class RequestSyncPlayer extends MinecraftEvent {
   static readonly type = 'Client.RequestSyncPlayer'
@@ -10,16 +10,16 @@ export class RequestSyncPlayer extends MinecraftEvent {
   }
 
   static deserialize(obj: any): RequestSyncPlayer {
-    return chain(obj.playerData)
+    return pipe(obj.playerData)
       .map(Player.deserialize)
       .map((player) => new RequestSyncPlayer(player))
-      .unwrap()
+      .value()
   }
 
   serialize() {
-    return chain(this.playerData)
+    return pipe(this.playerData)
       .map((player) => player.serialize())
       .map((playerData) => ({ playerData }))
-      .unwrap()
+      .value()
   }
 }

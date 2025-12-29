@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { Component } from '../shared/Component.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
-import { World } from './World.ts'
+import { World_Legacy } from './WorldLegacy.ts'
 
 const FAR = 5
 
@@ -48,7 +48,7 @@ export class Raycaster implements Component {
     const scene = ClientContainer.resolve(THREE.Scene).unwrap()
     const camera = ClientContainer.resolve(THREE.PerspectiveCamera).unwrap()
     const player = ClientContainer.resolve(GameSession).unwrap().getCurrentPlayer()
-    const world = ClientContainer.resolve(World).unwrap()
+    const world = ClientContainer.resolve(World_Legacy).unwrap()
 
     scene.remove(this.mesh)
 

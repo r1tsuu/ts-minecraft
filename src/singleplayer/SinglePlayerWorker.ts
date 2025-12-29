@@ -7,13 +7,13 @@ import { ServerContainer } from '../server/ServerContainer.ts'
 import { deserializeEvent, serializeEvent } from '../shared/Event.ts'
 import { ClientEvent } from '../shared/events/client/index.ts'
 import { SinglePlayerWorkerEvent } from '../shared/events/single-player-worker/index.ts'
-import { Maybe } from '../shared/Maybe.ts'
+import { Maybe, None, Some } from '../shared/Maybe.ts'
 import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { PrivateFileSystemWorldStorage } from './PrivateFileSystemWorldStorage.ts'
 
 class SinglePlayerServerImpl {
   private readonly eventBus: MinecraftEventBus
-  private server: Maybe<MinecraftServer> = Maybe.None()
+  private server: Maybe<MinecraftServer> = None()
 
   constructor() {
     this.eventBus = new MinecraftEventBus('Server')
@@ -52,7 +52,7 @@ class SinglePlayerServerImpl {
 
     const storage = await PrivateFileSystemWorldStorage.create(event.worldName)
     const { server, world } = await new MinecraftServerFactory(storage).build()
-    this.server = Maybe.Some(server)
+    this.server = Some(server)
 
     this.eventBus.publish(
       new SinglePlayerWorkerEvent.ServerStarted(world),

@@ -5,16 +5,21 @@ import type { ContainerScope } from '../shared/Container.ts'
 
 import { Component, isComponent } from '../shared/Component.ts'
 import { Config } from '../shared/Config.ts'
+import { Player } from '../shared/entities/Player.ts'
+import { PauseToggle } from '../shared/events/client/PauseToggle.ts'
 import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
+import { pipe } from '../shared/Pipe.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
+import { World } from '../shared/World.ts'
 import { type UUID } from '../types.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { ClientPlayerManager } from './ClientPlayerManager.ts'
 import { GUI } from './gui/GUI.ts'
 import { InputManager } from './InputManager.ts'
-import { Player } from './Player.ts'
+import { LocalStorageManager } from './LocalStorageManager.ts'
+import { PlayerUpdateSystem } from './PlayerUpdateSystem.ts'
 import { Raycaster } from './Raycaster.ts'
-import { World } from './World.ts'
+import { World_Legacy } from './WorldLegacy.ts'
 
 @Component()
 @MinecraftEventBus.ClientListener()
@@ -39,12 +44,7 @@ export class GameSession implements Component {
   private lastTimeout: null | number = null
   private scope: ContainerScope = ClientContainer.createScope()
 
-  constructor(
-    initialChunksFromServer: DatabaseChunkData[],
-    initialPlayerFromServer: DatabasePlayerData,
-  ) {
-    this.playerUUID = initialPlayerFromServer.uuid
-
+  constructor(world: World) {
     const scope = this.scope
 
     scope.registerSingleton(new THREE.Scene())
@@ -70,22 +70,7 @@ export class GameSession implements Component {
     camera.position.set(0, 40, 0)
     camera.lookAt(30, 35, 30)
 
-    scope.register(
-      new Player(
-        initialPlayerFromServer.uuid,
-        THREE.Vector3.fromRaw(initialPlayerFromServer.position),
-        THREE.Vector3.fromRaw(initialPlayerFromServer.velocity),
-        new THREE.Euler(
-          initialPlayerFromServer.rotation.x,
-          initialPlayerFromServer.rotation.y,
-          0,
-          Config.EULER_ORDER,
-        ),
-      ),
-      initialPlayerFromServer.uuid,
-    )
-
-    scope.registerSingleton(new World(initialChunksFromServer))
+    scope.registerSingleton(world)
     scope.registerSingleton(new ClientPlayerManager())
     scope.registerSingleton(new InputManager())
     scope.registerSingleton(new Raycaster())
@@ -135,43 +120,49 @@ export class GameSession implements Component {
   }
 
   getCurrentPlayer(): Player {
-    return ClientContainer.resolve<Player>(this.playerUUID).unwrap()
+    const world = ClientContainer.resolve(World).unwrap()
+    const localStorage = ClientContainer.resolve(LocalStorageManager).unwrap()
+
+    return pipe(localStorage.getPlayerUUID())
+      .map((playerUUID) => world.getEntity(playerUUID, Player))
+      .value()
+      .unwrap()
   }
 
   getDelta(): number {
     return this.delta
   }
 
-  @MinecraftEventBus.Handler('Client.PauseToggle')
+  @MinecraftEventBus.Handler(PauseToggle)
   protected onPauseToggle(): void {
     this.paused = !this.paused
   }
 
-  @Scheduler.Every(1000)
-  protected async syncPlayer(): Promise<void> {
-    if (this.paused) {
-      return
-    }
+  // @Scheduler.Every(1000)
+  // protected async syncPlayer(): Promise<void> {
+  //   if (this.paused) {
+  //     return
+  //   }
 
-    const player = this.getCurrentPlayer()
-    await ClientContainer.resolve(MinecraftEventBus)
-      .unwrap()
-      .request(
-        'Client.RequestSyncPlayer',
-        {
-          playerData: {
-            position: player.position.toRaw(),
-            rotation: {
-              x: player.rotation.x,
-              y: player.rotation.y,
-            },
-            uuid: this.playerUUID,
-            velocity: player.velocity.toRaw(),
-          },
-        },
-        'Server.ResponseSyncPlayer',
-      )
-  }
+  //   const player = this.getCurrentPlayer()
+  //   await ClientContainer.resolve(MinecraftEventBus)
+  //     .unwrap()
+  //     .request(
+  //       'Client.RequestSyncPlayer',
+  //       {
+  //         playerData: {
+  //           position: player.position.toRaw(),
+  //           rotation: {
+  //             x: player.rotation.x,
+  //             y: player.rotation.y,
+  //           },
+  //           uuid: this.playerUUID,
+  //           velocity: player.velocity.toRaw(),
+  //         },
+  //       },
+  //       'Server.ResponseSyncPlayer',
+  //     )
+  // }
 
   private handleGameFrame() {
     if (this.paused) {

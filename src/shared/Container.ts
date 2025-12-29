@@ -1,4 +1,4 @@
-import { Maybe } from './Maybe.ts'
+import { Maybe, None } from './Maybe.ts'
 import { type ClassConstructor, getObjectConstructor } from './util.ts'
 
 type InstanceKey = ClassConstructor<any> | number | string | symbol
@@ -95,7 +95,7 @@ export class Container<I extends object = object> {
       }
     }
 
-    return Maybe.None()
+    return None()
   }
 
   unregister(key: InstanceKey): void {

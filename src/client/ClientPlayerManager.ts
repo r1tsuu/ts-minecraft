@@ -1,5 +1,4 @@
 import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
-import { Component } from '../shared/Component.ts'
 import { Config } from '../shared/Config.ts'
 import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { Throttle } from '../shared/util.ts'
@@ -7,11 +6,10 @@ import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
 import { InputManager } from './InputManager.ts'
 import { Raycaster } from './Raycaster.ts'
-import { World } from './World.ts'
+import { World_Legacy } from './WorldLegacy.ts'
 
-@Component()
 @MinecraftEventBus.ClientListener()
-export class ClientPlayerManager implements Component {
+export class ClientPlayerManager {
   private static THROTTLE_DELAY_MS = 500
 
   update(): void {
@@ -82,7 +80,7 @@ export class ClientPlayerManager implements Component {
 
   @Throttle(ClientPlayerManager.THROTTLE_DELAY_MS)
   private handleBlockPlace(): void {
-    const world = ClientContainer.resolve(World).unwrap()
+    const world = ClientContainer.resolve(World_Legacy).unwrap()
     const raycaster = ClientContainer.resolve(Raycaster).unwrap()
     const blocksRegistry = ClientContainer.resolve(BlocksRegistry).unwrap()
 
@@ -100,7 +98,7 @@ export class ClientPlayerManager implements Component {
 
   @Throttle(ClientPlayerManager.THROTTLE_DELAY_MS)
   private handleBlockRemove(): void {
-    const world = ClientContainer.resolve(World).unwrap()
+    const world = ClientContainer.resolve(World_Legacy).unwrap()
     const raycaster = ClientContainer.resolve(Raycaster).unwrap()
 
     if (raycaster.lookingAtBlock) {

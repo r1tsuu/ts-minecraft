@@ -5,7 +5,7 @@ import {
   getEntityConstructor,
 } from './entities/Entity.ts'
 import { HashMap } from './HashMap.ts'
-import { Maybe } from './Maybe.ts'
+import { Maybe, None, Some } from './Maybe.ts'
 import { Result } from './Result.ts'
 import { type ClassConstructor } from './util.ts'
 
@@ -163,18 +163,18 @@ export class World {
    */
   getEntity<T extends Entity>(id: string, type?: ClassConstructor<T>): Maybe<T> {
     const maybeEntity = this.entities.get(id)
-    if (maybeEntity.isNone()) return Maybe.None()
+    if (maybeEntity.isNone()) return None()
     const entity = maybeEntity.value()
 
     if (!type) {
-      return Maybe.Some(entity as T)
+      return Some(entity as T)
     }
 
     if (entity instanceof type) {
-      return Maybe.Some(entity as T)
+      return Some(entity as T)
     }
 
-    return Maybe.None()
+    return None()
   }
 
   markEntityAsDirty(id: string): void {

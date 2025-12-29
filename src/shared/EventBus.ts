@@ -6,7 +6,7 @@ import type { UUID } from '../types.ts'
 import type { ClassConstructor } from './util.ts'
 
 import { Event, type EventMetadata } from './Event.ts'
-import { Maybe } from './Maybe.ts'
+import { Maybe, Some } from './Maybe.ts'
 
 const EVENT_HANDLERS_KEY = Symbol('EVENT_HANDLERS')
 const WILDCARD = '*'
@@ -160,7 +160,7 @@ export class EventBus<E extends Event<EventMetadata>> {
     const type = getEventConstructor(event).type
 
     if (uuid) {
-      event.metadata.uuid = Maybe.Some(uuid)
+      event.metadata.uuid = Some(uuid)
     }
 
     if (!type) {
@@ -283,7 +283,7 @@ export class EventBus<E extends Event<EventMetadata>> {
     ResponseEventConstructor: EventConstructor<R>,
   ): Promise<R> {
     if (requestEvent.metadata.uuid.isNone()) {
-      requestEvent.metadata.uuid = Maybe.Some(crypto.randomUUID())
+      requestEvent.metadata.uuid = Some(crypto.randomUUID())
     }
 
     this.publish(requestEvent)

@@ -1,4 +1,4 @@
-import { Maybe } from './Maybe.ts'
+import { Maybe, None, Some } from './Maybe.ts'
 
 /**
  * A simple HashMap implementation that wraps a JavaScript Map.
@@ -50,7 +50,7 @@ export class HashMap<K, V> {
 
   get(key: K): Maybe<V> {
     const value = this.map.get(key)
-    return value !== undefined ? Maybe.Some(value) : Maybe.None<V>()
+    return value !== undefined ? Some(value) : None<V>()
   }
 
   has(key: K): boolean {

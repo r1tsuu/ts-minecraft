@@ -3,23 +3,23 @@
 import { isIterable } from './util.ts'
 
 /**
- * A type-safe ChainAsync class for functional method chaining with async operations
+ * A type-safe AsyncPipeline class for functional method chaining with async support
  */
-class ChainAsync<T> {
+class AsyncPipeline<T> {
   constructor(private promise: Promise<T>) {}
 
   /**
    * Catch errors and provide a fallback value
    */
-  catch<U>(handler: (error: unknown) => Promise<U> | U): ChainAsync<T | U> {
-    return new ChainAsync(this.promise.catch(handler))
+  catch<U>(handler: (error: unknown) => Promise<U> | U): AsyncPipeline<T | U> {
+    return new AsyncPipeline(this.promise.catch(handler))
   }
 
   /**
    * Collect an AsyncIterable into an array
    */
-  collect<U>(this: ChainAsync<AsyncIterable<U>>): ChainAsync<U[]> {
-    return new ChainAsync(
+  collect<U>(this: AsyncPipeline<AsyncIterable<U>>): AsyncPipeline<U[]> {
+    return new AsyncPipeline(
       this.promise.then(async (iterable) => {
         if (!isIterable(iterable)) {
           throw new Error('collect can only be called on ChainAsync wrapping an AsyncIterable')
@@ -37,8 +37,8 @@ class ChainAsync<T> {
   /**
    * Provide a default value if current value is null or undefined
    */
-  default<U>(defaultValue: U): ChainAsync<NonNullable<T> | U> {
-    return new ChainAsync(
+  default<U>(defaultValue: U): AsyncPipeline<NonNullable<T> | U> {
+    return new AsyncPipeline(
       this.promise.then((value) => (value ?? defaultValue) as NonNullable<T> | U),
     )
   }
@@ -53,8 +53,8 @@ class ChainAsync<T> {
   /**
    * Filter the value - if predicate fails, returns ChainAsync with undefined
    */
-  filter(predicate: (value: T) => boolean | Promise<boolean>): ChainAsync<T | undefined> {
-    return new ChainAsync(
+  filter(predicate: (value: T) => boolean | Promise<boolean>): AsyncPipeline<T | undefined> {
+    return new AsyncPipeline(
       this.promise.then(async (value) => {
         const passes = await predicate(value)
         return passes ? value : undefined
@@ -64,8 +64,8 @@ class ChainAsync<T> {
 
   filterArray(
     predicate: (value: T extends Array<infer R> ? R : never) => boolean | Promise<boolean>,
-  ): ChainAsync<Array<T extends Array<infer R> ? R : never>> {
-    return new ChainAsync(
+  ): AsyncPipeline<Array<T extends Array<infer R> ? R : never>> {
+    return new AsyncPipeline(
       this.promise.then(async (value) => {
         if (!Array.isArray(value)) {
           throw new Error('filterArray can only be called on ChainAsync wrapping an array')
@@ -81,18 +81,15 @@ class ChainAsync<T> {
     )
   }
 
-  /**
-   * Execute finally logic (always runs)
-   */
-  finally(fn: () => Promise<void> | void): ChainAsync<T> {
-    return new ChainAsync(this.promise.finally(fn))
+  finally<U>(fn: () => Promise<void> | void): AsyncPipeline<T | U> {
+    return new AsyncPipeline(this.promise.finally(fn))
   }
 
   /**
    * Flat map - useful for chaining operations that return ChainAsync
    */
-  flatMap<U>(fn: (value: T) => ChainAsync<U> | Promise<ChainAsync<U>>): ChainAsync<U> {
-    return new ChainAsync(
+  flatMap<U>(fn: (value: T) => AsyncPipeline<U> | Promise<AsyncPipeline<U>>): AsyncPipeline<U> {
+    return new AsyncPipeline(
       this.promise.then(async (value) => {
         const chain = await fn(value)
         return chain
@@ -103,8 +100,8 @@ class ChainAsync<T> {
   /**
    * Transform the current value using a mapping function (sync or async)
    */
-  map<const U>(fn: (value: T) => Promise<U> | U): ChainAsync<U> {
-    return new ChainAsync(this.promise.then(fn))
+  map<const U>(fn: (value: T) => Promise<U> | U): AsyncPipeline<U> {
+    return new AsyncPipeline(this.promise.then(fn))
   }
 
   /**
@@ -112,8 +109,8 @@ class ChainAsync<T> {
    */
   mapArray<U>(
     fn: (value: T extends Array<infer R> ? R : never, index: number) => Promise<U> | U,
-  ): ChainAsync<U[]> {
-    return new ChainAsync(
+  ): AsyncPipeline<U[]> {
+    return new AsyncPipeline(
       this.promise.then(async (value) => {
         if (!Array.isArray(value)) {
           throw new Error('mapArray can only be called on ChainAsync wrapping an array')
@@ -133,7 +130,7 @@ class ChainAsync<T> {
 
   mapIter<U>(
     fn: (value: T extends Iterable<infer R> ? R : never) => Promise<U> | U,
-  ): ChainAsync<AsyncIterable<U>> {
+  ): AsyncPipeline<AsyncIterable<U>> {
     function asyncIterableFromPromise(promise: Promise<T>): AsyncIterable<U> {
       return {
         async *[Symbol.asyncIterator]() {
@@ -151,7 +148,7 @@ class ChainAsync<T> {
     }
 
     // @ts-expect-error
-    return new ChainAsync(asyncIterableFromPromise(this.promise))
+    return new AsyncPipeline(asyncIterableFromPromise(this.promise))
   }
 
   /**
@@ -160,8 +157,8 @@ class ChainAsync<T> {
   parallel<U extends readonly unknown[]>(
     fn: (value: T) => Promise<readonly [...U]> | readonly [...U],
     limit?: number,
-  ): ChainAsync<{ [K in keyof U]: Awaited<U[K]> }> {
-    return new ChainAsync(
+  ): AsyncPipeline<{ [K in keyof U]: Awaited<U[K]> }> {
+    return new AsyncPipeline(
       this.promise.then(async (value) => {
         const tasks = await fn(value)
 
@@ -190,8 +187,8 @@ class ChainAsync<T> {
   /**
    * Retry the operation if it fails
    */
-  retry(times: number, delay = 0): ChainAsync<T> {
-    return new ChainAsync(
+  retry(times: number, delay = 0): AsyncPipeline<T> {
+    return new AsyncPipeline(
       this.promise.catch(async (error) => {
         if (times <= 0) throw error
 
@@ -208,8 +205,8 @@ class ChainAsync<T> {
   /**
    * Apply a side effect without changing the value (sync or async)
    */
-  tap(fn: (value: T) => Promise<void> | void): ChainAsync<T> {
-    return new ChainAsync(
+  tap(fn: (value: T) => any | Promise<void>): AsyncPipeline<T> {
+    return new AsyncPipeline(
       this.promise.then(async (value) => {
         await fn(value)
         return value
@@ -217,11 +214,30 @@ class ChainAsync<T> {
     )
   }
 
-  tapError(fn: (error: unknown) => Promise<void> | void): ChainAsync<T> {
-    return new ChainAsync(
+  tapError(fn: (error: unknown) => Promise<void> | void): AsyncPipeline<T> {
+    return new AsyncPipeline(
       this.promise.catch(async (error) => {
         await fn(error)
         throw error
+      }),
+    )
+  }
+
+  /**
+   * Execute a function regardless of success or failure
+   * @example
+   * asyncPipe(someAsyncOperation())
+   *   .tapFinally(() => {
+   *     console.log('Operation completed (success or failure)')
+   *   })
+   *   .catch((error) => {
+   *     console.error('Operation failed:', error)
+   *   })
+   */
+  tapFinally(fn: () => Promise<void> | void): AsyncPipeline<T> {
+    return new AsyncPipeline(
+      this.promise.finally(async () => {
+        await fn()
       }),
     )
   }
@@ -239,8 +255,8 @@ class ChainAsync<T> {
   /**
    * Add timeout to the chain
    */
-  timeout(ms: number, message = 'Operation timed out'): ChainAsync<T> {
-    return new ChainAsync(
+  timeout(ms: number, message = 'Operation timed out'): AsyncPipeline<T> {
+    return new AsyncPipeline(
       Promise.race([
         this.promise,
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
@@ -254,8 +270,8 @@ class ChainAsync<T> {
   when(
     predicate: (value: T) => boolean | Promise<boolean>,
     fn: (value: T) => Promise<T> | T,
-  ): ChainAsync<T> {
-    return new ChainAsync(
+  ): AsyncPipeline<T> {
+    return new AsyncPipeline(
       this.promise.then(async (value) => {
         const shouldExecute = await predicate(value)
         return shouldExecute ? await fn(value) : value
@@ -265,9 +281,9 @@ class ChainAsync<T> {
 }
 
 /**
- * Factory function to create a new ChainAsync
+ * Factory function to create a new AsyncPipeline
  */
 // @ts-expect-error
-export function chainAsync<T>(value: Promise<T> | T = null): ChainAsync<T> {
-  return new ChainAsync(Promise.resolve(value))
+export function asyncPipe<T>(value: Promise<T> | T = null): AsyncPipeline<T> {
+  return new AsyncPipeline(Promise.resolve(value))
 }

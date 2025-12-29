@@ -2,8 +2,8 @@ import { Euler, Vector3 } from 'three'
 
 import type { ContainerScope } from '../shared/Container.ts'
 
-import { chain } from '../shared/Chain.ts'
-import { chainAsync } from '../shared/ChainAsync.ts'
+import { pipe } from '../shared/Pipe.ts'
+import { asyncPipe } from '../shared/AsyncPipe.ts'
 import { Config } from '../shared/Config.ts'
 import { Chunk } from '../shared/entities/Chunk.ts'
 import { Player } from '../shared/entities/Player.ts'
@@ -17,6 +17,7 @@ import { World } from '../shared/World.ts'
 import { ServerContainer } from './ServerContainer.ts'
 import { TerrainGenerator } from './TerrainGenerator.ts'
 
+@MinecraftEventBus.ServerListener()
 export class MinecraftServer {
   constructor(private readonly scope: ContainerScope) {}
 
@@ -30,7 +31,7 @@ export class MinecraftServer {
     const world = ServerContainer.resolve(World).unwrap()
     const eventBus = ServerContainer.resolve(MinecraftEventBus).unwrap()
 
-    await chainAsync(event.chunks)
+    await asyncPipe(event.chunks)
       .mapArray((coord) =>
         world
           .getEntity(Chunk.getWorldID(coord), Chunk)
@@ -46,7 +47,7 @@ export class MinecraftServer {
     const world = ServerContainer.resolve(World).unwrap()
     const eventBus = ServerContainer.resolve(MinecraftEventBus).unwrap()
 
-    chain(event.playerUUID)
+    pipe(event.playerUUID)
       .map((uuid) =>
         world
           .getEntity(uuid, Player)
@@ -64,10 +65,10 @@ export class MinecraftServer {
     const world = ServerContainer.resolve(World).unwrap()
     const centralChunk = world.getEntity(Chunk.getWorldID({ x: 0, z: 0 }), Chunk).unwrap()
 
-    return chain(range(Config.WORLD_HEIGHT))
+    return pipe(range(Config.WORLD_HEIGHT))
       .filterIter((y) => centralChunk.getBlock(0, y, 0).isSome())
       .iterLast()
-      .unwrap()
+      .value()
       .map((y) => new Vector3(0, y + 2, 0))
       .unwrap()
   }

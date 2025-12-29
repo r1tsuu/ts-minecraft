@@ -148,10 +148,11 @@ class MaybeSome<T> extends MaybeImpl<T> {
   }
 }
 
+export const None = MaybeImpl.None
+export const Some = MaybeImpl.Some
+
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Maybe {
-  export const None = MaybeImpl.None
-  export const Some = MaybeImpl.Some
   export const from = MaybeImpl.from
   export const fromPromise = MaybeImpl.fromPromise
   export const Unwrap = MaybeImpl.Unwrap

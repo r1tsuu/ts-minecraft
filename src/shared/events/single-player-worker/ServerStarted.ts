@@ -1,5 +1,5 @@
-import { chain } from '../../Chain.ts'
 import { MinecraftEvent } from '../../MinecraftEvent.ts'
+import { pipe } from '../../Pipe.ts'
 import { World } from '../../World.ts'
 
 export class ServerStarted extends MinecraftEvent {
@@ -10,10 +10,10 @@ export class ServerStarted extends MinecraftEvent {
   }
 
   static deserialize(obj: any): ServerStarted {
-    return chain(obj.world)
+    return pipe(obj.world)
       .map(World.deserialize)
       .map((world) => new ServerStarted(world))
-      .unwrap()
+      .value()
   }
 
   serialize() {

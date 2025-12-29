@@ -1,6 +1,6 @@
-import { chain } from '../../Chain.ts'
 import { Chunk } from '../../entities/Chunk.ts'
 import { MinecraftEvent } from '../../MinecraftEvent.ts'
+import { pipe } from '../../Pipe.ts'
 
 export class ResponseChunksLoad extends MinecraftEvent {
   static readonly type = 'Server.ResponseChunksLoad'
@@ -10,16 +10,16 @@ export class ResponseChunksLoad extends MinecraftEvent {
   }
 
   static deserialize(obj: any): ResponseChunksLoad {
-    return chain(obj.chunks)
+    return pipe(obj.chunks)
       .mapArray(Chunk.deserialize)
       .map((chunks) => new ResponseChunksLoad(chunks))
-      .unwrap()
+      .value()
   }
 
   serialize() {
-    return chain(this.chunks)
+    return pipe(this.chunks)
       .mapArray(Chunk.serialize)
       .map((chunks) => ({ chunks }))
-      .unwrap()
+      .value()
   }
 }

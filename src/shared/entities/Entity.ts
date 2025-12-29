@@ -23,8 +23,33 @@ export interface EntityConstructor<T extends Entity = Entity> extends ClassConst
  * Entities must implement methods to get their world ID and serialize themselves when transferring over the network.
  */
 export abstract class Entity {
+  /**
+   * Generator function to fetch all registered entity constructors along with their type strings.
+   * @returns An iterable of objects containing the constructor and its associated type string.
+   * @example
+   * ```typescript
+   * for (const { Constructor, type } of Entity.fetchEntityConstructors()) {
+   *   console.log(`Entity type: ${type}, Constructor:`, Constructor);
+   * }
+   * ```
+   */
+  static *fetchEntityConstructors(): Iterable<{
+    Constructor: EntityConstructor<Entity>
+    type: string
+  }> {
+    for (const [type, Constructor] of entityTypeMap) {
+      yield {
+        Constructor,
+        type,
+      }
+    }
+  }
+
   abstract getWorldID(): string
-  abstract serialize(): any
+
+  serialize(): any {
+    throw new Error('Method not implemented.')
+  }
 }
 
 const ENTITY_TYPE_KEY = '__t'
@@ -50,14 +75,6 @@ export const EntityType = (incomingType?: string): ClassDecorator => {
   return (target: EntityConstructor<Entity>) => {
     const type = incomingType ?? target.name
     const entitySerialize = (target.prototype as Entity).serialize
-
-    if (typeof entitySerialize !== 'function') {
-      throw new Error(`Entity class ${target.name} must implement serialize method`)
-    }
-
-    if (typeof target.deserialize !== 'function') {
-      throw new Error(`Entity class ${target.name} must implement static deserialize method`)
-    }
 
     entityTypeMap.set(type, target)
 

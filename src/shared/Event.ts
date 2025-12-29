@@ -1,7 +1,7 @@
 import type { UUID } from '../types.ts'
 import type { EventBus } from './EventBus.ts'
 
-import { Maybe } from './Maybe.ts'
+import { Maybe, None } from './Maybe.ts'
 
 const isCanceledSymbol = Symbol('isCanceled')
 
@@ -14,7 +14,7 @@ export abstract class Event<Meta extends object> {
   static readonly type: string
   metadata: EventMetadata & Meta = {
     timestamp: Date.now(),
-    uuid: Maybe.None<UUID>(),
+    uuid: None(),
   } as EventMetadata & Meta
   private [isCanceledSymbol] = false
 

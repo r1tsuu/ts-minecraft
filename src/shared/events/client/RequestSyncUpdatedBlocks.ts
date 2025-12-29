@@ -1,7 +1,7 @@
 import { Vector3 } from 'three'
 
-import { chain } from '../../Chain.ts'
 import { MinecraftEvent } from '../../MinecraftEvent.ts'
+import { pipe } from '../../Pipe.ts'
 
 type BlockUpdate = {
   blockID: number
@@ -17,14 +17,14 @@ export class RequestSyncUpdatedBlocks extends MinecraftEvent {
   }
 
   static deserialize(obj: any): RequestSyncUpdatedBlocks {
-    return chain(obj.blocks as any[])
+    return pipe(obj.blocks as any[])
       .mapArray((block) => ({
         blockID: block.blockID,
         position: Vector3.deserialize(block.position),
         type: block.type,
       }))
       .map((blocks) => new RequestSyncUpdatedBlocks(blocks))
-      .unwrap()
+      .value()
   }
 
   serialize() {

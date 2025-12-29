@@ -1,5 +1,5 @@
 import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
-import { chainAsync } from '../shared/ChainAsync.ts'
+import { asyncPipe } from '../shared/AsyncPipe.ts'
 import { Config } from '../shared/Config.ts'
 import { Chunk } from '../shared/entities/Chunk.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
@@ -32,13 +32,11 @@ export class MinecraftServerFactory {
 
     const world = new World()
 
-    const chunks = await chainAsync(this.storage.readChunks(spawnChunks))
+    const chunks = await asyncPipe(this.storage.readChunks(spawnChunks))
       .mapArray((readChunk) =>
-        readChunk.chunk.unwrapOr(() => {
-          const chunk = terrainGenerator.generateChunkAt(readChunk)
-          world.markEntityAsDirty(chunk.getWorldID())
-          return chunk
-        }),
+        readChunk.chunk.unwrapOr(() =>
+          world.addDirtyEntity(() => terrainGenerator.generateChunkAt(readChunk)),
+        ),
       )
       .execute()
 
