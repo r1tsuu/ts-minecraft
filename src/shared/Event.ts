@@ -1,62 +1,29 @@
 import type { UUID } from '../types.ts'
 
-export type AnyEvent<
-  Events extends Record<string, any>,
-  Meta extends Record<string, unknown> = {},
-> = {
-  // @ts-expect-error
-  [K in keyof Events]: Event<K, Events[K], Meta>
-}[keyof Events]
+import { Maybe } from './Maybe.ts'
 
-/**
- * Serializable representation of an event.
- * Used for transferring events between different environments.
- */
-export class RawEvent<
-  K extends string,
-  D extends Record<string, unknown> = {},
-  Meta extends Record<string, unknown> = {},
-> {
-  eventUUID: UUID
-  metadata: Meta
-  payload: D
-  type: K
+const isCanceledSymbol = Symbol('isCanceled')
 
-  constructor(
-    type: K,
-    payload: D,
-    eventUUID: UUID = crypto.randomUUID(),
-    metadata: Meta = {} as Meta,
-  ) {
-    this.type = type
-    this.payload = payload
-    this.eventUUID = eventUUID
-    this.metadata = metadata
-  }
+type BaseMeta = {
+  timestamp: number
+  uuid: Maybe<UUID>
 }
 
-export class Event<
-  K extends string,
-  D extends Record<string, unknown> = {},
-  Meta extends Record<string, unknown> = {},
-> extends RawEvent<K, D, Meta> {
-  private _isCanceled = false
+export abstract class Event<Meta extends object> {
+  static readonly type: string
+  eventMetadata: BaseMeta & Meta = {
+    timestamp: Date.now(),
+    uuid: Maybe.None<UUID>(),
+  } as BaseMeta & Meta
+  private [isCanceledSymbol] = false
 
-  constructor(type: K, payload: D, eventUUID?: UUID, metadata?: Meta) {
-    super(type, payload, eventUUID, metadata)
-  }
-
-  cancel(): void {
-    this._isCanceled = true
-  }
-
-  intoRaw(): RawEvent<K, D, Meta> {
-    // @ts-expect-error TODO: fix
-    const payload = 'serialize' in this.payload ? this.payload.serialize() : this.payload
-    return new RawEvent<K, D, Meta>(this.type, payload, this.eventUUID, this.metadata)
+  cancel() {
+    this[isCanceledSymbol] = true
   }
 
   isCanceled(): boolean {
-    return this._isCanceled
+    return this[isCanceledSymbol]
   }
+
+  abstract serialize(): any
 }

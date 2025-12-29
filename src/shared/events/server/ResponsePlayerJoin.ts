@@ -1,9 +1,13 @@
 import { chain } from '../../Chain.ts'
 import { Player } from '../../entities/Player.ts'
+import { MinecraftEvent } from '../../MinecraftEvent.ts'
 
-export class ResponsePlayerJoin {
-  static readonly type = 'Server.ResponsePlayerJoin'
-  constructor(readonly player: Player) {}
+export class ResponsePlayerJoin extends MinecraftEvent {
+  readonly type = 'Server.ResponsePlayerJoin'
+
+  constructor(readonly player: Player) {
+    super()
+  }
 
   static deserialize(obj: any): ResponsePlayerJoin {
     return chain(obj.player)

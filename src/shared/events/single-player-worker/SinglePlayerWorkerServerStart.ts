@@ -3,24 +3,24 @@ import { Chunk } from '../../entities/Chunk.ts'
 import { MinecraftEvent } from '../../MinecraftEvent.ts'
 import { apply, mapDecoder, mapEncoder } from '../../util.ts'
 
-export class ResponseChunksLoad extends MinecraftEvent {
-  readonly type = 'Server.ResponseChunksLoad'
+export class ServerStarted extends MinecraftEvent {
+  readonly type = 'SinglePlayerWorker.ServerStarted'
 
-  constructor(readonly chunks: Map<string, Chunk>) {
+  constructor(readonly loadedChunks: Map<string, Chunk>) {
     super()
   }
 
-  static deserialize(obj: any): ResponseChunksLoad {
-    return chain(obj.chunks)
+  static deserialize(obj: any): ServerStarted {
+    return chain(obj.loadedChunks)
       .map(apply(mapDecoder, Chunk.deserialize))
-      .map((chunks) => new ResponseChunksLoad(chunks))
+      .map((chunks) => new ServerStarted(chunks))
       .unwrap()
   }
 
   serialize() {
-    return chain(this.chunks)
+    return chain(this.loadedChunks)
       .map(apply(mapEncoder, (chunk: Chunk) => chunk.serialize()))
-      .map((chunks) => ({ chunks }))
+      .map((loadedChunks) => ({ loadedChunks }))
       .unwrap()
   }
 }

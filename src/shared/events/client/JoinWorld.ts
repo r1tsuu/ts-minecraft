@@ -1,8 +1,13 @@
 import type { UUID } from '../../../types.ts'
 
-export class JoinWorld {
+import { MinecraftEvent } from '../../MinecraftEvent.ts'
+
+export class JoinWorld extends MinecraftEvent {
   static readonly type = 'Client.JoinWorld'
-  constructor(readonly worldUUID: UUID) {}
+
+  constructor(readonly worldUUID: UUID) {
+    super()
+  }
 
   static deserialize(obj: any): JoinWorld {
     return new JoinWorld(obj.worldUUID)

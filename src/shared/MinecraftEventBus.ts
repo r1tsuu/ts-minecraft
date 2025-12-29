@@ -1,17 +1,8 @@
-import { type AnyEvent, Event } from './Event.ts'
+import { Event } from './Event.ts'
 import { EventBus } from './EventBus.ts'
 import { ClientEvent } from './events/client/index.ts'
 import { ServerEvent } from './events/server/index.ts'
 import { SinglePlayerWorkerEvent } from './events/single-player-worker/index.ts'
-
-export type AnyMinecraftEvent = AnyEvent<MinecraftEventsData, MinecraftEventMetadata>
-
-export type MinecraftEventType = keyof MinecraftEventsData
-
-type MinecraftEventMetadata = {
-  environment: 'Client' | 'Server'
-  isForwarded: boolean
-}
 
 // EVENT TYPE DEFINITION START
 
@@ -22,30 +13,7 @@ const eventTypes = [
 ]
 // EVENT TYPE DEFINITION END
 
-export type MinecraftEventPayload<T extends MinecraftEventType> = MinecraftEventsData[T]
-
-type MinecraftEventsData = {
-  [K in (typeof eventTypes)[number] as K['type']]: InstanceType<K>
-}
-
-type MinecraftEventTypeMeta = {
-  codec: {
-    decode?(obj: any): any
-    encode?(obj: any): any
-  }
-}
-
-export class MinecraftEvent<T extends ({} & string) | MinecraftEventType> extends Event<
-  T,
-  T extends keyof MinecraftEventsData ? MinecraftEventsData[T] : any,
-  MinecraftEventMetadata
-> {}
-
-export class MinecraftEventBus extends EventBus<
-  // @ts-expect-error
-  MinecraftEventsData,
-  MinecraftEventMetadata
-> {
+export class MinecraftEventBus extends EventBus {
   constructor(environment: 'Client' | 'Server') {
     super()
 
@@ -54,8 +22,9 @@ export class MinecraftEventBus extends EventBus<
     }
 
     this.addPrePublishHook((event) => {
-      event.metadata.environment = event.metadata.environment ?? environment
-      event.metadata.isForwarded = event.metadata.isForwarded ?? false
+      const metadata = event.eventMetadata as MinecraftEventMetadata
+      metadata.environment = metadata.environment ?? environment
+      metadata.isForwarded = metadata.isForwarded ?? false
     })
   }
 
@@ -64,14 +33,14 @@ export class MinecraftEventBus extends EventBus<
    * @example
    * ```ts
    * class MyClass {
-   *   @MinecraftEventBus.Handler('Client.JoinWorld')
-   *   onJoinWorld(event: MinecraftEvent<'Client.JoinWorld'>) {
-   *     console.log('Player joined world with UUID:', event.payload.worldUUID)
+   *   @MinecraftEventBus.Handler(JoinWorld)
+   *   onJoinWorld(event: JoinWorld) {
+   *     console.log('Player joined world with UUID:', event.worldUUID)
    *   }
    * }
    * ```
    */
-  static Handler<T extends '*' | ({} & string) | MinecraftEventType>(eventType: T) {
+  static Handler<T extends MinecraftEvent>(eventType: '*' | { new (): T; type: string } | string) {
     return EventBus.Handler<T>(eventType)
   }
 }

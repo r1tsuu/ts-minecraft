@@ -1,6 +1,11 @@
-export class JoinedWorld {
+import { MinecraftEvent } from '../../MinecraftEvent.ts'
+
+export class JoinedWorld extends MinecraftEvent {
   static readonly type = 'Client.JoinedWorld'
-  constructor() {}
+
+  constructor() {
+    super()
+  }
 
   static deserialize(): JoinedWorld {
     return new JoinedWorld()

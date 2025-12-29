@@ -1,6 +1,7 @@
 import { Vector3 } from 'three'
 
 import { chain } from '../../Chain.ts'
+import { MinecraftEvent } from '../../MinecraftEvent.ts'
 
 type BlockUpdate = {
   blockID: number
@@ -8,9 +9,12 @@ type BlockUpdate = {
   type: 'add' | 'remove'
 }
 
-export class RequestSyncUpdatedBlocks {
-  static readonly type = 'Client.RequestSyncUpdatedBlocks'
-  constructor(readonly blocks: BlockUpdate[]) {}
+export class RequestSyncUpdatedBlocks extends MinecraftEvent {
+  readonly type = 'Client.RequestSyncUpdatedBlocks'
+
+  constructor(readonly blocks: BlockUpdate[]) {
+    super()
+  }
 
   static deserialize(obj: any): RequestSyncUpdatedBlocks {
     return chain(obj.blocks as any[])

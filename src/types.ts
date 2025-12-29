@@ -20,11 +20,6 @@ export type Chunk = {
   uuid: UUID
 }
 
-export type ChunkCoordinates = {
-  chunkX: number
-  chunkZ: number
-}
-
 export type ChunkIndex = {
   readonly __brand: 'ChunkIndex'
   x: number

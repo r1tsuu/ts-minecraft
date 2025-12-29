@@ -1,12 +1,13 @@
 import { chain } from '../../Chain.ts'
+import { MinecraftEvent } from '../../MinecraftEvent.ts'
 import { World } from '../../World.ts'
 
-export class ServerStarted {
-  static readonly type = 'SinglePlayerWorker.ServerStarted'
-  /**
-   * @param world The world that has been started
-   */
-  constructor(readonly world: World) {}
+export class ServerStarted extends MinecraftEvent {
+  readonly type = 'SinglePlayerWorker.ServerStarted'
+
+  constructor(readonly world: World) {
+    super()
+  }
 
   static deserialize(obj: any): ServerStarted {
     return chain(obj.world)

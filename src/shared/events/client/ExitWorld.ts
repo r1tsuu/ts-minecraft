@@ -1,6 +1,11 @@
-export class ExitWorld {
+import { MinecraftEvent } from '../../MinecraftEvent.ts'
+
+export class ExitWorld extends MinecraftEvent {
   static readonly type = 'Client.ExitWorld'
-  constructor() {}
+
+  constructor() {
+    super()
+  }
 
   static deserialize(): ExitWorld {
     return new ExitWorld()
