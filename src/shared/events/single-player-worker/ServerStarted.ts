@@ -3,7 +3,7 @@ import { MinecraftEvent } from '../../MinecraftEvent.ts'
 import { World } from '../../World.ts'
 
 export class ServerStarted extends MinecraftEvent {
-  readonly type = 'SinglePlayerWorker.ServerStarted'
+  static readonly type = 'SinglePlayerWorker.ServerStarted'
 
   constructor(readonly world: World) {
     super()

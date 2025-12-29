@@ -1,7 +1,7 @@
 import { MinecraftEvent } from '../../MinecraftEvent.ts'
 
 export class StartLocalServer extends MinecraftEvent {
-  readonly type = 'Client.StartLocalServer'
+  static readonly type = 'Client.StartLocalServer'
 
   constructor(readonly worldName: string) {
     super()

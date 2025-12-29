@@ -1,7 +1,7 @@
 import { MinecraftEvent } from '../../MinecraftEvent.ts'
 
 export class ResponseSyncPlayer extends MinecraftEvent {
-  readonly type = 'Server.ResponseSyncPlayer'
+  static readonly type = 'Server.ResponseSyncPlayer'
 
   constructor() {
     super()

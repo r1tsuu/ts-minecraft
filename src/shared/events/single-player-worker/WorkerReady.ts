@@ -1,7 +1,7 @@
 import { MinecraftEvent } from '../../MinecraftEvent.ts'
 
 export class WorkerReady extends MinecraftEvent {
-  readonly type = 'SinglePlayerWorker.WorkerReady'
+  static readonly type = 'SinglePlayerWorker.WorkerReady'
 
   constructor() {
     super()

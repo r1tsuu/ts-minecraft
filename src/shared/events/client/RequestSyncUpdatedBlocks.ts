@@ -10,7 +10,7 @@ type BlockUpdate = {
 }
 
 export class RequestSyncUpdatedBlocks extends MinecraftEvent {
-  readonly type = 'Client.RequestSyncUpdatedBlocks'
+  static readonly type = 'Client.RequestSyncUpdatedBlocks'
 
   constructor(readonly blocks: BlockUpdate[]) {
     super()

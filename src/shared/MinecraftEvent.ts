@@ -1,8 +1,10 @@
-import { Event } from './Event.ts'
+import { Event, type EventMetadata } from './Event.ts'
 
-export type MinecraftEventMetadata = {
-  environment: 'Client' | 'Server'
-  isForwarded: boolean
-}
+export type MinecraftEventMetadata = MinecraftEvent['metadata']
 
-export abstract class MinecraftEvent extends Event<MinecraftEventMetadata> {}
+export abstract class MinecraftEvent extends Event<
+  {
+    environment: 'Client' | 'Server'
+    isForwarded: boolean
+  } & EventMetadata
+> {}

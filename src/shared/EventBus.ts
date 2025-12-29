@@ -1,10 +1,11 @@
+import type { UUID } from '../types.ts'
 /**
  * Event Bus system for publishing and subscribing to events.
  * Supports event metadata and pre-publish hooks.
  */
 import type { ClassConstructor } from './util.ts'
 
-import { Event } from './Event.ts'
+import { Event, type EventMetadata } from './Event.ts'
 import { Maybe } from './Maybe.ts'
 
 const EVENT_HANDLERS_KEY = Symbol('EVENT_HANDLERS')
@@ -12,11 +13,14 @@ const WILDCARD = '*'
 
 export interface EventConstructor<T extends Event<any>> extends ClassConstructor<T> {
   deserialize(obj: any): T
+  readonly type: string
 }
 
 const getEventConstructor = <T extends Event<any>>(event: T): EventConstructor<T> => {
   return event.constructor as EventConstructor<T>
 }
+
+export type WildcardKey = typeof WILDCARD
 
 type EventHandler<E extends Event<any>> = (event: E) => Promise<void> | void
 
@@ -24,8 +28,6 @@ interface EventHandlerMetadata {
   Constructor: EventConstructor<any>
   methodName: string
 }
-
-type WildcardKey = typeof WILDCARD
 
 /**
  * EventBus class for managing event publishing and subscription.
@@ -40,8 +42,8 @@ type WildcardKey = typeof WILDCARD
  * ```
  * Note: Event types _must_ be registered using `registerEventType` before publishing or subscribing.
  */
-export class EventBus {
-  private beforeEmitHooks: ((event: Event<any>) => void)[] = []
+export class EventBus<E extends Event<EventMetadata>> {
+  private beforeEmitHooks: ((event: E) => void)[] = []
   private eventTypesRegistry = new Map<string, EventConstructor<any>>()
   private registry = new Map<string | WildcardKey, { listeners: ((event: any) => void)[] }>()
 
@@ -57,10 +59,10 @@ export class EventBus {
    * }
    * ```
    */
-  static Handler<T extends EventConstructor<any>>(Constructor: T) {
+  static Handler<T extends EventConstructor<any>>(Constructor: T | WildcardKey) {
     return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
       console.log(
-        `Registering event handler for ${Constructor.name} on ${target.constructor.name}.${propertyKey}`,
+        `Registering event handler for ${typeof Constructor === 'string' ? Constructor : Constructor.type} on ${target.constructor.name}.${propertyKey}`,
       )
       // Store metadata about this event handler
       if (!target.constructor[EVENT_HANDLERS_KEY]) {
@@ -68,8 +70,8 @@ export class EventBus {
       }
 
       target.constructor[EVENT_HANDLERS_KEY].push({
-        Constructor,
         methodName: propertyKey,
+        type: typeof Constructor === 'string' ? Constructor : Constructor.type,
       })
 
       // Return the original method (binding happens at initialization)
@@ -91,7 +93,7 @@ export class EventBus {
    * }
    */
   static Listener(
-    resolveEventBus: () => Pick<EventBus, 'registerHandlers' | 'unregisterHandlers'>,
+    resolveEventBus: () => Pick<EventBus<Event<any>>, 'registerHandlers' | 'unregisterHandlers'>,
   ): ClassDecorator {
     // @ts-expect-error
     return function <T extends new (...args: any[]) => any>(Target: T): T {
@@ -125,11 +127,15 @@ export class EventBus {
    * })
    * ```
    */
-  addPrePublishHook(hook: (event: Event<any>) => void): void {
+  addPrePublishHook(hook: (event: E) => void): void {
     this.beforeEmitHooks.push(hook)
   }
 
-  getEventType<T extends Event<any>>(type: string): Maybe<EventConstructor<T>> {
+  getEventConstructor<T extends E>(type: string): Maybe<EventConstructor<T>> {
+    return Maybe.from(this.eventTypesRegistry.get(type))
+  }
+
+  getEventType<T extends E>(type: string): Maybe<EventConstructor<T>> {
     return Maybe.from(this.eventTypesRegistry.get(type))
   }
 
@@ -141,8 +147,12 @@ export class EventBus {
    * eventBus.publish(new JoinWorld('some-uuid'))
    * ```
    */
-  publish<T extends Event<any>>(event: T): void {
+  publish<T extends E>(event: T, uuid?: UUID): void {
     const type = getEventConstructor(event).type
+
+    if (uuid) {
+      event.metadata.uuid = Maybe.Some(uuid)
+    }
 
     if (!type) {
       throw new Error('Event must have a type property')
@@ -171,14 +181,14 @@ export class EventBus {
    * Registers an event type in the EventBus.
    * Must be called before publishing or subscribing to the event type.
    *
-   * @param constructor - The event constructor to register
+   * @param EventConstructor - The event constructor to register
    * @example
    * ```ts
    * eventBus.registerEventType(JoinWorld)
    * ```
    */
-  registerEventType<T extends Event<any>>(constructor: EventConstructor<T>): void {
-    this.eventTypesRegistry.set(constructor.name, constructor)
+  registerEventType<T extends Event<any>>(EventConstructor: EventConstructor<T>): void {
+    this.eventTypesRegistry.set(EventConstructor.name, EventConstructor)
   }
 
   /**
@@ -240,22 +250,17 @@ export class EventBus {
    * )
    * ```
    */
-  async reply<T extends Event<any>, R extends Event<any>>(
-    originalEvent: T,
-    responseEvent: R,
-  ): Promise<void> {
+  async reply<T extends E, R extends E>(originalEvent: T, responseEvent: R): Promise<void> {
     const Constructor = getEventConstructor(responseEvent)
-    responseEvent.eventMetadata.uuid = originalEvent.eventMetadata.uuid
+    responseEvent.metadata.uuid = originalEvent.metadata.uuid.clone()
     this.publish(responseEvent)
-    await this.waitFor(Constructor, {
-      eventUUID: originalEvent.eventMetadata.uuid.unwrap(),
-    })
+    await this.waitFor(Constructor, originalEvent.metadata.uuid.unwrap())
   }
 
   /**
    * Sends a request event and waits for a response event.
    * @param requestEvent The request event instance.
-   * @param ResponseConstructor The constructor of the response event to wait for.
+   * @param ResponseEventConstructor The constructor of the response event to wait for.
    * @returns A promise that resolves with the response event.
    * @example
    * ```ts
@@ -266,24 +271,22 @@ export class EventBus {
    * console.log('Join response:', responseEvent)
    * ```
    */
-  async request<T extends Event<any>, R extends Event<any>>(
+  async request<T extends E, R extends E>(
     requestEvent: T,
-    ResponseConstructor: EventConstructor<R>,
+    ResponseEventConstructor: EventConstructor<R>,
   ): Promise<R> {
-    if (requestEvent.eventMetadata.uuid.isNone()) {
-      requestEvent.eventMetadata.uuid = Maybe.Some(crypto.randomUUID())
+    if (requestEvent.metadata.uuid.isNone()) {
+      requestEvent.metadata.uuid = Maybe.Some(crypto.randomUUID())
     }
 
     this.publish(requestEvent)
 
-    return this.waitFor(ResponseConstructor, {
-      eventUUID: requestEvent.eventMetadata.uuid.unwrap(),
-    })
+    return this.waitFor(ResponseEventConstructor, requestEvent.metadata.uuid.unwrap())
   }
 
   /**
    * Subscribes to an event type with a handler function.
-   * @param type The type (string, Constructor, or '*') of the event to subscribe to.
+   * @param wildcardOrEventConstructor The type (string, Constructor, or '*') of the event to subscribe to.
    * @param handler The handler function to call when the event is published.
    * @returns A function to unsubscribe the handler.
    * @example
@@ -307,13 +310,22 @@ export class EventBus {
    * })
    * ```
    */
+  subscribe<T extends E>(
+    EventConstructor: EventConstructor<T>,
+    handler: EventHandler<T>,
+  ): () => void
+  subscribe(type: ({} & string) | WildcardKey, handler: EventHandler<E>): () => void
   subscribe<T extends Event<any>>(
-    type: '*' | EventConstructor<T> | string,
+    wildcardOrEventConstructor: EventConstructor<T> | string,
     handler: EventHandler<T>,
   ): () => void {
-    this.validateEventType(type)
+    this.validateEventType(wildcardOrEventConstructor)
 
-    const typeStr = typeof type === 'string' ? type : type.type
+    const typeStr =
+      typeof wildcardOrEventConstructor === 'string'
+        ? wildcardOrEventConstructor
+        : wildcardOrEventConstructor.type
+
     let entry = this.registry.get(typeStr)
 
     if (!entry) {
@@ -356,16 +368,11 @@ export class EventBus {
    * })
    * ```
    */
-  waitFor<T extends Event<any>>(
-    Constructor: EventConstructor<T>,
-    options: {
-      eventUUID?: string
-    } = {},
-  ): Promise<T> {
+  waitFor<T extends E>(Constructor: EventConstructor<T>, eventUUID?: UUID): Promise<T> {
     return new Promise((resolve) => {
       const unsub = this.subscribe(Constructor, (event) => {
-        const uuid = event.eventMetadata.uuid
-        if (options.eventUUID && uuid.isSome() && uuid.unwrap() !== options.eventUUID) return
+        const uuid = event.metadata.uuid
+        if (eventUUID && uuid.isSome() && uuid.unwrap() !== eventUUID) return
         resolve(event)
         unsub()
       })

@@ -1,28 +1,30 @@
-import { Event } from './Event.ts'
-import { EventBus } from './EventBus.ts'
+import type { MinecraftEvent } from './MinecraftEvent.ts'
+
+import { EventBus, type EventConstructor, type WildcardKey } from './EventBus.ts'
 import { ClientEvent } from './events/client/index.ts'
 import { ServerEvent } from './events/server/index.ts'
 import { SinglePlayerWorkerEvent } from './events/single-player-worker/index.ts'
 
 // EVENT TYPE DEFINITION START
 
-const eventTypes = [
-  ...Object.values(ClientEvent),
-  ...Object.values(ServerEvent),
-  ...Object.values(SinglePlayerWorkerEvent),
-]
 // EVENT TYPE DEFINITION END
 
-export class MinecraftEventBus extends EventBus {
+export class MinecraftEventBus extends EventBus<MinecraftEvent> {
   constructor(environment: 'Client' | 'Server') {
     super()
 
-    for (const eventType of eventTypes) {
-      this.registerEventType(eventType)
+    const eventConstructors = [
+      ...Object.values(ClientEvent),
+      ...Object.values(ServerEvent),
+      ...Object.values(SinglePlayerWorkerEvent),
+    ]
+
+    for (const EventConstructor of eventConstructors) {
+      this.registerEventType(EventConstructor)
     }
 
     this.addPrePublishHook((event) => {
-      const metadata = event.eventMetadata as MinecraftEventMetadata
+      const metadata = event.metadata
       metadata.environment = metadata.environment ?? environment
       metadata.isForwarded = metadata.isForwarded ?? false
     })
@@ -40,7 +42,7 @@ export class MinecraftEventBus extends EventBus {
    * }
    * ```
    */
-  static Handler<T extends MinecraftEvent>(eventType: '*' | { new (): T; type: string } | string) {
-    return EventBus.Handler<T>(eventType)
+  static Handler<T extends EventConstructor<any>>(Constructor: T | WildcardKey) {
+    return EventBus.Handler<T>(Constructor)
   }
 }

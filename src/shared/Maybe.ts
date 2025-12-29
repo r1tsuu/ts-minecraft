@@ -52,6 +52,13 @@ class MaybeImpl<T> {
     return maybe.unwrap()
   }
 
+  clone(): Maybe<T> {
+    if (this.isSome()) {
+      return MaybeImpl.Some(this._value as T)
+    }
+    return MaybeImpl.None()
+  }
+
   flatMap<U>(fn: (value: T) => Maybe<U>): Maybe<U> {
     if (this.isSome()) {
       return fn(this._value as T)
@@ -96,6 +103,10 @@ class MaybeImpl<T> {
 
   valueOrNull(): null | T {
     return this._value
+  }
+
+  valueOrUndefined(): T | undefined {
+    return this._value === null ? undefined : this._value
   }
 }
 

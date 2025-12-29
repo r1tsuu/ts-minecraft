@@ -3,7 +3,7 @@ import { Player } from '../../entities/Player.ts'
 import { MinecraftEvent } from '../../MinecraftEvent.ts'
 
 export class ResponsePlayerJoin extends MinecraftEvent {
-  readonly type = 'Server.ResponsePlayerJoin'
+  static readonly type = 'Server.ResponsePlayerJoin'
 
   constructor(readonly player: Player) {
     super()

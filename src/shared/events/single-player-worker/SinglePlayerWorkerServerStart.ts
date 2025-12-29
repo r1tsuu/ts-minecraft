@@ -4,7 +4,7 @@ import { MinecraftEvent } from '../../MinecraftEvent.ts'
 import { apply, mapDecoder, mapEncoder } from '../../util.ts'
 
 export class ServerStarted extends MinecraftEvent {
-  readonly type = 'SinglePlayerWorker.ServerStarted'
+  static readonly type = 'SinglePlayerWorker.ServerStarted'
 
   constructor(readonly loadedChunks: Map<string, Chunk>) {
     super()

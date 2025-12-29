@@ -3,7 +3,7 @@ import { Player } from '../../entities/Player.ts'
 import { MinecraftEvent } from '../../MinecraftEvent.ts'
 
 export class RequestSyncPlayer extends MinecraftEvent {
-  readonly type = 'Client.RequestSyncPlayer'
+  static readonly type = 'Client.RequestSyncPlayer'
 
   constructor(readonly playerData: Player) {
     super()

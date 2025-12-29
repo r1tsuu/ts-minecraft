@@ -1,5 +1,3 @@
-import type { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
-
 import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { chainAsync } from '../shared/ChainAsync.ts'
 import { Config } from '../shared/Config.ts'
@@ -17,16 +15,12 @@ import { type WorldStorageAdapter, WorldStorageAdapterSymbol } from './types.ts'
  * loads initial data, and prepares the world.
  */
 export class MinecraftServerFactory {
-  constructor(
-    private eventBus: MinecraftEventBus,
-    private storage: WorldStorageAdapter,
-  ) {}
+  constructor(private storage: WorldStorageAdapter) {}
 
   async build(): Promise<{
     server: MinecraftServer
     world: World
   }> {
-    ServerContainer.registerSingleton(this.eventBus)
     const serverScope = ServerContainer.createScope()
     serverScope.registerSingleton(this.storage, WorldStorageAdapterSymbol)
     serverScope.registerSingleton(new BlocksRegistry())

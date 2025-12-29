@@ -9,3 +9,5 @@ export const ClientEvent = {
   RequestChunksLoad,
   StartLocalServer,
 }
+
+export type ClientEvent = typeof ClientEvent

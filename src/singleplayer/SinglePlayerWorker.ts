@@ -1,71 +1,68 @@
+import type { StartLocalServer } from '../shared/events/client/StartLocalServer.ts'
+import type { MinecraftEvent } from '../shared/MinecraftEvent.ts'
+
 import { MinecraftServer } from '../server/MinecraftServer.ts'
 import { MinecraftServerFactory } from '../server/MinecraftServerFactory.ts'
+import { ServerContainer } from '../server/ServerContainer.ts'
+import { deserializeEvent, serializeEvent } from '../shared/Event.ts'
+import { ClientEvent } from '../shared/events/client/index.ts'
 import { SinglePlayerWorkerEvent } from '../shared/events/single-player-worker/index.ts'
-import { type AnyMinecraftEvent, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
+import { Maybe } from '../shared/Maybe.ts'
+import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { PrivateFileSystemWorldStorage } from './PrivateFileSystemWorldStorage.ts'
 
-let localServer: MinecraftServer | null = null
+class SinglePlayerServerImpl {
+  private eventBus: MinecraftEventBus
+  private server: Maybe<MinecraftServer> = Maybe.None()
 
-const eventBus = new MinecraftEventBus('Server')
-
-const shouldForwardEventToClient = (event: AnyMinecraftEvent) => {
-  if (event.metadata.environment === 'Client') {
-    return false
+  constructor() {
+    this.eventBus = new MinecraftEventBus('Server')
+    ServerContainer.registerSingleton(this.eventBus)
+    this.eventBus.registerHandlers(this)
+    this.eventBus.publish(new SinglePlayerWorkerEvent.WorkerReady())
   }
 
-  if (event.type.startsWith('Server.Response')) {
-    return true
+  async handleMessage(message: MessageEvent<MinecraftEvent>): Promise<void> {
+    const event = deserializeEvent(this.eventBus, message.data)
+    event.metadata.isForwarded = true // Mark as forwarded
+    this.eventBus.publish(event)
   }
 
-  if (
-    event.type === 'SinglePlayerWorker.WorkerReady' ||
-    event.type === 'SinglePlayerWorker.ServerStarted'
-  ) {
-    return true
+  @MinecraftEventBus.Handler('*')
+  protected forwardEventsToClient(event: MinecraftEvent): void {
+    if (
+      event.getType().startsWith('Server.Response') ||
+      event instanceof SinglePlayerWorkerEvent.WorkerReady ||
+      event instanceof SinglePlayerWorkerEvent.ServerStarted
+    ) {
+      postMessage(serializeEvent(event))
+    }
   }
 
-  return false
-}
-
-eventBus.subscribe('*', (event) => {
-  if (shouldForwardEventToClient(event)) {
-    postMessage(event.intoRaw())
-  }
-})
-
-onmessage = async (message: MessageEvent<AnyMinecraftEvent>) => {
-  if (message.data.type === 'Client.StartLocalServer') {
-    if (localServer) {
-      console.warn('Received START_LOCAL_SERVER but Local server is already started.')
+  @MinecraftEventBus.Handler(ClientEvent.StartLocalServer)
+  protected async startLocalServer(event: StartLocalServer): Promise<void> {
+    if (this.server.isSome()) {
+      console.warn(
+        `Received ${ClientEvent.StartLocalServer.type} but Local server is already started.`,
+      )
       return
     }
 
-    console.log(`Starting local server...`, message)
+    console.log(`Starting local server...`)
 
-    const storage = await PrivateFileSystemWorldStorage.create(message.data.payload.worldName)
-    const { server, world } = await new MinecraftServerFactory(eventBus, storage).build()
-    localServer = server
+    const storage = await PrivateFileSystemWorldStorage.create(event.worldName)
+    const { server, world } = await new MinecraftServerFactory(storage).build()
+    this.server = Maybe.Some(server)
 
-    eventBus.publish(new SinglePlayerWorkerEvent.ServerStarted(world), message.data.eventUUID)
-
-    console.log('Local server started.', localServer)
-
-    return
-  }
-
-  if (localServer !== null) {
-    const payload = eventBus
-      .getEventType(message.data.type)
-      .map((Constructor) => Constructor.deserialize(message.data.payload))
-      .unwrap()
-
-    eventBus.publish(payload, message.data.eventUUID, {
-      environment: message.data.metadata.environment,
-      isForwarded: true,
-    })
-  } else {
-    console.warn('Received event but local server is not started yet:', message.data)
+    this.eventBus.publish(
+      new SinglePlayerWorkerEvent.ServerStarted(world),
+      event.metadata.uuid.valueOrUndefined(),
+    )
   }
 }
 
-eventBus.publish(new SinglePlayerWorkerEvent.WorkerReady())
+const singlePlayerServer = new SinglePlayerServerImpl()
+
+self.onmessage = (message: MessageEvent<MinecraftEvent>) => {
+  singlePlayerServer.handleMessage(message)
+}

@@ -4,7 +4,7 @@ import { MinecraftEvent } from '../../MinecraftEvent.ts'
 import { apply, mapDecoder, mapEncoder } from '../../util.ts'
 
 export class ResponseChunksLoad extends MinecraftEvent {
-  readonly type = 'Server.ResponseChunksLoad'
+  static readonly type = 'Server.ResponseChunksLoad'
 
   constructor(readonly chunks: Map<string, Chunk>) {
     super()
