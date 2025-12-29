@@ -1,0 +1,43 @@
+import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
+import { chainAsync } from '../shared/ChainAsync.ts'
+import { Config } from '../shared/Config.ts'
+import { Chunk } from '../shared/entities/Chunk.ts'
+import { World } from '../shared/World.ts'
+import { MinecraftServer } from './MinecraftServer.ts'
+import { ServerContainer } from './ServerContainer.ts'
+import { TerrainGenerator } from './TerrainGenerator.ts'
+import { type WorldStorageAdapter, WorldStorageAdapterSymbol } from './types.ts'
+
+/**
+ * Factory for creating MinecraftServer instances.
+ * It sets up the server with necessary components,
+ * loads initial data, and prepares the world.
+ */
+export class MinecraftServerFactory {
+  constructor(private storage: WorldStorageAdapter) {}
+
+  async build(): Promise<MinecraftServer> {
+    const serverScope = ServerContainer.createScope()
+    serverScope.registerSingleton(this.storage, WorldStorageAdapterSymbol)
+    serverScope.registerSingleton(new BlocksRegistry())
+    const terrainGenerator = new TerrainGenerator()
+    serverScope.registerSingleton(terrainGenerator)
+
+    const players = await this.storage.readPlayers()
+    const spawnChunks = Chunk.coordsInRadius(0, 0, Config.SPAWN_CHUNK_RADIUS)
+
+    const chunks = await chainAsync(this.storage.readChunks(spawnChunks))
+      .mapArray((readChunk) =>
+        readChunk.chunk.unwrapOr(() => terrainGenerator.generateChunkAt(readChunk)),
+      )
+      .execute()
+
+    const world = new World()
+    serverScope.registerSingleton(world)
+    const server = new MinecraftServer(serverScope)
+
+    server.world.addEntities(players, chunks)
+
+    return server
+  }
+}

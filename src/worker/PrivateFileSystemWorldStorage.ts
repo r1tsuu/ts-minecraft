@@ -81,9 +81,19 @@ export class PrivateFileSystemWorldStorage implements WorldStorageAdapter {
       .execute()
   }
 
-  readChunks(chunks: ChunkCoordinates[]): Promise<Maybe<Chunk>[]> {
+  readChunks(chunks: ChunkCoordinates[]): Promise<
+    {
+      chunk: Maybe<Chunk>
+      x: number
+      z: number
+    }[]
+  > {
     return chainAsync(chunks)
-      .mapArray((chunk) => this.readChunk(chunk))
+      .mapArray(async (chunk) => ({
+        chunk: await this.readChunk({ x: chunk.x, z: chunk.z }),
+        x: chunk.x,
+        z: chunk.z,
+      }))
       .execute()
   }
 

@@ -1,12 +1,12 @@
-import { Maybe } from '../Maybe.ts'
-import { Result } from '../Result.ts'
-import { type ClassConstructor } from '../util.ts'
 import {
   deserializeEntity,
   Entity,
   type EntityConstructor,
   getEntityConstructor,
-} from './Entity.ts'
+} from './entities/Entity.ts'
+import { Maybe } from './Maybe.ts'
+import { Result } from './Result.ts'
+import { type ClassConstructor } from './util.ts'
 
 export interface WorldQuery<T extends Entity[] = [], Initial extends boolean = true> {
   execute(): IterableIterator<{ entity: T[number]; id: string }>
@@ -101,6 +101,25 @@ export class World {
     return world
   }
 
+  /**
+   * Add multiple entities to the world.
+   * @param iterators - Iterable collections of entities to add.
+   * @example
+   * ```ts
+   * const players: Player[] = [...] // some array of Player entities
+   * const chunks: Chunk[] = [...] // some array of Chunk entities
+   *
+   * world.addEntities(players, chunks)
+   * ```
+   */
+  addEntities(...iterators: Iterable<Entity>[]): void {
+    for (const iterator of iterators) {
+      for (const entity of iterator) {
+        this.addEntity(entity)
+      }
+    }
+  }
+
   addEntity(entity: Entity): void {
     const id = entity.getWorldID()
     this.entities.set(id, entity)
@@ -109,10 +128,6 @@ export class World {
       this.entitiesByType.set(entityConstructor, new Set())
     }
     this.entitiesByType.get(entityConstructor)!.add(id)
-  }
-
-  fetch(): WorldQuery {
-    return new WorldQueryImpl(this.entities, this.entitiesByType)
   }
 
   getEntity<T extends Entity>(id: string): Maybe<T>
@@ -132,11 +147,23 @@ export class World {
 
     return Maybe.None()
   }
-  removeEntity(id: string): Result<Entity, 'EntityNotFound'> {
+  query(): WorldQuery {
+    return new WorldQueryImpl(this.entities, this.entitiesByType)
+  }
+  removeEntity(id: string): Result<
+    Entity,
+    {
+      id: string
+      type: 'EntityNotFound'
+    }
+  > {
     const entity = this.getEntity(id)
 
     if (entity.isNone()) {
-      return Result.Err('EntityNotFound')
+      return Result.Err({
+        id,
+        type: 'EntityNotFound',
+      })
     }
 
     this.entities.delete(id)

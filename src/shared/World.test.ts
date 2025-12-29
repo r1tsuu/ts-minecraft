@@ -1,9 +1,9 @@
 import * as THREE from 'three'
 import { expect, test } from 'vitest'
 
-import { Config } from '../Config.ts'
-import { Entity, EntityType } from './Entity.ts'
-import { Player } from './Player.ts'
+import { Config } from './Config.ts'
+import { Entity, EntityType } from './entities/Entity.ts'
+import { Player } from './entities/Player.ts'
 import { World } from './World.ts'
 
 test('World can add and retrieve entities', () => {
@@ -105,12 +105,10 @@ test('World can serialize and deserialize', () => {
 
 test('WorldQuery throws error when no entity type is selected', () => {
   const world = new World()
-  const query = world.fetch()
+  const query = world.query()
 
   expect(() => {
-    for (const _ of query.execute()) {
-      // Should throw before iterating
-    }
+    query.execute().next() // Attempt to iterate
   }).toThrow('Selecting all entities is not supported in WorldQuery')
 })
 
@@ -134,7 +132,7 @@ test('WorldQuery can select and retrieve entities by type', () => {
   world.addEntity(player2)
   world.addEntity(testEntity)
 
-  const results = Array.from(world.fetch().select(Player).execute())
+  const results = Array.from(world.query().select(Player).execute())
 
   expect(results.length).toBe(2)
   expect(results[0].entity).toBeInstanceOf(Player)
@@ -161,7 +159,7 @@ test('WorldQuery can filter entities with where clause', () => {
 
   const results = Array.from(
     world
-      .fetch()
+      .query()
       .select(Player)
       .where((entity) => entity.position.x > 5)
       .execute(),
@@ -191,7 +189,7 @@ test('WorldQuery can filter entities with whereID clause', () => {
 
   const results = Array.from(
     world
-      .fetch()
+      .query()
       .select(Player)
       .whereID((id) => id.includes('174000'))
       .execute(),
@@ -229,7 +227,7 @@ test('WorldQuery can chain multiple filters', () => {
 
   const results = Array.from(
     world
-      .fetch()
+      .query()
       .select(Player)
       .where((entity) => entity.position.x > 5)
       .where((entity) => entity.velocity.x < 3)
@@ -253,7 +251,7 @@ test('WorldQuery can select multiple entity types', () => {
   world.addEntity(player)
   world.addEntity(testEntity)
 
-  const results = Array.from(world.fetch().select(Player).select(TestEntity).execute())
+  const results = Array.from(world.query().select(Player).select(TestEntity).execute())
 
   expect(results.length).toBe(2)
   const entities = results.map((r) => r.entity)
@@ -274,7 +272,7 @@ test('WorldQuery returns empty results when no entities match filters', () => {
 
   const results = Array.from(
     world
-      .fetch()
+      .query()
       .select(Player)
       .where((entity) => entity.position.x > 100)
       .execute(),

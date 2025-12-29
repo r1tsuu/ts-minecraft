@@ -8,7 +8,6 @@ import { chainAsync } from '../shared/ChainAsync.ts'
 import { Config } from '../shared/Config.ts'
 import { Chunk } from '../shared/entities/Chunk.ts'
 import { type MinecraftEvent, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
-import { Result } from '../shared/Result.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
 import {
   findByXYZ,
@@ -18,6 +17,7 @@ import {
   rawVector3,
   zeroRawVector3,
 } from '../shared/util.ts'
+import { World } from '../shared/World.ts'
 import { ServerContainer } from './ServerContainer.ts'
 import { TerrainGenerator } from './TerrainGenerator.ts'
 import {
@@ -27,29 +27,8 @@ import {
 import { type DatabaseChunkData } from './WorldDatabase.ts'
 
 export class MinecraftServer {
-  chunks: Map<string, Chunk> = new Map()
-  players: Map<string, Player> = new Map()
-  scope: ContainerScope = ServerContainer.createScope()
-
-  private constructor(storage: WorldStorageAdapter) {
-    this.scope.registerSingleton(storage, WorldStorageAdapterKey)
-    this.scope.registerSingleton(new BlocksRegistry())
-    this.scope.registerSingleton(new TerrainGenerator())
-  }
-
-  static create(storage: WorldStorageAdapter): Promise<MinecraftServer> {
-    return chainAsync(Chunk.getCoordinatesInRadius(0, 0, Config.SPAWN_CHUNK_RADIUS))
-      .parallel((spawnChunksCoords) => [
-        storage.readPlayers(),
-        storage.readChunks(spawnChunksCoords),
-      ])
-      .map(
-        ([players, spawnChunks]) =>
-          new MinecraftServer(storage, spawnChunks, eventBus, meta, players),
-      )
-      .tap((server) => server.initialize())
-      .execute()
-  }
+  world = new World()
+  constructor(readonly scope: ContainerScope) {}
 
   async dispose(): Promise<void> {
     this.eventBus.unregisterHandlers(this)

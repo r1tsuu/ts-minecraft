@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 
 import type { RawVector3 } from '../types.ts'
+import type { ChunkCoordinates } from './entities/Chunk.ts'
 
 import { Config } from './Config.ts'
 
@@ -107,19 +108,16 @@ export const getChunksCoordinatesInRadius = ({
   centerChunkX: number
   centerChunkZ: number
   chunkRadius: number
-}): {
-  chunkX: number
-  chunkZ: number
-}[] => {
-  const chunks: { chunkX: number; chunkZ: number }[] = []
+}): ChunkCoordinates[] => {
+  const chunks: { x: number; z: number }[] = []
 
   for (let dx = -chunkRadius; dx <= chunkRadius; dx++) {
     for (let dz = -chunkRadius; dz <= chunkRadius; dz++) {
       const distanceSquared = dx * dx + dz * dz
       if (distanceSquared <= chunkRadius * chunkRadius) {
         chunks.push({
-          chunkX: centerChunkX + dx,
-          chunkZ: centerChunkZ + dz,
+          x: centerChunkX + dx,
+          z: centerChunkZ + dz,
         })
       }
     }
@@ -367,4 +365,30 @@ export const apply = <A, B>(fn: (arg: A) => B, arg: A): B => fn(arg)
 
 export const isIterable = <T>(obj: any): obj is Iterable<T> => {
   return obj != null && typeof obj[Symbol.iterator] === 'function'
+}
+
+/**
+ * Merges multiple iterators into a single iterator.
+ * The merged iterator yields values from each input iterator in sequence.
+ * @param iterators The input iterators to merge.
+ * @returns An iterator that yields values from all input iterators.
+ * @example
+ * const array = [1, 2, 3]
+ * const set = new Set(['a', 'b', 'c'])
+ * const map = new Map([[true, 'yes'], [false, 'no']])
+ * const mergedIterator = combineIterators(array, set, map.keys())
+ * for (const value of mergedIterator) {
+ *  console.log(value)
+ * }
+ */
+export function* combineIterators<T extends unknown[]>(
+  ...iterators: {
+    [K in keyof T]: Iterable<T[K]>
+  }
+): IterableIterator<T[number]> {
+  for (const iterator of iterators) {
+    for (const value of iterator) {
+      yield value
+    }
+  }
 }

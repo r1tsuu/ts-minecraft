@@ -13,7 +13,9 @@ export interface WorldStorageAdapter {
   deleteChunk(coordinates: ChunkCoordinates): Promise<void>
   deletePlayer(uuid: UUID): Promise<void>
   readChunk(coordinates: ChunkCoordinates): Promise<Maybe<Chunk>>
-  readChunks(coordinates: ChunkCoordinates[]): Promise<Maybe<Chunk>[]>
+  readChunks(
+    coordinates: ChunkCoordinates[],
+  ): Promise<{ chunk: Maybe<Chunk>; x: number; z: number }[]>
   readPlayers(): Promise<Player[]>
   writeChunk(chunk: Chunk): Promise<void>
   writePlayers(data: Player[]): Promise<void>

@@ -1,3 +1,4 @@
+import { Config } from '../Config.ts'
 import { Entity, EntityType } from './Entity.ts'
 
 export type ChunkCoordinates = {
@@ -10,24 +11,18 @@ export class Chunk extends Entity {
   constructor(
     readonly x: number,
     readonly z: number,
-    readonly blocks: Uint8Array,
+    readonly blocks: Uint8Array = new Uint8Array(
+      Config.CHUNK_SIZE * Config.CHUNK_SIZE * Config.WORLD_HEIGHT,
+    ),
   ) {
     super()
   }
 
-  static deserialize(obj: any): Chunk {
-    if (!(obj.blocks instanceof Uint8Array)) {
-      obj.blocks = new Uint8Array(obj.blocks)
-    }
-
-    return new Chunk(obj.x, obj.z, obj.blocks)
+  static blockIndex(x: number, y: number, z: number): number {
+    return x + Config.CHUNK_SIZE * (z + Config.CHUNK_SIZE * y)
   }
 
-  static getCoordinatesInRadius(
-    centerX: number,
-    centerZ: number,
-    chunkRadius: number,
-  ): ChunkCoordinates[] {
+  static coordsInRadius(centerX: number, centerZ: number, chunkRadius: number): ChunkCoordinates[] {
     const coordinates: ChunkCoordinates[] = []
 
     for (let x = centerX - chunkRadius; x <= centerX + chunkRadius; x++) {
@@ -40,6 +35,14 @@ export class Chunk extends Entity {
     }
 
     return coordinates
+  }
+
+  static deserialize(obj: any): Chunk {
+    if (!(obj.blocks instanceof Uint8Array)) {
+      obj.blocks = new Uint8Array(obj.blocks)
+    }
+
+    return new Chunk(obj.x, obj.z, obj.blocks)
   }
 
   getWorldID(): string {
