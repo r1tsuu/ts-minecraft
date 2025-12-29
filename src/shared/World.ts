@@ -4,6 +4,7 @@ import {
   type EntityConstructor,
   getEntityConstructor,
 } from './entities/Entity.ts'
+import { HashMap } from './HashMap.ts'
 import { Maybe } from './Maybe.ts'
 import { Result } from './Result.ts'
 import { type ClassConstructor } from './util.ts'
@@ -29,8 +30,8 @@ class WorldQueryImpl<T extends Entity[] = [], Initial extends boolean = true> im
   private idFilters: ((id: string) => boolean)[] = []
 
   constructor(
-    private entities: Map<string, Entity> = new Map(),
-    private entitiesByType: Map<EntityConstructor, Set<string>> = new Map(),
+    private entities: HashMap<string, Entity> = new HashMap(),
+    private entitiesByType: HashMap<EntityConstructor, Set<string>> = new HashMap(),
   ) {}
 
   *execute(): IterableIterator<{ entity: T[number]; id: string }> {
@@ -39,14 +40,14 @@ class WorldQueryImpl<T extends Entity[] = [], Initial extends boolean = true> im
     }
 
     for (const constructor of this.entitiesToQuery) {
-      const ids = this.entitiesByType.get(constructor)!
+      const ids = this.entitiesByType.get(constructor).unwrap()
 
       for (const id of ids) {
         if (!this.idFilters.every((filter) => filter(id))) {
           continue
         }
 
-        const entity = this.entities.get(id)!
+        const entity = this.entities.get(id).unwrap()
 
         if (!this.filters.every((filter) => filter(entity))) {
           continue
@@ -82,11 +83,11 @@ class WorldQueryImpl<T extends Entity[] = [], Initial extends boolean = true> im
 }
 
 export class World {
-  private entities: Map<string, Entity> = new Map()
-  private entitiesByType: Map<EntityConstructor, Set<string>> = new Map()
+  private entities: HashMap<string, Entity> = new HashMap()
+  private entitiesByType: HashMap<EntityConstructor, Set<string>> = new HashMap()
 
   constructor() {
-    this.entities = new Map()
+    this.entities = new HashMap()
   }
 
   static deserialize(obj: any): World {
@@ -127,7 +128,7 @@ export class World {
     if (!this.entitiesByType.has(entityConstructor)) {
       this.entitiesByType.set(entityConstructor, new Set())
     }
-    this.entitiesByType.get(entityConstructor)!.add(id)
+    this.entitiesByType.get(entityConstructor).unwrap().add(id)
   }
 
   /**
@@ -142,9 +143,9 @@ export class World {
    * internal implementation
    */
   getEntity<T extends Entity>(id: string, type?: ClassConstructor<T>): Maybe<T> {
-    const entity = this.entities.get(id)
-
-    if (!entity) return Maybe.None()
+    const maybeEntity = this.entities.get(id)
+    if (maybeEntity.isNone()) return Maybe.None()
+    const entity = maybeEntity.value()
 
     if (!type) {
       return Maybe.Some(entity as T)

@@ -5,10 +5,9 @@ import { ClientEvent } from './events/client/index.ts'
 import { ServerEvent } from './events/server/index.ts'
 import { SinglePlayerWorkerEvent } from './events/single-player-worker/index.ts'
 
-// EVENT TYPE DEFINITION START
-
-// EVENT TYPE DEFINITION END
-
+/**
+ * MinecraftEventBus class for managing Minecraft-specific event publishing and subscription.
+ */
 export class MinecraftEventBus extends EventBus<MinecraftEvent> {
   constructor(environment: 'Client' | 'Server') {
     super()
@@ -31,13 +30,12 @@ export class MinecraftEventBus extends EventBus<MinecraftEvent> {
   }
 
   /**
-   * Decorator to mark a method as an event handler for Minecraft events.
-   * @example
-   * ```ts
-   * class MyClass {
-   *   @MinecraftEventBus.Handler(JoinWorld)
-   *   onJoinWorld(event: JoinWorld) {
-   *     console.log('Player joined world with UUID:', event.worldUUID)
+   * Decorator to mark a method as an event handler for a specific event type or for all event types (wildcard).
+   * ```typescript
+   * class MyEventHandler {
+   *   @MinecraftEventBus.Handler(MyEvent)
+   *   handleMyEvent(event: MyEvent) {
+   *     // Handle MyEvent
    *   }
    * }
    * ```

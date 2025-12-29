@@ -5,11 +5,7 @@ import type { BlockInWorld, Chunk } from '../types.ts'
 
 import { Component } from '../shared/Component.ts'
 import { Config } from '../shared/Config.ts'
-import {
-  MinecraftEvent,
-  MinecraftEventBus,
-  type MinecraftEventPayload,
-} from '../shared/MinecraftEventBus.ts'
+import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
 import { getBlockIndex, getBlockKey, getChunkCoordinates } from '../shared/util.ts'
 import { ClientBlocksRegistry } from './ClientBlocksRegistry.ts'

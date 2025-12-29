@@ -48,14 +48,13 @@ export class EventBus<E extends Event<EventMetadata>> {
   private registry = new Map<string | WildcardKey, { listeners: ((event: any) => void)[] }>()
 
   /**
-   * Decorator to mark a method as an event handler.
-   * @example
-   * ```ts
-   * class MyClass {
-   *  @EventBus.Handler('Client.JoinWorld')
-   *  onJoinWorld(event: MinecraftEvent<'Client.JoinWorld'>) {
-   *    console.log('Player joined world with UUID:', event.payload.worldUUID)
-   *  }
+   * Decorator to mark a method as an event handler for a specific event type or for all event types (wildcard).
+   * ```typescript
+   * class MyEventHandler {
+   *   @EventBus.Handler(MyEvent)
+   *   handleMyEvent(event: MyEvent) {
+   *     // Handle MyEvent
+   *   }
    * }
    * ```
    */
@@ -80,17 +79,18 @@ export class EventBus<E extends Event<EventMetadata>> {
   }
 
   /**
-   * Decorator to mark a class as a EventBus listener.
-   * Ensures automatic registration and unregistration of event handlers.
+   * Class decorator to register all event handlers in the class with the provided EventBus.
+   * @param resolveEventBus A function that returns the EventBus instance to register handlers with.
    * @example
    * ```ts
-   * @EventBus.Listener(() => ClientContainer.resolve(MinecraftEventBus).unwrap())
-   * class MyClass {
-   *  @EventBus.Handler('Client.JoinWorld')
-   *  onJoinWorld(event: MinecraftEvent<'Client.JoinWorld'>) {
-   *    console.log('Player joined world with UUID:', event.payload.worldUUID)
-   *  }
+   * @MinecraftEventBus.Listener(() => myEventBus)
+   * class MyEventListener {
+   *   @MinecraftEventBus.Handler(JoinWorld)
+   *   onJoinWorld(event: JoinWorld) {
+   *     console.log('Player joined world with UUID:', event.worldUUID)
+   *   }
    * }
+   * ```
    */
   static Listener(
     resolveEventBus: () => Pick<EventBus<Event<any>>, 'registerHandlers' | 'unregisterHandlers'>,
@@ -131,11 +131,20 @@ export class EventBus<E extends Event<EventMetadata>> {
     this.beforeEmitHooks.push(hook)
   }
 
+  /**
+   * Gets the event constructor for a given event type.
+   * @param type The event type string.
+   * @returns `Maybe` containing the event constructor if found, otherwise `None`.
+   * @example
+   * ```ts
+   * const constructor = eventBus.getEventConstructor('Client.JoinWorld')
+   * if (constructor.isSome()) {
+   *   const JoinWorld = constructor.unwrap()
+   *   const event = new JoinWorld('some-uuid')
+   * }
+   * ```
+   */
   getEventConstructor<T extends E>(type: string): Maybe<EventConstructor<T>> {
-    return Maybe.from(this.eventTypesRegistry.get(type))
-  }
-
-  getEventType<T extends E>(type: string): Maybe<EventConstructor<T>> {
     return Maybe.from(this.eventTypesRegistry.get(type))
   }
 
@@ -359,7 +368,7 @@ export class EventBus<E extends Event<EventMetadata>> {
   /**
    * Waits for a specific event to be published.
    * @param Constructor The constructor of the event to wait for.
-   * @param options Additional options including eventUUID.
+   * @param eventUUID Optional UUID to filter the event by.
    * @returns A promise that resolves with the event when it is published.
    * @example
    * ```ts
