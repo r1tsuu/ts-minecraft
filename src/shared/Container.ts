@@ -1,4 +1,4 @@
-import { Option } from './Option.ts'
+import { Maybe } from './Maybe.ts'
 import { type ClassConstructor, getObjectConstructor } from './util.ts'
 
 type InstanceKey = ClassConstructor<any> | number | string | symbol
@@ -49,13 +49,7 @@ export class Container<I extends object = object> {
    * container.registerSingleton(new MyClass(), 'my-key')
    */
   registerSingleton<T extends object>(instance: T, key?: InstanceKey): T {
-    let keyToUse: InstanceKey
-
-    if (key) {
-      keyToUse = key
-    } else {
-      keyToUse = getObjectConstructor(instance)
-    }
+    const keyToUse = key ?? getObjectConstructor(instance)
 
     if (this.instanceMap.has(keyToUse)) {
       throw new Error(`Singleton instance already registered for ${this.keyToString(keyToUse)}`)
@@ -83,13 +77,13 @@ export class Container<I extends object = object> {
    * }
    * const anotherInstance = container.resolve('my-key').unwrap()
    */
-  resolve<T extends object>(key: ClassConstructor<T>): Option<T>
-  resolve<T extends object>(key: number | string | symbol): Option<T>
-  resolve<T extends object>(key: InstanceKey): Option<T> {
-    const maybeInstance = Option.from(this.instanceMap.get(key))
+  resolve<T extends object>(key: ClassConstructor<T>): Maybe<T>
+  resolve<T extends object>(key: number | string | symbol): Maybe<T>
+  resolve<T extends object>(key: InstanceKey): Maybe<T> {
+    const maybeInstance = Maybe.from(this.instanceMap.get(key))
 
     if (maybeInstance.isSome()) {
-      return maybeInstance as unknown as Option<T>
+      return maybeInstance as unknown as Maybe<T>
     }
 
     for (const scope of this.scopes) {
@@ -101,7 +95,7 @@ export class Container<I extends object = object> {
       }
     }
 
-    return Option.None()
+    return Maybe.None()
   }
 
   unregister(key: InstanceKey): void {

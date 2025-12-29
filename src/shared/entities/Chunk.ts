@@ -1,5 +1,11 @@
-import { Entity } from './Entity.ts'
+import { Entity, EntityType } from './Entity.ts'
 
+export type ChunkCoordinates = {
+  x: number
+  z: number
+}
+
+@EntityType('Chunk')
 export class Chunk extends Entity {
   constructor(
     readonly x: number,
@@ -9,7 +15,7 @@ export class Chunk extends Entity {
     super()
   }
 
-  static decode(obj: any): Chunk {
+  static deserialize(obj: any): Chunk {
     if (!(obj.blocks instanceof Uint8Array)) {
       obj.blocks = new Uint8Array(obj.blocks)
     }
@@ -17,11 +23,34 @@ export class Chunk extends Entity {
     return new Chunk(obj.x, obj.z, obj.blocks)
   }
 
-  static encode(obj: Chunk): any {
+  static getCoordinatesInRadius(
+    centerX: number,
+    centerZ: number,
+    chunkRadius: number,
+  ): ChunkCoordinates[] {
+    const coordinates: ChunkCoordinates[] = []
+
+    for (let x = centerX - chunkRadius; x <= centerX + chunkRadius; x++) {
+      for (let z = centerZ - chunkRadius; z <= centerZ + chunkRadius; z++) {
+        coordinates.push({
+          x,
+          z,
+        })
+      }
+    }
+
+    return coordinates
+  }
+
+  getWorldID(): string {
+    return `chunk_${this.x}_${this.z}`
+  }
+
+  serialize(): any {
     return {
-      blocks: obj.blocks,
-      x: obj.x,
-      z: obj.z,
+      blocks: this.blocks,
+      x: this.x,
+      z: this.z,
     }
   }
 }

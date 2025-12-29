@@ -9,6 +9,8 @@ export class JoinWorldPayload {
   }
 
   static encode(obj: JoinWorldPayload): any {
-    return { worldUUID: obj.worldUUID }
+    return {
+      worldUUID: obj.worldUUID,
+    }
   }
 }

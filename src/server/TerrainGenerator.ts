@@ -1,16 +1,18 @@
 import { SimplexNoise } from 'three/examples/jsm/Addons.js'
 
-import type { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import type { DatabaseChunkData } from './WorldDatabase.ts'
 
+import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { Config } from '../shared/Config.ts'
+import { ServerContainer } from './ServerContainer.ts'
 
 export class TerrainGenerator {
   private noise = new SimplexNoise()
 
-  constructor(private readonly blocksRegistry: BlocksRegistry) {}
+  constructor() {}
 
   generateChunk = (chunkX: number, chunkZ: number): DatabaseChunkData => {
+    const blocksRegistry = ServerContainer.resolve(BlocksRegistry).unwrap()
     const chunk: DatabaseChunkData = {
       chunkX,
       chunkZ,
@@ -40,7 +42,7 @@ export class TerrainGenerator {
           const block = y === height ? 'grass' : 'dirt'
 
           chunk.data.blocks.push({
-            typeID: this.blocksRegistry.getBlockIdByName(block),
+            typeID: blocksRegistry.getBlockIdByName(block),
             x,
             y,
             z,

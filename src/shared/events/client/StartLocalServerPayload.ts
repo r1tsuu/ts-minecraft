@@ -7,6 +7,8 @@ export class StartLocalServerPayload {
   }
 
   static encode(obj: StartLocalServerPayload): any {
-    return { worldDatabaseName: obj.worldDatabaseName }
+    return {
+      worldDatabaseName: obj.worldDatabaseName,
+    }
   }
 }

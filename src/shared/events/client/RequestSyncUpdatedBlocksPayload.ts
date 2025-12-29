@@ -1,23 +1,26 @@
-import * as THREE from 'three'
+import { Vector3 } from 'three'
+
+import { chain } from '../../Chain.ts'
+
+type BlockUpdate = {
+  blockID: number
+  position: Vector3
+  type: 'add' | 'remove'
+}
 
 export class RequestSyncUpdatedBlocksPayload {
   static readonly type = 'Client.RequestSyncUpdatedBlocks'
-  constructor(
-    readonly blocks: {
-      blockID: number
-      position: THREE.Vector3
-      type: 'add' | 'remove'
-    }[],
-  ) {}
+  constructor(readonly blocks: BlockUpdate[]) {}
 
   static decode(obj: any): RequestSyncUpdatedBlocksPayload {
-    return new RequestSyncUpdatedBlocksPayload(
-      obj.blocks.map((block: any) => ({
+    return chain(obj.blocks as any[])
+      .mapArray((block) => ({
         blockID: block.blockID,
-        position: new THREE.Vector3(block.position.x, block.position.y, block.position.z),
+        position: Vector3.encode(block.position),
         type: block.type,
-      })),
-    )
+      }))
+      .map((blocks) => new RequestSyncUpdatedBlocksPayload(blocks))
+      .unwrap()
   }
 
   static encode(obj: RequestSyncUpdatedBlocksPayload): any {

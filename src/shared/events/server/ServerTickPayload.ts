@@ -7,6 +7,8 @@ export class ServerTickPayload {
   }
 
   static encode(obj: ServerTickPayload): any {
-    return { currentTick: obj.currentTick }
+    return {
+      currentTick: obj.currentTick,
+    }
   }
 }

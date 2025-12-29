@@ -1,8 +1,14 @@
+import type { ContainerScope } from '../shared/Container.ts'
+import type { Player } from '../shared/entities/Player.ts'
+import type { Maybe } from '../shared/Maybe.ts'
 import type { BlockInWorld, ChunkCoordinates } from '../types.ts'
 
 import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
+import { chainAsync } from '../shared/ChainAsync.ts'
 import { Config } from '../shared/Config.ts'
+import { Chunk } from '../shared/entities/Chunk.ts'
 import { type MinecraftEvent, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
+import { Result } from '../shared/Result.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
 import {
   findByXYZ,
@@ -12,46 +18,37 @@ import {
   rawVector3,
   zeroRawVector3,
 } from '../shared/util.ts'
+import { ServerContainer } from './ServerContainer.ts'
 import { TerrainGenerator } from './TerrainGenerator.ts'
 import {
-  type DatabaseChunkData,
-  type DatabasePlayerData,
-  type DatabaseWorldMetaData,
-  WorldDatabase,
-} from './WorldDatabase.ts'
+  type WorldStorageAdapter,
+  WorldStorageAdapterSymbol as WorldStorageAdapterKey,
+} from './types.ts'
+import { type DatabaseChunkData } from './WorldDatabase.ts'
 
 export class MinecraftServer {
-  blocksRegistry: BlocksRegistry
-  currentTick: number = 0
-  loadedChunks: DatabaseChunkData[] = []
-  scheduler = new Scheduler()
-  terrainGenerator: TerrainGenerator
+  chunks: Map<string, Chunk> = new Map()
+  players: Map<string, Player> = new Map()
+  scope: ContainerScope = ServerContainer.createScope()
 
-  private updatedChunks: Set<DatabaseChunkData> = new Set()
-
-  private constructor(
-    private readonly database: WorldDatabase,
-    private readonly eventBus: MinecraftEventBus,
-    private readonly meta: DatabaseWorldMetaData,
-    private players: DatabasePlayerData[],
-  ) {
-    this.blocksRegistry = new BlocksRegistry()
-    this.terrainGenerator = new TerrainGenerator(this.blocksRegistry)
+  private constructor(storage: WorldStorageAdapter) {
+    this.scope.registerSingleton(storage, WorldStorageAdapterKey)
+    this.scope.registerSingleton(new BlocksRegistry())
+    this.scope.registerSingleton(new TerrainGenerator())
   }
 
-  static async create(
-    eventBus: MinecraftEventBus,
-    worldDatabaseName: string,
-  ): Promise<MinecraftServer> {
-    const database = await WorldDatabase.create(worldDatabaseName)
-    const players: DatabasePlayerData[] = await database.fetchPlayers()
-    const meta = await database.fetchWorldMeta()
-
-    const server = new MinecraftServer(database, eventBus, meta, players)
-
-    await server.initialize()
-
-    return server
+  static create(storage: WorldStorageAdapter): Promise<MinecraftServer> {
+    return chainAsync(Chunk.getCoordinatesInRadius(0, 0, Config.SPAWN_CHUNK_RADIUS))
+      .parallel((spawnChunksCoords) => [
+        storage.readPlayers(),
+        storage.readChunks(spawnChunksCoords),
+      ])
+      .map(
+        ([players, spawnChunks]) =>
+          new MinecraftServer(storage, spawnChunks, eventBus, meta, players),
+      )
+      .tap((server) => server.initialize())
+      .execute()
   }
 
   async dispose(): Promise<void> {
@@ -62,6 +59,8 @@ export class MinecraftServer {
     this.currentTick = 0
     this.players = []
   }
+
+  init() {}
 
   @MinecraftEventBus.Handler('Client.RequestChunksLoad')
   protected async onRequestChunksLoad(

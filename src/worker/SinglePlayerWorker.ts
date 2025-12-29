@@ -1,4 +1,5 @@
 import { MinecraftServer } from '../server/MinecraftServer.ts'
+import { SinglePlayerWorkerServerStartPayload } from '../shared/events/single-player-worker/SinglePlayerWorkerServerStartPayload.ts'
 import { type AnyMinecraftEvent, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 
 let localServer: MinecraftServer | null = null
@@ -42,10 +43,7 @@ onmessage = async (message: MessageEvent<AnyMinecraftEvent>) => {
     localServer = await MinecraftServer.create(eventBus, message.data.payload.worldDatabaseName)
 
     eventBus.publish(
-      'SinglePlayerWorker.ServerStarted',
-      {
-        loadedChunks: localServer.loadedChunks,
-      },
+      new SinglePlayerWorkerServerStartPayload(localServer.loadedChunks),
       message.data.eventUUID,
     )
 

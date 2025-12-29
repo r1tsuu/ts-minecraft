@@ -9,7 +9,6 @@ import { RequestPlayerJoinPayload } from './events/client/RequestPlayerJoinPaylo
 import { RequestSyncPlayerPayload } from './events/client/RequestSyncPlayerPayload.ts'
 import { RequestSyncUpdatedBlocksPayload } from './events/client/RequestSyncUpdatedBlocksPayload.ts'
 import { StartLocalServerPayload } from './events/client/StartLocalServerPayload.ts'
-import { TestingEventPayload } from './events/client/TestingEventPayload.ts'
 import { ResponseChunksLoadPayload } from './events/server/ResponseChunksLoadPayload.ts'
 import { ResponsePlayerJoinPayload } from './events/server/ResponsePlayerJoinPayload.ts'
 import { ResponseSyncPlayerPayload } from './events/server/ResponseSyncPlayerPayload.ts'
@@ -46,7 +45,6 @@ const eventTypes = [
   SinglePlayerWorkerServerStartPayload,
   WorkerReadyPayload,
   PauseTogglePayload,
-  TestingEventPayload,
 ]
 // EVENT TYPE DEFINITION END
 

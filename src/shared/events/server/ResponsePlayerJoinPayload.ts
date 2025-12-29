@@ -1,3 +1,4 @@
+import { chain } from '../../Chain.ts'
 import { Player } from '../../entities/Player.ts'
 
 export class ResponsePlayerJoinPayload {
@@ -5,10 +6,15 @@ export class ResponsePlayerJoinPayload {
   constructor(readonly player: Player) {}
 
   static decode(obj: any): ResponsePlayerJoinPayload {
-    return new ResponsePlayerJoinPayload(Player.decode(obj.player))
+    return chain(obj.player)
+      .map(Player.decode)
+      .map((player) => new ResponsePlayerJoinPayload(player))
+      .unwrap()
   }
 
   static encode(obj: ResponsePlayerJoinPayload): any {
-    return { player: Player.encode(obj.player) }
+    return {
+      player: Player.encode(obj.player),
+    }
   }
 }

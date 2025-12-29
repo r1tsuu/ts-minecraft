@@ -9,6 +9,8 @@ export class RequestChunksLoadPayload {
   }
 
   static encode(obj: RequestChunksLoadPayload): any {
-    return { chunks: obj.chunks }
+    return {
+      chunks: obj.chunks,
+    }
   }
 }

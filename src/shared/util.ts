@@ -129,17 +129,26 @@ export const getChunksCoordinatesInRadius = ({
 }
 
 declare module 'three' {
-  interface Vector3 {
-    toRaw(): RawVector3
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Vector3 {
+    function deserialize(obj: RawVector3): THREE.Vector3
   }
 
   // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace Vector3 {
-    function fromRaw(rawVector: RawVector3): Vector3
+  namespace Euler {
+    function deserialize(obj: { x: number; y: number; z: number }): THREE.Euler
+  }
+
+  interface Euler {
+    serialize(): { x: number; y: number; z: number }
+  }
+
+  interface Vector3 {
+    serialize(): RawVector3
   }
 }
 
-THREE.Vector3.prototype.toRaw = function (): RawVector3 {
+THREE.Vector3.prototype.serialize = function (): RawVector3 {
   return {
     x: this.x,
     y: this.y,
@@ -147,8 +156,20 @@ THREE.Vector3.prototype.toRaw = function (): RawVector3 {
   }
 }
 
-THREE.Vector3.fromRaw = function (rawVector: RawVector3): THREE.Vector3 {
+THREE.Vector3.deserialize = (rawVector: RawVector3): THREE.Vector3 => {
   return new THREE.Vector3(rawVector.x, rawVector.y, rawVector.z)
+}
+
+THREE.Euler.prototype.serialize = function (): { x: number; y: number; z: number } {
+  return {
+    x: this.x,
+    y: this.y,
+    z: this.z,
+  }
+}
+
+THREE.Euler.deserialize = (obj: { x: number; y: number; z: number }): THREE.Euler => {
+  return new THREE.Euler(obj.x, obj.y, obj.z, Config.EULER_ORDER)
 }
 
 export const UP_VECTOR = new THREE.Vector3(0, 1, 0)
@@ -188,26 +209,6 @@ export type ClassConstructor<T extends object> = new (...args: any[]) => T
 
 export const getObjectConstructor = <T extends object>(obj: T): ClassConstructor<T> => {
   return obj.constructor as ClassConstructor<T>
-}
-
-export function pipe<A>(value: A): A
-export function pipe<A, AS extends boolean, B>(value: A, fn1: (input: A, skip: () => AS) => B): B
-export function pipe<A, B, C>(value: A, fn1: (input: A) => B, fn2: (input: B) => C): C
-export function pipe<A, B, C, D>(
-  value: A,
-  fn1: (input: A) => B,
-  fn2: (input: B) => C,
-  fn3: (input: C) => D,
-): D
-export function pipe<A, B, C, D, E>(
-  value: A,
-  fn1: (input: A) => B,
-  fn2: (input: B) => C,
-  fn3: (input: C) => D,
-  fn4: (input: D) => E,
-): E
-export function pipe(value: any, ...fns: Function[]): unknown {
-  return fns.reduce((acc, fn) => fn(acc), value)
 }
 
 const decodeMap = (decodeFn: (obj: any) => any, obj: any): Map<string, any> => {
@@ -310,4 +311,60 @@ export const codec = (keys: Record<string, [(obj: any) => any, (obj: any) => any
     decode: decoder(decodeFns),
     encode: encoder(encodeFns),
   }
+}
+
+// Type-safe compose function (right-to-left composition)
+// compose(f, g, h)(x) = f(g(h(x)))
+
+// Overloads for different numbers of functions
+export function compose<A>(fn: (a: A) => A): (a: A) => A
+export function compose<A, B>(fn2: (b: B) => A, fn1: (a: A) => B): (a: A) => A
+export function compose<A, B, C>(fn3: (c: C) => A, fn2: (b: B) => C, fn1: (a: A) => B): (a: A) => A
+export function compose<A, B, C, D>(
+  fn4: (d: D) => A,
+  fn3: (c: C) => D,
+  fn2: (b: B) => C,
+  fn1: (a: A) => B,
+): (a: A) => A
+export function compose<A, B, C, D, E>(
+  fn5: (e: E) => A,
+  fn4: (d: D) => E,
+  fn3: (c: C) => D,
+  fn2: (b: B) => C,
+  fn1: (a: A) => B,
+): (a: A) => A
+
+// Implementation
+export function compose(...fns: Function[]) {
+  return (input: any) => fns.reduceRight((acc, fn) => fn(acc), input)
+}
+
+// Type-safe pipe function (left-to-right composition)
+// pipe(f, g, h)(x) = h(g(f(x)))
+
+export function pipe<A>(fn: (a: A) => A): (a: A) => A
+export function pipe<A, B>(fn1: (a: A) => B, fn2: (b: B) => A): (a: A) => A
+export function pipe<A, B, C>(fn1: (a: A) => B, fn2: (b: B) => C, fn3: (c: C) => A): (a: A) => A
+export function pipe<A, B, C, D>(
+  fn1: (a: A) => B,
+  fn2: (b: B) => C,
+  fn3: (c: C) => D,
+  fn4: (d: D) => A,
+): (a: A) => A
+export function pipe<A, B, C, D, E>(
+  fn1: (a: A) => B,
+  fn2: (b: B) => C,
+  fn3: (c: C) => D,
+  fn4: (d: D) => E,
+  fn5: (e: E) => A,
+): (a: A) => A
+
+export function pipe(...fns: Function[]) {
+  return (input: any) => fns.reduce((acc, fn) => fn(acc), input)
+}
+
+export const apply = <A, B>(fn: (arg: A) => B, arg: A): B => fn(arg)
+
+export const isIterable = <T>(obj: any): obj is Iterable<T> => {
+  return obj != null && typeof obj[Symbol.iterator] === 'function'
 }

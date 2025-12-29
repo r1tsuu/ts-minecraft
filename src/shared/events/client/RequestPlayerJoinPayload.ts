@@ -9,6 +9,8 @@ export class RequestPlayerJoinPayload {
   }
 
   static encode(obj: RequestPlayerJoinPayload): any {
-    return { playerUUID: obj.playerUUID }
+    return {
+      playerUUID: obj.playerUUID,
+    }
   }
 }
