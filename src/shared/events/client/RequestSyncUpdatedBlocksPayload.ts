@@ -12,20 +12,20 @@ export class RequestSyncUpdatedBlocksPayload {
   static readonly type = 'Client.RequestSyncUpdatedBlocks'
   constructor(readonly blocks: BlockUpdate[]) {}
 
-  static decode(obj: any): RequestSyncUpdatedBlocksPayload {
+  static deserialize(obj: any): RequestSyncUpdatedBlocksPayload {
     return chain(obj.blocks as any[])
       .mapArray((block) => ({
         blockID: block.blockID,
-        position: Vector3.encode(block.position),
+        position: Vector3.deserialize(block.position),
         type: block.type,
       }))
       .map((blocks) => new RequestSyncUpdatedBlocksPayload(blocks))
       .unwrap()
   }
 
-  static encode(obj: RequestSyncUpdatedBlocksPayload): any {
+  serialize() {
     return {
-      blocks: obj.blocks.map((block) => ({
+      blocks: this.blocks.map((block) => ({
         blockID: block.blockID,
         position: {
           x: block.position.x,

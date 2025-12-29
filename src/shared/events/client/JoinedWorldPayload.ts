@@ -2,11 +2,11 @@ export class JoinedWorldPayload {
   static readonly type = 'Client.JoinedWorld'
   constructor() {}
 
-  static decode(): JoinedWorldPayload {
+  static deserialize(): JoinedWorldPayload {
     return new JoinedWorldPayload()
   }
 
-  static encode(): any {
+  serialize() {
     return {}
   }
 }

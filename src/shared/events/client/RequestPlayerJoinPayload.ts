@@ -4,13 +4,13 @@ export class RequestPlayerJoinPayload {
   static readonly type = 'Client.RequestPlayerJoin'
   constructor(readonly playerUUID: UUID) {}
 
-  static decode(obj: any): RequestPlayerJoinPayload {
+  static deserialize(obj: any): RequestPlayerJoinPayload {
     return new RequestPlayerJoinPayload(obj.playerUUID)
   }
 
-  static encode(obj: RequestPlayerJoinPayload): any {
+  serialize() {
     return {
-      playerUUID: obj.playerUUID,
+      playerUUID: this.playerUUID,
     }
   }
 }

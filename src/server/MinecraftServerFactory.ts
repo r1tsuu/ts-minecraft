@@ -2,6 +2,7 @@ import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { chainAsync } from '../shared/ChainAsync.ts'
 import { Config } from '../shared/Config.ts'
 import { Chunk } from '../shared/entities/Chunk.ts'
+import { Scheduler } from '../shared/Scheduler.ts'
 import { World } from '../shared/World.ts'
 import { MinecraftServer } from './MinecraftServer.ts'
 import { ServerContainer } from './ServerContainer.ts'
@@ -33,10 +34,13 @@ export class MinecraftServerFactory {
       .execute()
 
     const world = new World()
-    serverScope.registerSingleton(world)
-    const server = new MinecraftServer(serverScope)
 
-    server.world.addEntities(players, chunks)
+    world.addEntities(players, chunks)
+    serverScope.registerSingleton(world)
+    serverScope.registerSingleton(new Scheduler())
+
+    const server = new MinecraftServer(serverScope)
+    serverScope.registerSingleton(server)
 
     return server
   }

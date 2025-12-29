@@ -20,7 +20,7 @@ export interface EntityConstructor<T extends Entity = Entity> extends ClassConst
 
 /**
  * Abstract base class for all entities in the system.
- * Entities must implement methods to get their world ID and serialize themselves.
+ * Entities must implement methods to get their world ID and serialize themselves when transferring over the network.
  */
 export abstract class Entity {
   abstract getWorldID(): string

@@ -2,11 +2,11 @@ export class WorkerReadyPayload {
   static readonly type = 'SinglePlayerWorker.WorkerReady'
   constructor() {}
 
-  static decode(): WorkerReadyPayload {
+  static deserialize(): WorkerReadyPayload {
     return new WorkerReadyPayload()
   }
 
-  static encode(): any {
+  serialize() {
     return {}
   }
 }

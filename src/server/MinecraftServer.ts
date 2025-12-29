@@ -1,45 +1,23 @@
 import type { ContainerScope } from '../shared/Container.ts'
-import type { Player } from '../shared/entities/Player.ts'
-import type { Maybe } from '../shared/Maybe.ts'
 import type { BlockInWorld, ChunkCoordinates } from '../types.ts'
 
-import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
-import { chainAsync } from '../shared/ChainAsync.ts'
 import { Config } from '../shared/Config.ts'
-import { Chunk } from '../shared/entities/Chunk.ts'
 import { type MinecraftEvent, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
 import {
   findByXYZ,
   findChunkByXZ,
   getChunkCoordinates,
-  getChunksCoordinatesInRadius,
   rawVector3,
   zeroRawVector3,
 } from '../shared/util.ts'
-import { World } from '../shared/World.ts'
-import { ServerContainer } from './ServerContainer.ts'
-import { TerrainGenerator } from './TerrainGenerator.ts'
-import {
-  type WorldStorageAdapter,
-  WorldStorageAdapterSymbol as WorldStorageAdapterKey,
-} from './types.ts'
-import { type DatabaseChunkData } from './WorldDatabase.ts'
 
 export class MinecraftServer {
-  world = new World()
-  constructor(readonly scope: ContainerScope) {}
+  constructor(private readonly scope: ContainerScope) {}
 
-  async dispose(): Promise<void> {
-    this.eventBus.unregisterHandlers(this)
-    this.scheduler.unregisterInstance(this)
-    await this.database.dispose()
-    this.loadedChunks = []
-    this.currentTick = 0
-    this.players = []
+  dispose(): void {
+    this.scope.destroyScope()
   }
-
-  init() {}
 
   @MinecraftEventBus.Handler('Client.RequestChunksLoad')
   protected async onRequestChunksLoad(
@@ -206,53 +184,5 @@ export class MinecraftServer {
     this.updatedChunks.clear()
 
     await this.database.updateChunks(chunksToUpdate)
-  }
-
-  // @Scheduler.Every(Config.TICK_RATE, {
-  //   disabled: true, // Enable when ready to run the server tick loop
-  //   runImmediately: true,
-  // })
-  // protected tick(): void {
-  //   console.log(`Server Tick ${this.currentTick}`)
-  //   this.currentTick++
-  // }
-
-  private async initialize(): Promise<void> {
-    const spawnChunksCoordinates = getChunksCoordinatesInRadius({
-      centerChunkX: 0,
-      centerChunkZ: 0,
-      chunkRadius: Config.SPAWN_CHUNK_RADIUS,
-    })
-
-    // Setup initial world state if this is the first server start
-    if (!this.meta.lastLoadedAt) {
-      for (const coordinates of spawnChunksCoordinates) {
-        const chunk = this.terrainGenerator.generateChunk(coordinates.chunkX, coordinates.chunkZ)
-        this.loadedChunks.push(chunk)
-      }
-
-      await this.database.createChunks(this.loadedChunks)
-    } else {
-      const chunks = await this.database.fetchChunksByUUIDs(
-        this.meta.loadedChunks.map((chunk) => chunk.uuid),
-      )
-      this.loadedChunks.push(...chunks)
-    }
-
-    this.meta.lastLoadedAt = new Date()
-
-    await this.syncMeta()
-
-    this.eventBus.registerHandlers(this)
-    this.scheduler.registerInstance(this)
-  }
-
-  private async syncMeta(): Promise<void> {
-    this.meta.loadedChunks = this.loadedChunks.map((chunk) => ({
-      chunkX: chunk.chunkX,
-      chunkZ: chunk.chunkZ,
-      uuid: chunk.uuid,
-    }))
-    await this.database.updateWorldMeta(this.meta)
   }
 }

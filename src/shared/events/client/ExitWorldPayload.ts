@@ -2,11 +2,11 @@ export class ExitWorldPayload {
   static readonly type = 'Client.ExitWorld'
   constructor() {}
 
-  static decode(): ExitWorldPayload {
+  static deserialize(): ExitWorldPayload {
     return new ExitWorldPayload()
   }
 
-  static encode(): any {
+  serialize() {
     return {}
   }
 }

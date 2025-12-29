@@ -130,8 +130,17 @@ export class World {
     this.entitiesByType.get(entityConstructor)!.add(id)
   }
 
+  /**
+   * Get an entity by its ID
+   */
   getEntity<T extends Entity>(id: string): Maybe<T>
+  /**
+   * Get an entity by its ID and type.
+   */
   getEntity<T extends Entity>(id: string, type: ClassConstructor<T>): Maybe<T>
+  /**
+   * internal implementation
+   */
   getEntity<T extends Entity>(id: string, type?: ClassConstructor<T>): Maybe<T> {
     const entity = this.entities.get(id)
 
@@ -150,6 +159,7 @@ export class World {
   query(): WorldQuery {
     return new WorldQueryImpl(this.entities, this.entitiesByType)
   }
+
   removeEntity(id: string): Result<
     Entity,
     {

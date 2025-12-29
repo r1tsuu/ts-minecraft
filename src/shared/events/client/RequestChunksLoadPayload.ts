@@ -4,13 +4,13 @@ export class RequestChunksLoadPayload {
   static readonly type = 'Client.RequestChunksLoad'
   constructor(readonly chunks: ChunkCoordinates[]) {}
 
-  static decode(obj: any): RequestChunksLoadPayload {
+  static deserialize(obj: any): RequestChunksLoadPayload {
     return new RequestChunksLoadPayload(obj.chunks)
   }
 
-  static encode(obj: RequestChunksLoadPayload): any {
+  serialize() {
     return {
-      chunks: obj.chunks,
+      chunks: this.chunks,
     }
   }
 }

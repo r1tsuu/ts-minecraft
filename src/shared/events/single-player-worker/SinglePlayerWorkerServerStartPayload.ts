@@ -6,16 +6,16 @@ export class SinglePlayerWorkerServerStartPayload {
   static readonly type = 'SinglePlayerWorker.ServerStarted'
   constructor(readonly loadedChunks: Map<string, Chunk>) {}
 
-  static decode(obj: any): SinglePlayerWorkerServerStartPayload {
+  static deserialize(obj: any): SinglePlayerWorkerServerStartPayload {
     return chain(obj.loadedChunks)
-      .map(apply(mapDecoder, Chunk.decode))
+      .map(apply(mapDecoder, Chunk.deserialize))
       .map((chunks) => new SinglePlayerWorkerServerStartPayload(chunks))
       .unwrap()
   }
 
-  static encode(obj: SinglePlayerWorkerServerStartPayload): any {
-    return chain(obj.loadedChunks)
-      .map(apply(mapEncoder, Chunk.encode))
+  serialize() {
+    return chain(this.loadedChunks)
+      .map(apply(mapEncoder, (chunk: Chunk) => chunk.serialize()))
       .map((loadedChunks) => ({ loadedChunks }))
       .unwrap()
   }

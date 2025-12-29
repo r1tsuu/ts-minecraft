@@ -79,8 +79,8 @@ export class MinecraftEventBus extends EventBus<
     for (const eventType of eventTypes) {
       this.registerEventType(eventType.type, {
         // @ts-expect-error
-        decode: eventType.decode,
-        encode: eventType.encode,
+        decode: eventType.deserialize,
+        encode: (obj: any) => obj.serialize(),
       })
     }
 

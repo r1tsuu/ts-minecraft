@@ -77,18 +77,20 @@ class MaybeImpl<T> {
   }
 
   unwrap(): T {
-    if (this._value === null) {
+    if (this._type === 'none') {
       throw new Error('Called unwrap on Maybe.None')
     }
 
+    // @ts-expect-error type guard
     return this._value
   }
 
   unwrapOr(resolveFallback: () => T): T {
-    if (this._value === null) {
+    if (this._type === 'none') {
       return resolveFallback()
     }
 
+    // @ts-expect-error type guard
     return this._value
   }
 

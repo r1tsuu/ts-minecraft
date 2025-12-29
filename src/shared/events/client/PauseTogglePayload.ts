@@ -2,11 +2,11 @@ export class PauseTogglePayload {
   static readonly type = 'Client.PauseToggle'
   constructor() {}
 
-  static decode(): PauseTogglePayload {
+  static deserialize(): PauseTogglePayload {
     return new PauseTogglePayload()
   }
 
-  static encode(): any {
+  serialize() {
     return {}
   }
 }

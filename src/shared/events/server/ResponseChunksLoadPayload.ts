@@ -6,16 +6,16 @@ export class ResponseChunksLoadPayload {
   static readonly type = 'Server.ResponseChunksLoad'
   constructor(readonly chunks: Map<string, Chunk>) {}
 
-  static decode(obj: any): ResponseChunksLoadPayload {
+  static deserialize(obj: any): ResponseChunksLoadPayload {
     return chain(obj.chunks)
-      .map(apply(mapDecoder, Chunk.decode))
+      .map(apply(mapDecoder, Chunk.deserialize))
       .map((chunks) => new ResponseChunksLoadPayload(chunks))
       .unwrap()
   }
 
-  static encode(obj: ResponseChunksLoadPayload): any {
-    return chain(obj.chunks)
-      .map(apply(mapEncoder, Chunk.encode))
+  serialize() {
+    return chain(this.chunks)
+      .map(apply(mapEncoder, (chunk: Chunk) => chunk.serialize()))
       .map((chunks) => ({ chunks }))
       .unwrap()
   }

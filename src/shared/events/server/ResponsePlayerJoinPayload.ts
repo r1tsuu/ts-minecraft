@@ -5,16 +5,16 @@ export class ResponsePlayerJoinPayload {
   static readonly type = 'Server.ResponsePlayerJoin'
   constructor(readonly player: Player) {}
 
-  static decode(obj: any): ResponsePlayerJoinPayload {
+  static deserialize(obj: any): ResponsePlayerJoinPayload {
     return chain(obj.player)
-      .map(Player.decode)
+      .map(Player.deserialize)
       .map((player) => new ResponsePlayerJoinPayload(player))
       .unwrap()
   }
 
-  static encode(obj: ResponsePlayerJoinPayload): any {
+  serialize() {
     return {
-      player: Player.encode(obj.player),
+      player: this.player.serialize(),
     }
   }
 }

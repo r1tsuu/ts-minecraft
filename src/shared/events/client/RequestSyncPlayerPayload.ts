@@ -5,16 +5,16 @@ export class RequestSyncPlayerPayload {
   static readonly type = 'Client.RequestSyncPlayer'
   constructor(readonly playerData: Player) {}
 
-  static decode(obj: any): RequestSyncPlayerPayload {
+  static deserialize(obj: any): RequestSyncPlayerPayload {
     return chain(obj.playerData)
-      .map(Player.decode)
+      .map(Player.deserialize)
       .map((player) => new RequestSyncPlayerPayload(player))
       .unwrap()
   }
 
-  static encode(obj: RequestSyncPlayerPayload): any {
-    return chain(obj.playerData)
-      .map(Player.encode)
+  serialize() {
+    return chain(this.playerData)
+      .map((player) => player.serialize())
       .map((playerData) => ({ playerData }))
       .unwrap()
   }
