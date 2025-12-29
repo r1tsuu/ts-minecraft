@@ -83,6 +83,24 @@ class MaybeImpl<T> {
     return MaybeImpl.None()
   }
 
+  tap(fn: (value: T) => void): Maybe<T> {
+    if (this.isSome()) {
+      fn(this._value as T)
+    }
+
+    // @ts-expect-error
+    return this
+  }
+
+  tapNone(fn: () => void): Maybe<T> {
+    if (this.isNone()) {
+      fn()
+    }
+
+    // @ts-expect-error
+    return this
+  }
+
   unwrap(): T {
     if (this._type === 'none') {
       throw new Error('Called unwrap on Maybe.None')

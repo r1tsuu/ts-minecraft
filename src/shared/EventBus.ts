@@ -248,7 +248,7 @@ export class EventBus<E extends Event<EventMetadata>> {
   }
 
   /**
-   * Publishes a response event to an original event and waits for confirmation.
+   * Publishes a response event to an original event, does not wait for a reply since it's a one-way response.
    * @param originalEvent The original event to reply to.
    * @param responseEvent The response event instance.
    * @example
@@ -259,11 +259,9 @@ export class EventBus<E extends Event<EventMetadata>> {
    * )
    * ```
    */
-  async reply<T extends E, R extends E>(originalEvent: T, responseEvent: R): Promise<void> {
-    const Constructor = getEventConstructor(responseEvent)
+  reply<T extends E, R extends E>(originalEvent: T, responseEvent: R): void {
     responseEvent.metadata.uuid = originalEvent.metadata.uuid.clone()
     this.publish(responseEvent)
-    await this.waitFor(Constructor, originalEvent.metadata.uuid.unwrap())
   }
 
   /**

@@ -1,16 +1,21 @@
-import type { ContainerScope } from '../shared/Container.ts'
-import type { BlockInWorld, ChunkCoordinates } from '../types.ts'
+import { Euler, Vector3 } from 'three'
 
+import type { ContainerScope } from '../shared/Container.ts'
+
+import { chain } from '../shared/Chain.ts'
+import { chainAsync } from '../shared/ChainAsync.ts'
 import { Config } from '../shared/Config.ts'
-import { type MinecraftEvent, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
-import { Scheduler } from '../shared/Scheduler.ts'
-import {
-  findByXYZ,
-  findChunkByXZ,
-  getChunkCoordinates,
-  rawVector3,
-  zeroRawVector3,
-} from '../shared/util.ts'
+import { Chunk } from '../shared/entities/Chunk.ts'
+import { Player } from '../shared/entities/Player.ts'
+import { RequestChunksLoad } from '../shared/events/client/RequestChunksLoad.ts'
+import { RequestPlayerJoin } from '../shared/events/client/RequestPlayerJoin.ts'
+import { ResponseChunksLoad } from '../shared/events/server/ResponseChunksLoad.ts'
+import { ResponsePlayerJoin } from '../shared/events/server/ResponsePlayerJoin.ts'
+import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
+import { range } from '../shared/util.ts'
+import { World } from '../shared/World.ts'
+import { ServerContainer } from './ServerContainer.ts'
+import { TerrainGenerator } from './TerrainGenerator.ts'
 
 export class MinecraftServer {
   constructor(private readonly scope: ContainerScope) {}
@@ -19,170 +24,51 @@ export class MinecraftServer {
     this.scope.destroyScope()
   }
 
-  @MinecraftEventBus.Handler('Client.RequestChunksLoad')
-  protected async onRequestChunksLoad(
-    event: MinecraftEvent<'Client.RequestChunksLoad'>,
-  ): Promise<void> {
-    const response: DatabaseChunkData[] = []
+  @MinecraftEventBus.Handler(RequestChunksLoad)
+  protected async onRequestChunksLoad(event: RequestChunksLoad): Promise<void> {
+    const terrainGenerator = ServerContainer.resolve(TerrainGenerator).unwrap()
+    const world = ServerContainer.resolve(World).unwrap()
+    const eventBus = ServerContainer.resolve(MinecraftEventBus).unwrap()
 
-    const coordsToLoad: ChunkCoordinates[] = []
-
-    for (const chunk of event.payload.chunks) {
-      // first check if chunk is already loaded
-      const loadedChunk = findChunkByXZ(this.loadedChunks, chunk.chunkX, chunk.chunkZ)
-
-      if (loadedChunk) {
-        response.push(loadedChunk)
-      } else {
-        coordsToLoad.push({ chunkX: chunk.chunkX, chunkZ: chunk.chunkZ })
-      }
-    }
-
-    const loadedFromDb = await this.database.fetchChunksByCoordinates(coordsToLoad)
-
-    for (const chunk of loadedFromDb) {
-      this.loadedChunks.push(chunk)
-      response.push(chunk)
-    }
-
-    const chunksToInsertToDb: DatabaseChunkData[] = []
-    for (const coord of coordsToLoad) {
-      const alreadyLoaded = findChunkByXZ(this.loadedChunks, coord.chunkX, coord.chunkZ)
-
-      if (!alreadyLoaded) {
-        const generatedChunk = this.terrainGenerator.generateChunk(coord.chunkX, coord.chunkZ)
-        this.loadedChunks.push(generatedChunk)
-        response.push(generatedChunk)
-        chunksToInsertToDb.push(generatedChunk)
-      }
-    }
-
-    if (chunksToInsertToDb.length > 0) {
-      await this.database.createChunks(chunksToInsertToDb)
-    }
-
-    await this.syncMeta()
-
-    await this.eventBus.reply(event, 'Server.ResponseChunksLoad', {
-      chunks: response,
-    })
-  }
-
-  @MinecraftEventBus.Handler('Client.RequestPlayerJoin')
-  protected async onRequestPlayerJoin(event: MinecraftEvent<'Client.RequestPlayerJoin'>) {
-    let playerData = this.players.find((player) => player.uuid === event.payload.playerUUID)
-
-    if (!playerData) {
-      const centralChunk = findChunkByXZ(this.loadedChunks, 0, 0)!
-
-      let latestBlock: BlockInWorld | null = null
-
-      for (let y = 0; y < Config.WORLD_HEIGHT; y++) {
-        const maybeBlock = findByXYZ(centralChunk.data.blocks, 0, y, 0)
-
-        if (maybeBlock) {
-          latestBlock = maybeBlock
-        } else {
-          break
-        }
-      }
-
-      if (!latestBlock) {
-        throw new Error('TODO: Include spawn platform generation')
-      }
-
-      playerData = {
-        position: rawVector3(latestBlock.x, latestBlock.y + 2, latestBlock.z),
-        rotation: {
-          x: 0,
-          y: 0,
-        },
-        uuid: event.payload.playerUUID,
-        velocity: zeroRawVector3(),
-      }
-
-      await this.database.createPlayer(playerData)
-      this.players.push(playerData)
-    }
-
-    this.eventBus.reply(event, 'Server.ResponsePlayerJoin', {
-      playerData,
-    })
-  }
-
-  @MinecraftEventBus.Handler('Client.RequestSyncPlayer')
-  protected async onRequestSyncPlayer(
-    event: MinecraftEvent<'Client.RequestSyncPlayer'>,
-  ): Promise<void> {
-    const player = this.players.find((p) => p.uuid === event.payload.playerData.uuid)
-
-    if (player) {
-      Object.assign(player, event.payload.playerData)
-      await this.database.updatePlayer(player)
-    }
-
-    await this.eventBus.reply(event, 'Server.ResponseSyncPlayer', {})
-  }
-
-  @MinecraftEventBus.Handler('Client.RequestSyncUpdatedBlocks')
-  protected async onRequestSyncUpdatedBlocks(
-    event: MinecraftEvent<'Client.RequestSyncUpdatedBlocks'>,
-  ): Promise<void> {
-    for (const blockUpdate of event.payload.updatedBlocks) {
-      const chunkCoordinates = getChunkCoordinates({
-        x: blockUpdate.position.x,
-        z: blockUpdate.position.z,
-      })
-
-      const chunk = findChunkByXZ(
-        this.loadedChunks,
-        chunkCoordinates.chunkX,
-        chunkCoordinates.chunkZ,
+    await chainAsync(event.chunks)
+      .mapArray((coord) =>
+        world
+          .getEntity(Chunk.getWorldID(coord), Chunk)
+          .unwrapOr(() => world.addDirtyEntity(() => terrainGenerator.generateChunkAt(coord))),
       )
-
-      if (chunk) {
-        const localX = blockUpdate.position.x - chunkCoordinates.chunkX * Config.CHUNK_SIZE
-        const localZ = blockUpdate.position.z - chunkCoordinates.chunkZ * Config.CHUNK_SIZE
-
-        if (blockUpdate.type === 'add') {
-          chunk.data.blocks.push({
-            typeID: blockUpdate.blockID,
-            x: blockUpdate.position.x,
-            y: blockUpdate.position.y,
-            z: blockUpdate.position.z,
-          })
-          this.updatedChunks.add(chunk)
-          continue
-        }
-
-        if (blockUpdate.type === 'remove') {
-          const block = findByXYZ(chunk.data.blocks, localX, blockUpdate.position.y, localZ)
-          if (block) {
-            const index = chunk.data.blocks.indexOf(block)
-            if (index !== -1) {
-              chunk.data.blocks.splice(index, 1)
-              this.updatedChunks.add(chunk)
-              continue
-            }
-          }
-        }
-      }
-    }
-
-    this.eventBus.publish('Server.ResponseSyncUpdatedBlocks', {})
+      .map((chunks) => new ResponseChunksLoad(chunks))
+      .tap((response) => eventBus.reply(event, response))
+      .execute()
   }
 
-  @Scheduler.Every(1000)
-  protected async syncUpdatedChunks(): Promise<void> {
-    if (this.updatedChunks.size === 0) {
-      return
-    }
+  @MinecraftEventBus.Handler(RequestPlayerJoin)
+  protected async onRequestPlayerJoin(event: RequestPlayerJoin) {
+    const world = ServerContainer.resolve(World).unwrap()
+    const eventBus = ServerContainer.resolve(MinecraftEventBus).unwrap()
 
-    console.log(`Syncing ${this.updatedChunks.size} updated chunks to database...`)
+    chain(event.playerUUID)
+      .map((uuid) =>
+        world
+          .getEntity(uuid, Player)
+          .unwrapOr(() =>
+            world.addDirtyEntity(
+              () => new Player(uuid, this.getPlayerSpawnPosition(), Euler.zero(), new Vector3()),
+            ),
+          ),
+      )
+      .map(() => new ResponsePlayerJoin(world))
+      .tap((response) => eventBus.reply(event, response))
+  }
 
-    const chunksToUpdate = Array.from(this.updatedChunks)
-    this.updatedChunks.clear()
+  private getPlayerSpawnPosition(): Vector3 {
+    const world = ServerContainer.resolve(World).unwrap()
+    const centralChunk = world.getEntity(Chunk.getWorldID({ x: 0, z: 0 }), Chunk).unwrap()
 
-    await this.database.updateChunks(chunksToUpdate)
+    return chain(range(Config.WORLD_HEIGHT))
+      .filterIter((y) => centralChunk.getBlock(0, y, 0).isSome())
+      .iterLast()
+      .unwrap()
+      .map((y) => new Vector3(0, y + 2, 0))
+      .unwrap()
   }
 }

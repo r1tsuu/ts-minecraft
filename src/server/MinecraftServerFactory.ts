@@ -30,13 +30,17 @@ export class MinecraftServerFactory {
     const players = await this.storage.readPlayers()
     const spawnChunks = Chunk.coordsInRadius(0, 0, Config.SPAWN_CHUNK_RADIUS)
 
+    const world = new World()
+
     const chunks = await chainAsync(this.storage.readChunks(spawnChunks))
       .mapArray((readChunk) =>
-        readChunk.chunk.unwrapOr(() => terrainGenerator.generateChunkAt(readChunk)),
+        readChunk.chunk.unwrapOr(() => {
+          const chunk = terrainGenerator.generateChunkAt(readChunk)
+          world.markEntityAsDirty(chunk.getWorldID())
+          return chunk
+        }),
       )
       .execute()
-
-    const world = new World()
 
     world.addEntities(players, chunks)
     serverScope.registerSingleton(world)

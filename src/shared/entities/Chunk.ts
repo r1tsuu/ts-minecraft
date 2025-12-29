@@ -1,4 +1,5 @@
 import { Config } from '../Config.ts'
+import { Maybe } from '../Maybe.ts'
 import { Entity, EntityType } from './Entity.ts'
 
 export type ChunkCoordinates = {
@@ -45,8 +46,28 @@ export class Chunk extends Entity {
     return new Chunk(obj.x, obj.z, obj.blocks)
   }
 
+  static getWorldID(coords: ChunkCoordinates): string {
+    return `chunk_${coords.x}_${coords.z}`
+  }
+
+  static serialize(chunk: Chunk): any {
+    return chunk.serialize()
+  }
+
+  getBlock(x: number, y: number, z: number): Maybe<number> {
+    const index = Chunk.blockIndex(x, y, z)
+    const blockID = this.blocks[index]
+
+    if (blockID === undefined || blockID === 0) {
+      // Assuming 0 is air / non-existent block
+      return Maybe.None()
+    }
+
+    return Maybe.Some(blockID)
+  }
+
   getWorldID(): string {
-    return `chunk_${this.x}_${this.z}`
+    return Chunk.getWorldID(this)
   }
 
   serialize(): any {

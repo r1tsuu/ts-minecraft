@@ -135,6 +135,7 @@ declare module 'three' {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Euler {
     function deserialize(obj: { x: number; y: number; z: number }): THREE.Euler
+    function zero(): THREE.Euler
   }
 
   interface Euler {
@@ -168,6 +169,10 @@ THREE.Euler.prototype.serialize = function (): { x: number; y: number; z: number
 
 THREE.Euler.deserialize = (obj: { x: number; y: number; z: number }): THREE.Euler => {
   return new THREE.Euler(obj.x, obj.y, obj.z, Config.EULER_ORDER)
+}
+
+THREE.Euler.zero = (): THREE.Euler => {
+  return new THREE.Euler(0, 0, 0, Config.EULER_ORDER)
 }
 
 export const UP_VECTOR = new THREE.Vector3(0, 1, 0)
@@ -392,3 +397,39 @@ export function* combineIterators<T extends unknown[]>(
     }
   }
 }
+
+export function range(end: number): IterableIterator<number>
+export function range(start: number, end: number): IterableIterator<number>
+export function* range(startOrEnd: number, end?: number): IterableIterator<number> {
+  if (end === undefined) {
+    end = startOrEnd
+    startOrEnd = 0
+  }
+
+  for (let i = startOrEnd; i < end; i++) {
+    yield i
+  }
+}
+
+export function rangeReverse(end: number): IterableIterator<number>
+export function rangeReverse(start: number, end: number): IterableIterator<number>
+export function* rangeReverse(startOrEnd: number, end?: number): IterableIterator<number> {
+  if (end === undefined) {
+    end = startOrEnd
+    startOrEnd = 0
+  }
+
+  for (let i = end - 1; i >= startOrEnd; i--) {
+    yield i
+  }
+}
+
+export function reduce<T, U>(iter: Iterable<T>, reducer: (acc: U, value: T) => U, initial: U): U {
+  let acc = initial
+  for (const value of iter) {
+    acc = reducer(acc, value)
+  }
+  return acc
+}
+
+const x = reduce([1, 2, 3], (a, v) => a + v, 0) //

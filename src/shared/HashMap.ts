@@ -17,6 +17,29 @@ import { Maybe } from './Maybe.ts'
  */
 export class HashMap<K, V> {
   private readonly map: Map<K, V> = new Map()
+
+  static deserializer<V, K = string>(valueDeserializer: (value: any) => V) {
+    return function (obj: any): HashMap<K, V> {
+      const hashMap = new HashMap<K, V>()
+      for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          hashMap.set(key as unknown as K, valueDeserializer(obj[key]))
+        }
+      }
+      return hashMap
+    }
+  }
+
+  static serializer<V, K = string>(valueSerializer: (value: V) => any) {
+    return function (hashMap: HashMap<K, V>): any {
+      const obj: any = {}
+      for (const [key, value] of hashMap.entries()) {
+        obj[key as unknown as string] = valueSerializer(value)
+      }
+      return obj
+    }
+  }
+
   delete(key: K): boolean {
     return this.map.delete(key)
   }

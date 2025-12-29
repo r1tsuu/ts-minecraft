@@ -1,3 +1,5 @@
+import { Maybe } from './Maybe.ts'
+
 /**
  * A type-safe Chain class for functional method chaining
  */
@@ -18,6 +20,24 @@ class Chain<T> {
     return new Chain(predicate(this._value) ? this._value : undefined)
   }
 
+  filterIter(
+    predicate: (value: T extends Iterable<infer R> ? R : never) => boolean,
+  ): Chain<Iterable<T extends Iterable<infer R> ? R : never>> {
+    if (!(Symbol.iterator in Object(this._value))) {
+      throw new Error('filterIter can only be called on Chain wrapping an iterable')
+    }
+
+    function* generator(this: Chain<T>) {
+      for (const item of this._value as Iterable<any>) {
+        if (predicate(item)) {
+          yield item
+        }
+      }
+    }
+
+    return new Chain(generator.call(this))
+  }
+
   /**
    * Flat map - useful for chaining operations that return Chain
    */
@@ -35,6 +55,19 @@ class Chain<T> {
 
   from<T>(value: T): Chain<T> {
     return new Chain(value)
+  }
+
+  iterLast(): Chain<T extends Iterable<infer R> ? Maybe<R> : never> {
+    if (!(Symbol.iterator in Object(this._value))) {
+      throw new Error('iterLast can only be called on Chain wrapping an iterable')
+    }
+
+    let last: any = Maybe.None()
+    for (const item of this._value as Iterable<any>) {
+      last = Maybe.Some(item)
+    }
+
+    return new Chain(last)
   }
 
   /**
