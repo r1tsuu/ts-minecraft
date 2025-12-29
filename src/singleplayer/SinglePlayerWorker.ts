@@ -12,7 +12,7 @@ import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { PrivateFileSystemWorldStorage } from './PrivateFileSystemWorldStorage.ts'
 
 class SinglePlayerServerImpl {
-  private eventBus: MinecraftEventBus
+  private readonly eventBus: MinecraftEventBus
   private server: Maybe<MinecraftServer> = Maybe.None()
 
   constructor() {
@@ -22,7 +22,7 @@ class SinglePlayerServerImpl {
     this.eventBus.publish(new SinglePlayerWorkerEvent.WorkerReady())
   }
 
-  async handleMessage(message: MessageEvent<MinecraftEvent>): Promise<void> {
+  handleMessage(message: MessageEvent<MinecraftEvent>): void {
     const event = deserializeEvent(this.eventBus, message.data)
     event.metadata.isForwarded = true // Mark as forwarded
     this.eventBus.publish(event)
@@ -40,7 +40,7 @@ class SinglePlayerServerImpl {
   }
 
   @MinecraftEventBus.Handler(ClientEvent.StartLocalServer)
-  protected async startLocalServer(event: StartLocalServer): Promise<void> {
+  protected async onStartLocalServer(event: StartLocalServer): Promise<void> {
     if (this.server.isSome()) {
       console.warn(
         `Received ${ClientEvent.StartLocalServer.type} but Local server is already started.`,
