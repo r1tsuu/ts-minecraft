@@ -1,14 +1,14 @@
 import { chain } from '../../Chain.ts'
 import { Player } from '../../entities/Player.ts'
 
-export class ResponsePlayerJoinPayload {
+export class ResponsePlayerJoin {
   static readonly type = 'Server.ResponsePlayerJoin'
   constructor(readonly player: Player) {}
 
-  static deserialize(obj: any): ResponsePlayerJoinPayload {
+  static deserialize(obj: any): ResponsePlayerJoin {
     return chain(obj.player)
       .map(Player.deserialize)
-      .map((player) => new ResponsePlayerJoinPayload(player))
+      .map((player) => new ResponsePlayerJoin(player))
       .unwrap()
   }
 

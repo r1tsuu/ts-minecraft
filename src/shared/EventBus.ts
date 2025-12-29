@@ -3,12 +3,26 @@
  * Supports event metadata and pre-publish hooks.
  */
 import type { UUID } from '../types.ts'
+import type { ClassConstructor } from './util.ts'
 
 import { type AnyEvent, Event } from './Event.ts'
+import { Maybe } from './Maybe.ts'
 
 const EVENT_HANDLERS_KEY = Symbol('EVENT_HANDLERS')
 
 const WILDCARD = '*'
+
+export interface EventConstructor<
+  T extends string = string,
+  P extends object = object,
+> extends ClassConstructor<P> {
+  deserialize(obj: any): P
+  readonly type: T
+}
+
+const getEventConstructor = (payloadObj: object): EventConstructor<string, object> => {
+  return payloadObj.constructor as unknown as EventConstructor<string, object>
+}
 
 type EventHandler<
   K extends string,
@@ -22,8 +36,8 @@ interface EventHandlerMetadata {
 }
 
 type EventKey<Events extends Record<string, unknown>> = keyof Events & string
-
 type RegistryKey<Events extends Record<string, unknown>> = EventKey<Events> | WildcardKey
+
 type WildcardKey = typeof WILDCARD
 
 /**
@@ -36,17 +50,16 @@ type WildcardKey = typeof WILDCARD
  * eventBus.subscribe('Client.JoinWorld', (event) => {
  *   console.log('Player joined world with UUID:', event.payload.worldUUID)
  * })
- * eventBus.publish('Client.JoinWorld', { worldUUID: 'some-uuid' })
+ * eventBus.publish(new JoinWorld('some-uuid'))
  * ```
  * Note: Event types _must_ be registered using `registerEventType` before publishing or subscribing.
  */
 export class EventBus<
   Events extends Record<string, Record<string, unknown>>,
   Meta extends Record<string, unknown> = {},
-  EventTypeMeta = {},
 > {
   private beforeEmitHooks: ((event: AnyEvent<Events, Meta>) => void)[] = []
-  private eventTypesRegistry = new Map<string, EventTypeMeta>()
+  private eventTypesRegistry = new Map<string, EventConstructor<any, any>>()
 
   private registry = new Map<
     RegistryKey<Events>,
@@ -139,48 +152,34 @@ export class EventBus<
     this.beforeEmitHooks.push(hook)
   }
 
-  publish(payloadInstance: object, eventUUID?: UUID, metadata?: Meta): void
-  publish<K extends ({} & string) | EventKey<Events>>(
-    type: K,
-    payload: K extends keyof Events ? Events[K] : any,
-    eventUUID?: UUID,
-    metadata?: Meta,
-  ): void
-  publish(
-    typeOrPayload: any,
-    payloadOrEventUUID?: any,
-    eventUUIDOrMetadata?: any,
-    metadata?: Meta,
-  ): void {
-    let type: string
-    let payload: any
-    let eventUUID: undefined | UUID
-    let meta: Meta | undefined
+  getEventType(type: string): Maybe<EventConstructor<any, any>> {
+    return Maybe.from(this.eventTypesRegistry.get(type))
+  }
 
-    if (typeof typeOrPayload !== 'string') {
-      // Called with (payloadInstance, eventUUID?, metadata?)
-      const payloadInstance = typeOrPayload
-      type = (payloadInstance.constructor as any).type
-      payload = payloadInstance
-      eventUUID = payloadOrEventUUID
-      meta = eventUUIDOrMetadata
-    } else {
-      // Called with (type, payload, eventUUID?, metadata?)
-      type = typeOrPayload
-      payload = payloadOrEventUUID
-      eventUUID = eventUUIDOrMetadata
-      meta = metadata
+  /**
+   * Publishes an event by passing a payload instance.
+   * @param payloadInstance The payload instance to publish (must have static type property).
+   * @param eventUUID Optional UUID for the event.
+   * @param metadata Optional metadata for the event.
+   * @example
+   * ```ts
+   * eventBus.publish(new JoinWorld('some-uuid'))
+   * ```
+   */
+  publish(payloadInstance: object, eventUUID?: UUID, metadata?: Meta): void {
+    const type = getEventConstructor(payloadInstance).type
+
+    if (!type) {
+      throw new Error('Payload instance must have a static type property')
     }
 
     this.validateEventType(type)
 
-    const event = new Event(type, payload, eventUUID, meta)
+    const event = new Event(type, payloadInstance as Record<string, any>, eventUUID, metadata)
 
     for (const hook of this.beforeEmitHooks) {
-      hook(event)
+      hook(event as AnyEvent<Events, Meta>)
     }
-
-    // console.log(`Event`, event, `emitted from`, environment, isForwarded ? `(forwarded)` : ``)
 
     const listeners = [
       ...(this.registry.get(type)?.listeners ?? []),
@@ -205,8 +204,8 @@ export class EventBus<
    * eventBus.registerEventType('Client.JoinWorld')
    * ```
    */
-  registerEventType(type: string, meta: EventTypeMeta): void {
-    this.eventTypesRegistry.set(type, meta)
+  registerEventType(constructor: EventConstructor<any, any>): void {
+    this.eventTypesRegistry.set(constructor.type, constructor)
   }
 
   /**
@@ -257,121 +256,61 @@ export class EventBus<
   }
 
   /**
-   * Publishes an event and waits for a response event.
+   * Publishes a response event to an original event and waits for confirmation.
    * @param originalEvent The original event to reply to.
-   * @param type The type of the response event.
-   * @param payload The payload of the response event.
+   * @param payloadInstance The response payload instance.
    * @example
    * ```ts
    * await eventBus.reply(
    *   originalEvent,
-   *   'Server.ResponseJoinWorld',
-   *   { success: true }
+   *   new ResponsePlayerJoin(player)
    * )
    * ```
    */
-  async reply<
-    OriginalK extends ({} & string) | EventKey<Events>,
-    K extends ({} & string) | EventKey<Events>,
-  >(
+  async reply<OriginalK extends ({} & string) | EventKey<Events>>(
     originalEvent: Event<OriginalK, OriginalK extends keyof Events ? Events[OriginalK] : any, Meta>,
-    type: K,
-    payload: K extends keyof Events ? Events[K] : any,
+    payloadInstance: object,
   ): Promise<void> {
-    this.publish(type, payload, originalEvent.eventUUID)
-    await this.waitFor(type, {
+    const Constructor = getEventConstructor(payloadInstance)
+    this.publish(payloadInstance, originalEvent.eventUUID)
+    await this.waitFor(Constructor, {
       eventUUID: originalEvent.eventUUID,
     })
   }
 
   /**
    * Sends a request event and waits for a response event.
-   * @param type The type of the request event.
-   * @param payload The payload of the request event.
+   * @param payloadInstance The request payload instance.
    * @param typeUntil The type of the response event to wait for.
    * @param options Additional options including eventUUID and metadata.
    * @returns A promise that resolves with the response event.
    * @example
    * ```ts
    * const responseEvent = await eventBus.request(
-   *   'Client.RequestJoinWorld',
-   *   { worldName: 'MyWorld' },
-   *   'Server.ResponseJoinWorld'
+   *   new RequestPlayerJoin('player-uuid'),
+   *   'Server.ResponsePlayerJoin'
    * )
-   * console.log('Join world response:', responseEvent.payload)
-   * ```
-   *
-   * Additionally, you can call with just a payload instance, constructor of which must have a static `type` property:
-   * ```ts
-   * const responseEvent = await eventBus.request(
-   *   new RequestJoinWorldPayload('MyWorld'),
-   *   'Server.ResponseJoinWorld'
-   * )
+   * console.log('Join response:', responseEvent.payload)
    * ```
    */
-  request<UntilK extends ({} & string) | EventKey<Events>>(
+  async request<UntilK extends ({} & string) | EventKey<Events>>(
     payloadInstance: object,
-    typeUntil: UntilK,
-    options?: {
-      eventUUID?: UUID
-      metadata?: Meta
-      /**
-       * TODO: AbortSignal to cancel waiting for response
-       */
-      signal?: AbortSignal
-    },
-  ): Promise<Event<UntilK, UntilK extends keyof Events ? Events[UntilK] : any, Meta>>
-  request<
-    K extends ({} & string) | EventKey<Events>,
-    UntilK extends ({} & string) | EventKey<Events>,
-  >(
-    type: K,
-    payload: K extends keyof Events ? Events[K] : any,
-    typeUntil: UntilK,
+    ConstructorUntil: EventConstructor<UntilK, any>,
     options?: {
       eventUUID?: UUID
       metadata?: Meta
       signal?: AbortSignal
     },
-  ): Promise<Event<UntilK, UntilK extends keyof Events ? Events[UntilK] : any, Meta>>
-  async request(
-    typeOrPayload: any,
-    payloadOrTypeUntil: any,
-    typeUntilOrOptions?: any,
-    options?: {
-      eventUUID?: UUID
-      metadata?: Meta
-      signal?: AbortSignal
-    },
-  ): Promise<any> {
-    let type: string
-    let payload: any
-    let typeUntil: string
-    let optionsFinal: {
-      eventUUID?: UUID
-      metadata?: Meta
-      signal?: AbortSignal
-    } = {}
-    if (typeof typeOrPayload !== 'string') {
-      // Called with (payloadInstance, typeUntil, options?)
-      const payloadInstance = typeOrPayload
-      type = (payloadInstance.constructor as any).type
-      payload = payloadInstance
-      typeUntil = payloadOrTypeUntil
-      optionsFinal = typeUntilOrOptions || {}
-    } else {
-      // Called with (type, payload, typeUntil, options?)
-      type = typeOrPayload
-      payload = payloadOrTypeUntil
-      typeUntil = typeUntilOrOptions
-      optionsFinal = options || {}
-    }
+  ): Promise<Event<UntilK, UntilK extends keyof Events ? Events[UntilK] : any, Meta>> {
+    const optionsFinal = options || {}
 
     if (!optionsFinal.eventUUID) {
       optionsFinal.eventUUID = crypto.randomUUID()
     }
-    this.publish(type, payload, optionsFinal.eventUUID, optionsFinal.metadata)
-    return this.waitFor(typeUntil, {
+
+    this.publish(payloadInstance, optionsFinal.eventUUID, optionsFinal.metadata)
+
+    return this.waitFor(ConstructorUntil, {
       eventUUID: optionsFinal.eventUUID,
     })
   }
@@ -396,19 +335,20 @@ export class EventBus<
    * })
    * ```
    */
-  subscribe<K extends ({} & string) | RegistryKey<Events>>(
+  subscribe<K extends ({} & string) | EventConstructor<string, object> | RegistryKey<Events>>(
     type: K,
     handler: K extends '*'
       ? (event: AnyEvent<Events, Meta>) => Promise<void> | void
-      : EventHandler<K, Events, Meta>,
+      : EventHandler<K extends EventConstructor<string, object> ? K['type'] : K, Events, Meta>,
   ): () => void {
     this.validateEventType(type)
 
-    let entry = this.registry.get(type)
+    const typeStr = typeof type === 'string' ? type : type.type
+    let entry = this.registry.get(typeStr)
 
     if (!entry) {
       entry = { listeners: [] }
-      this.registry.set(type, entry)
+      this.registry.set(typeStr, entry)
     }
 
     entry.listeners.push(handler as any)
@@ -436,7 +376,7 @@ export class EventBus<
 
   /**
    * Waits for a specific event to be published.
-   * @param type The type of the event to wait for.
+   * @param Constructor The constructor of the event to wait for.
    * @param options Additional options including eventUUID.
    * @returns A promise that resolves with the event when it is published.
    * @example
@@ -447,14 +387,14 @@ export class EventBus<
    * ```
    */
   waitFor<K extends ({} & string) | EventKey<Events>>(
-    type: K,
+    Constructor: EventConstructor<K, any>,
     options: {
       eventUUID?: UUID
     } = {},
   ): Promise<Event<K, K extends keyof Events ? Events[K] : any, Meta>> {
     return new Promise((resolve) => {
       // @ts-expect-error
-      const unsub = this.subscribe(type, (event) => {
+      const unsub = this.subscribe(Constructor.type, (event) => {
         if (options.eventUUID && event.eventUUID !== options.eventUUID) return
         resolve(event)
         unsub()
@@ -462,8 +402,9 @@ export class EventBus<
     })
   }
 
-  private validateEventType(type: string): void {
-    if (!this.eventTypesRegistry.has(type) && type !== WILDCARD) {
+  private validateEventType(type: EventConstructor<string, object> | string): void {
+    const typeStr = typeof type === 'string' ? type : type.type
+    if (!this.eventTypesRegistry.has(typeStr) && type !== WILDCARD) {
       throw new Error(`Event type "${type}" is not registered in the EventBus.`)
     }
   }

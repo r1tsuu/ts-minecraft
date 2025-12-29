@@ -1,14 +1,14 @@
 import { chain } from '../../Chain.ts'
 import { Player } from '../../entities/Player.ts'
 
-export class RequestSyncPlayerPayload {
+export class RequestSyncPlayer {
   static readonly type = 'Client.RequestSyncPlayer'
   constructor(readonly playerData: Player) {}
 
-  static deserialize(obj: any): RequestSyncPlayerPayload {
+  static deserialize(obj: any): RequestSyncPlayer {
     return chain(obj.playerData)
       .map(Player.deserialize)
-      .map((player) => new RequestSyncPlayerPayload(player))
+      .map((player) => new RequestSyncPlayer(player))
       .unwrap()
   }
 

@@ -1,21 +1,8 @@
 import { type AnyEvent, Event } from './Event.ts'
 import { EventBus } from './EventBus.ts'
-import { ExitWorldPayload } from './events/client/ExitWorldPayload.ts'
-import { JoinedWorldPayload } from './events/client/JoinedWorldPayload.ts'
-import { JoinWorldPayload } from './events/client/JoinWorldPayload.ts'
-import { PauseTogglePayload } from './events/client/PauseTogglePayload.ts'
-import { RequestChunksLoadPayload } from './events/client/RequestChunksLoadPayload.ts'
-import { RequestPlayerJoinPayload } from './events/client/RequestPlayerJoinPayload.ts'
-import { RequestSyncPlayerPayload } from './events/client/RequestSyncPlayerPayload.ts'
-import { RequestSyncUpdatedBlocksPayload } from './events/client/RequestSyncUpdatedBlocksPayload.ts'
-import { StartLocalServerPayload } from './events/client/StartLocalServerPayload.ts'
-import { ResponseChunksLoadPayload } from './events/server/ResponseChunksLoadPayload.ts'
-import { ResponsePlayerJoinPayload } from './events/server/ResponsePlayerJoinPayload.ts'
-import { ResponseSyncPlayerPayload } from './events/server/ResponseSyncPlayerPayload.ts'
-import { ResponseSyncUpdatedBlocksPayload } from './events/server/ResponseSyncUpdatedBlocksPayload.ts'
-import { ServerTickPayload } from './events/server/ServerTickPayload.ts'
-import { SinglePlayerWorkerServerStartPayload } from './events/single-player-worker/SinglePlayerWorkerServerStartPayload.ts'
-import { WorkerReadyPayload } from './events/single-player-worker/WorkerReadyPayload.ts'
+import { ClientEvent } from './events/client/index.ts'
+import { ServerEvent } from './events/server/index.ts'
+import { SinglePlayerWorkerEvent } from './events/single-player-worker/index.ts'
 
 export type AnyMinecraftEvent = AnyEvent<MinecraftEventsData, MinecraftEventMetadata>
 
@@ -29,22 +16,9 @@ type MinecraftEventMetadata = {
 // EVENT TYPE DEFINITION START
 
 const eventTypes = [
-  ExitWorldPayload,
-  JoinedWorldPayload,
-  JoinWorldPayload,
-  RequestChunksLoadPayload,
-  RequestPlayerJoinPayload,
-  RequestSyncPlayerPayload,
-  RequestSyncUpdatedBlocksPayload,
-  StartLocalServerPayload,
-  ResponseChunksLoadPayload,
-  ResponsePlayerJoinPayload,
-  ResponseSyncUpdatedBlocksPayload,
-  ResponseSyncPlayerPayload,
-  ServerTickPayload,
-  SinglePlayerWorkerServerStartPayload,
-  WorkerReadyPayload,
-  PauseTogglePayload,
+  ...Object.values(ClientEvent),
+  ...Object.values(ServerEvent),
+  ...Object.values(SinglePlayerWorkerEvent),
 ]
 // EVENT TYPE DEFINITION END
 
@@ -70,18 +44,13 @@ export class MinecraftEvent<T extends ({} & string) | MinecraftEventType> extend
 export class MinecraftEventBus extends EventBus<
   // @ts-expect-error
   MinecraftEventsData,
-  MinecraftEventMetadata,
-  MinecraftEventTypeMeta
+  MinecraftEventMetadata
 > {
   constructor(environment: 'Client' | 'Server') {
     super()
 
     for (const eventType of eventTypes) {
-      this.registerEventType(eventType.type, {
-        // @ts-expect-error
-        decode: eventType.deserialize,
-        encode: (obj: any) => obj.serialize(),
-      })
+      this.registerEventType(eventType)
     }
 
     this.addPrePublishHook((event) => {

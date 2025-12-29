@@ -1,9 +1,9 @@
-export class WorkerReadyPayload {
+export class WorkerReady {
   static readonly type = 'SinglePlayerWorker.WorkerReady'
   constructor() {}
 
-  static deserialize(): WorkerReadyPayload {
-    return new WorkerReadyPayload()
+  static deserialize(): WorkerReady {
+    return new WorkerReady()
   }
 
   serialize() {

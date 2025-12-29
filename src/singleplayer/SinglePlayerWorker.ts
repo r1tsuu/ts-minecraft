@@ -1,6 +1,8 @@
 import { MinecraftServer } from '../server/MinecraftServer.ts'
-import { SinglePlayerWorkerServerStartPayload } from '../shared/events/single-player-worker/SinglePlayerWorkerServerStartPayload.ts'
+import { MinecraftServerFactory } from '../server/MinecraftServerFactory.ts'
+import { SinglePlayerWorkerEvent } from '../shared/events/single-player-worker/index.ts'
 import { type AnyMinecraftEvent, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
+import { PrivateFileSystemWorldStorage } from './PrivateFileSystemWorldStorage.ts'
 
 let localServer: MinecraftServer | null = null
 
@@ -40,12 +42,11 @@ onmessage = async (message: MessageEvent<AnyMinecraftEvent>) => {
 
     console.log(`Starting local server...`, message)
 
-    localServer = await MinecraftServer.create(eventBus, message.data.payload.worldDatabaseName)
+    const storage = await PrivateFileSystemWorldStorage.create(message.data.payload.worldName)
+    const { server, world } = await new MinecraftServerFactory(eventBus, storage).build()
+    localServer = server
 
-    eventBus.publish(
-      new SinglePlayerWorkerServerStartPayload(localServer.loadedChunks),
-      message.data.eventUUID,
-    )
+    eventBus.publish(new SinglePlayerWorkerEvent.ServerStarted(world), message.data.eventUUID)
 
     console.log('Local server started.', localServer)
 
@@ -53,7 +54,12 @@ onmessage = async (message: MessageEvent<AnyMinecraftEvent>) => {
   }
 
   if (localServer !== null) {
-    eventBus.publish(message.data.type, message.data.payload, message.data.eventUUID, {
+    const payload = eventBus
+      .getEventType(message.data.type)
+      .map((Constructor) => Constructor.deserialize(message.data.payload))
+      .unwrap()
+
+    eventBus.publish(payload, message.data.eventUUID, {
       environment: message.data.metadata.environment,
       isForwarded: true,
     })
@@ -62,4 +68,4 @@ onmessage = async (message: MessageEvent<AnyMinecraftEvent>) => {
   }
 }
 
-eventBus.publish('SinglePlayerWorker.WorkerReady', {})
+eventBus.publish(new SinglePlayerWorkerEvent.WorkerReady())

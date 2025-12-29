@@ -10,7 +10,7 @@ import { Maybe } from '../shared/Maybe.ts'
 export class PrivateFileSystemWorldStorage implements WorldStorageAdapter {
   private static readonly PLAYERS_FILE_NAME = 'players.json'
 
-  constructor(private directory: FileSystemDirectoryHandle) {}
+  private constructor(private directory: FileSystemDirectoryHandle) {}
 
   static async create(worldName: string): Promise<PrivateFileSystemWorldStorage> {
     return chainAsync(navigator.storage.getDirectory())

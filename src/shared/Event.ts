@@ -46,25 +46,14 @@ export class Event<
     super(type, payload, eventUUID, metadata)
   }
 
-  static fromRaw<
-    K extends string,
-    D extends Record<string, unknown> = {},
-    Meta extends Record<string, unknown> = {},
-  >(rawEvent: RawEvent<K, D, Meta>): Event<K, D, Meta> {
-    return new Event<K, D, Meta>(
-      rawEvent.type,
-      rawEvent.payload,
-      rawEvent.eventUUID,
-      rawEvent.metadata,
-    )
-  }
-
   cancel(): void {
     this._isCanceled = true
   }
 
   intoRaw(): RawEvent<K, D, Meta> {
-    return new RawEvent<K, D, Meta>(this.type, this.payload, this.eventUUID, this.metadata)
+    // @ts-expect-error TODO: fix
+    const payload = 'serialize' in this.payload ? this.payload.serialize() : this.payload
+    return new RawEvent<K, D, Meta>(this.type, payload, this.eventUUID, this.metadata)
   }
 
   isCanceled(): boolean {

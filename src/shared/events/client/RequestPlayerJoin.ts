@@ -1,11 +1,11 @@
 import type { UUID } from '../../../types.ts'
 
-export class RequestPlayerJoinPayload {
+export class RequestPlayerJoin {
   static readonly type = 'Client.RequestPlayerJoin'
   constructor(readonly playerUUID: UUID) {}
 
-  static deserialize(obj: any): RequestPlayerJoinPayload {
-    return new RequestPlayerJoinPayload(obj.playerUUID)
+  static deserialize(obj: any): RequestPlayerJoin {
+    return new RequestPlayerJoin(obj.playerUUID)
   }
 
   serialize() {

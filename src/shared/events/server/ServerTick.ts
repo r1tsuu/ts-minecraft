@@ -1,9 +1,9 @@
-export class ServerTickPayload {
+export class ServerTick {
   static readonly type = 'Server.ServerTick'
   constructor(readonly currentTick: number) {}
 
-  static deserialize(obj: any): ServerTickPayload {
-    return new ServerTickPayload(obj.currentTick)
+  static deserialize(obj: any): ServerTick {
+    return new ServerTick(obj.currentTick)
   }
 
   serialize() {

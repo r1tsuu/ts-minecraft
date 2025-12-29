@@ -1,11 +1,11 @@
 import type { ChunkCoordinates } from '../../../types.ts'
 
-export class RequestChunksLoadPayload {
+export class RequestChunksLoad {
   static readonly type = 'Client.RequestChunksLoad'
   constructor(readonly chunks: ChunkCoordinates[]) {}
 
-  static deserialize(obj: any): RequestChunksLoadPayload {
-    return new RequestChunksLoadPayload(obj.chunks)
+  static deserialize(obj: any): RequestChunksLoad {
+    return new RequestChunksLoad(obj.chunks)
   }
 
   serialize() {
