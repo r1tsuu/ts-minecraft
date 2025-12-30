@@ -70,6 +70,43 @@ export class Chunk extends Entity {
     return Chunk.getWorldID(this)
   }
 
+  /**
+   * Iterates over all non-air blocks in the chunk
+   * Yields blockID and its local x, y, z coordinates within the chunk
+   * @example
+   * for (const { blockID, x, y, z } of chunk.iterateBlocks()) {
+   *   console.log(`Block ID: ${blockID} at (${x}, ${y}, ${z})`)
+   * }
+   */
+  *iterateBlocks(): Generator<{
+    blockID: number
+    x: number
+    y: number
+    z: number
+  }> {
+    let index = 0
+
+    for (let y = 0; y < Config.WORLD_HEIGHT; y++) {
+      for (let z = 0; z < Config.CHUNK_SIZE; z++) {
+        for (let x = 0; x < Config.CHUNK_SIZE; x++) {
+          const blockID = this.blocks[index]
+
+          if (blockID !== 0) {
+            // Skip air blocks
+            yield {
+              blockID,
+              x,
+              y,
+              z,
+            }
+          }
+
+          index++
+        }
+      }
+    }
+  }
+
   serialize(): any {
     return {
       blocks: this.blocks,

@@ -1,4 +1,3 @@
-import { Component } from '../shared/Component.ts'
 import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
 
@@ -10,8 +9,7 @@ const isGameKey = (key: string): key is KeyboardKey => {
 
 export type KeyboardKey = (typeof GameKeys)[number]
 
-@Component()
-export class InputManager implements Component {
+export class InputManager {
   private dispositions: (() => void)[] = []
 
   private keyboardState = GameKeys.reduce<Record<KeyboardKey, { isPressed: boolean }>>(

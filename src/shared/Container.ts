@@ -1,10 +1,10 @@
 import { Maybe, None } from './Maybe.ts'
 import { type ClassConstructor, getObjectConstructor } from './util.ts'
 
-type InstanceKey = ClassConstructor<any> | number | string | symbol
+export type ContainerInstanceKey = ClassConstructor<any> | number | string | symbol
 
 export class Container<I extends object = object> {
-  private instanceMap = new Map<InstanceKey, I>()
+  private instanceMap = new Map<ContainerInstanceKey, I>()
   private scopes: Set<ContainerScope<I>> = new Set()
 
   /**
@@ -36,24 +36,29 @@ export class Container<I extends object = object> {
    * container.register(new MyClass(), 'my-key')
    * @returns The registered instance.
    */
-  register<T extends object>(instance: T, key: InstanceKey): T {
+  register<T extends object>(instance: T, key: ContainerInstanceKey): T {
     this.instanceMap.set(key, instance as unknown as I)
     return instance
   }
 
-  /**
-   * Register a singleton instance in the container.
-   * Throws an error if an instance of the same constructor is already registered.
-   * @example
-   * container.registerSingleton(new MyClass()) // uses MyClass as the key
-   * container.registerSingleton(new MyClass(), 'my-key')
-   */
-  registerSingleton<T extends object>(instance: T, key?: InstanceKey): T {
-    const keyToUse = key ?? getObjectConstructor(instance)
+  registerSingleton<T extends object>(instance: T): T
+  registerSingleton<T extends object>(Constructor: ClassConstructor<T>): T
+  registerSingleton<T extends object>(instance: T, key: ContainerInstanceKey): T
+  registerSingleton<T extends object>(
+    instanceOrConstructor: ClassConstructor<T> | T,
+    key?: ContainerInstanceKey,
+  ): T {
+    const isConstructor = typeof instanceOrConstructor === 'function'
+    const keyToUse =
+      key ?? (isConstructor ? instanceOrConstructor : getObjectConstructor(instanceOrConstructor))
 
     if (this.instanceMap.has(keyToUse)) {
       throw new Error(`Singleton instance already registered for ${this.keyToString(keyToUse)}`)
     }
+
+    const instance = isConstructor
+      ? new (instanceOrConstructor as ClassConstructor<T>)()
+      : (instanceOrConstructor as T)
 
     this.instanceMap.set(keyToUse, instance as unknown as I) // Dont use WeakMap for constructors since
 
@@ -79,7 +84,7 @@ export class Container<I extends object = object> {
    */
   resolve<T extends object>(key: ClassConstructor<T>): Maybe<T>
   resolve<T extends object>(key: number | string | symbol): Maybe<T>
-  resolve<T extends object>(key: InstanceKey): Maybe<T> {
+  resolve<T extends object>(key: ContainerInstanceKey): Maybe<T> {
     const maybeInstance = Maybe.from(this.instanceMap.get(key))
 
     if (maybeInstance.isSome()) {
@@ -98,7 +103,7 @@ export class Container<I extends object = object> {
     return None()
   }
 
-  unregister(key: InstanceKey): void {
+  unregister(key: ContainerInstanceKey): void {
     if (!this.instanceMap.has(key)) {
       throw new Error(`No instance registered for key: ${this.keyToString(key)}`)
     }
@@ -114,7 +119,7 @@ export class Container<I extends object = object> {
     this.instanceMap.clear()
   }
 
-  private keyToString(key: InstanceKey): string {
+  private keyToString(key: ContainerInstanceKey): string {
     if (typeof key === 'function') {
       return key.name
     }

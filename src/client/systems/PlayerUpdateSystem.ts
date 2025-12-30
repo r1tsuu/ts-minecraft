@@ -1,14 +1,14 @@
 import * as THREE from 'three'
 
-import { Config } from '../shared/Config.ts'
-import { Player } from '../shared/entities/Player.ts'
-import { HashMap } from '../shared/HashMap.ts'
-import { pipe } from '../shared/Pipe.ts'
-import { UP_VECTOR } from '../shared/util.ts'
-import { ClientContainer } from './ClientContainer.ts'
-import { EntitySystem } from './EntitySystem.ts'
-import { GameSession } from './GameSession.ts'
-import { World_Legacy } from './WorldLegacy.ts'
+import { Config } from '../../shared/Config.ts'
+import { Player } from '../../shared/entities/Player.ts'
+import { HashMap } from '../../shared/HashMap.ts'
+import { pipe } from '../../shared/Pipe.ts'
+import { System } from '../../shared/System.ts'
+import { UP_VECTOR } from '../../shared/util.ts'
+import { ClientContainer } from '../ClientContainer.ts'
+import { GameSession } from '../GameSession.ts'
+import { World_Legacy } from '../WorldLegacy.ts'
 
 class PlayerMovementState {
   canJump: boolean = false
@@ -23,8 +23,8 @@ class PlayerMovementState {
  * @extends EntitySystem<Player>
  *
  */
-@EntitySystem.For(Player)
-export class PlayerUpdateSystem extends EntitySystem<Player> {
+
+export class PlayerUpdateSystem extends System {
   private movementStates: HashMap<string, PlayerMovementState> = new HashMap()
 
   canJump(player: Player): boolean {
@@ -89,7 +89,14 @@ export class PlayerUpdateSystem extends EntitySystem<Player> {
       .value()
   }
 
-  update(player: Player): void {
+  @System.UpdateAll(Player)
+  protected updatePlayers(players: Player[]): void {
+    for (const player of players) {
+      this.update(player)
+    }
+  }
+
+  private update(player: Player): void {
     const gameSession = ClientContainer.resolve(GameSession).unwrap()
     const delta = gameSession.getDelta()
     player.velocity.y -= Config.GRAVITY * delta

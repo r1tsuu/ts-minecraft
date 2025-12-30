@@ -98,7 +98,7 @@ export class GUI implements Component {
 
     const gameSession = maybeGameSession.value()
 
-    const player = gameSession.getCurrentPlayer()
+    const player = gameSession.getSessionPlayer()
     this.setState(
       {
         fps: gameSession.frameCounter.fps.toFixed(0),

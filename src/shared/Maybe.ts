@@ -52,13 +52,43 @@ class MaybeImpl<T> {
     return maybe.unwrap()
   }
 
+  static When<T>(condition: boolean, value: () => T): Maybe<T> {
+    if (condition) {
+      return MaybeImpl.Some(value())
+    }
+    return MaybeImpl.None()
+  }
+
+  /**
+   * Chains a Maybe-producing function if the Maybe is Some.
+   * @param fn - The function to apply if the Maybe is Some.
+   * @returns A new Maybe.
+   * @example
+   * ```typescript
+   * const result = maybe.andThen(value => Maybe.Some(value + 1))
+   * ```
+   */
+  andThen<U>(fn: (value: T) => Maybe<U>): Maybe<U> {
+    if (this.isSome()) {
+      return fn(this._value as T)
+    }
+    return MaybeImpl.None()
+  }
+
   clone(): Maybe<T> {
     if (this.isSome()) {
       return MaybeImpl.Some(this._value as T)
     }
     return MaybeImpl.None()
   }
+  expect(message: string): T {
+    if (this._type === 'none') {
+      throw new Error(message)
+    }
 
+    // @ts-expect-error type guard
+    return this._value
+  }
   flatMap<U>(fn: (value: T) => Maybe<U>): Maybe<U> {
     if (this.isSome()) {
       return fn(this._value as T)
@@ -83,6 +113,24 @@ class MaybeImpl<T> {
     return MaybeImpl.None()
   }
 
+  orElse(resolveFallback: () => Maybe<T>): Maybe<T> {
+    if (this._type === 'none') {
+      return resolveFallback()
+    }
+
+    // @ts-expect-error type guard
+    return this
+  }
+
+  /**
+   * Executes a side-effect function if the Maybe is Some.
+   * @param fn - The function to execute with the unwrapped value.
+   * @returns The original Maybe for chaining.
+   * @example
+   * ```typescript
+   * maybe.tap(value => console.log(value))
+   * ```
+   */
   tap(fn: (value: T) => void): Maybe<T> {
     if (this.isSome()) {
       fn(this._value as T)
@@ -151,9 +199,14 @@ class MaybeSome<T> extends MaybeImpl<T> {
 export const None = MaybeImpl.None
 export const Some = MaybeImpl.Some
 
+export const isMaybe = <T>(value: unknown): value is Maybe<T> => {
+  return value instanceof MaybeImpl
+}
+
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Maybe {
   export const from = MaybeImpl.from
   export const fromPromise = MaybeImpl.fromPromise
   export const Unwrap = MaybeImpl.Unwrap
+  export const When = MaybeImpl.When
 }

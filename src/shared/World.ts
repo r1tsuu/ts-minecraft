@@ -12,6 +12,8 @@ import { type ClassConstructor } from './util.ts'
 export interface WorldQuery<T extends Entity[] = [], Initial extends boolean = true> {
   execute(): IterableIterator<{ entity: T[number]; id: string }>
 
+  exists(): boolean
+
   select<U extends Entity>(
     constructor: EntityConstructor<U>,
   ): WorldQuery<[...(Initial extends true ? [] : T), U], false>
@@ -59,6 +61,11 @@ class WorldQueryImpl<T extends Entity[] = [], Initial extends boolean = true> im
         }
       }
     }
+  }
+
+  exists(): boolean {
+    const next = this.execute().next()
+    return Boolean(next.value)
   }
 
   select<U extends Entity>(

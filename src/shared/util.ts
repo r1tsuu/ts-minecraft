@@ -407,5 +407,3 @@ export function reduce<T, U>(iter: Iterable<T>, reducer: (acc: U, value: T) => U
   }
   return acc
 }
-
-const x = reduce([1, 2, 3], (a, v) => a + v, 0) //

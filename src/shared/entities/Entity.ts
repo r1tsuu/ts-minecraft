@@ -33,7 +33,7 @@ export abstract class Entity {
    * }
    * ```
    */
-  static *fetchEntityConstructors(): Iterable<{
+  static *iterEntityConstructors(): Iterable<{
     Constructor: EntityConstructor<Entity>
     type: string
   }> {
@@ -69,6 +69,7 @@ const entityTypeMap = new Map<string, EntityConstructor<Entity>>()
  * }
  * ```
  * WARNING: The decorated class must implement static `encode` and `decode` methods, otherwise an error will be thrown.
+ * UPDATE: This requirement has been removed, but ensure your class implements `serialize` and `deserialize` methods if you transfer entities over the network.
  */
 export const EntityType = (incomingType?: string): ClassDecorator => {
   // @ts-expect-error
@@ -98,6 +99,17 @@ export const getEntityConstructor = <T extends Entity>(entity: T): EntityConstru
   return entity.constructor as EntityConstructor<T>
 }
 
+/**
+ * Deserializes an object into an Entity instance based on its registered type.
+ * @param obj The object to deserialize.
+ * @returns The deserialized Entity instance.
+ * @throws Will throw an error if the object does not have a valid entity type or if the type is unknown.
+ * @example
+ * ```typescript
+ * const serializedObj = { __t: 'CustomEntity', /* other properties *\/ };
+ * const entity = deserializeEntity(serializedObj);
+ * ```
+ */
 export const deserializeEntity = (obj: any): Entity => {
   if (typeof obj[ENTITY_TYPE_KEY] !== 'string') {
     throw new Error(`${obj} is not a valid serialized Entity`)

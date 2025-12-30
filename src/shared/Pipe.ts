@@ -1,10 +1,20 @@
-import { Maybe, None, Some } from './Maybe.ts'
+import { HashMap } from './HashMap.ts'
+import { isMaybe, Maybe, None, Some } from './Maybe.ts'
 
 /**
  * A type-safe Pipeline class for functional method chaining
  */
 class Pipeline<T> {
   constructor(private readonly _value: T) {}
+
+  collectArray(): Pipeline<Array<T extends Iterable<infer R> ? R : never>> {
+    if (!(Symbol.iterator in Object(this._value))) {
+      throw new Error('collectArray can only be called on Chain wrapping an iterable')
+    }
+
+    const result = Array.from(this._value as Iterable<any>)
+    return new Pipeline(result)
+  }
 
   /**
    * Provide a default value if current value is null or undefined
@@ -70,6 +80,22 @@ class Pipeline<T> {
     return new Pipeline(last)
   }
 
+  iterToMap<K, V>(
+    fn: (value: T extends Iterable<infer R> ? R : never) => [K, V],
+  ): Pipeline<HashMap<K, V>> {
+    if (!(Symbol.iterator in Object(this._value))) {
+      throw new Error('iterToMap can only be called on Chain wrapping an iterable')
+    }
+
+    const result = new HashMap<K, V>()
+    for (const item of this._value as Iterable<any>) {
+      const [key, value] = fn(item)
+      result.set(key, value)
+    }
+
+    return new Pipeline(result)
+  }
+
   /**
    * Transform the current value using a mapping function
    */
@@ -85,7 +111,9 @@ class Pipeline<T> {
     return new Pipeline(result)
   }
 
-  mapIter<U>(fn: (value: T extends Iterable<infer R> ? R : never) => U): Pipeline<Iterable<U>> {
+  mapIter<U>(
+    fn: (value: T extends Iterable<infer R> ? R : never) => U,
+  ): Pipeline<IterableIterator<U>> {
     if (!(Symbol.iterator in Object(this._value))) {
       throw new Error('mapIter can only be called on Chain wrapping an iterable')
     }
@@ -107,13 +135,22 @@ class Pipeline<T> {
     return this
   }
 
-  tapIter(fn: (value: T extends Iterable<infer R> ? R : never) => void): Pipeline<T> {
+  tapIter(fn: (value: T extends IterableIterator<infer R> ? R : never) => void): Pipeline<T> {
     if (!(Symbol.iterator in Object(this._value))) {
       throw new Error('tapIter can only be called on Chain wrapping an iterable')
     }
 
     for (const item of this._value as Iterable<any>) {
       fn(item)
+    }
+
+    return this
+  }
+
+  tapSome(fn: (value: T extends Maybe<infer R> ? R : never) => void): Pipeline<T> {
+    if (isMaybe(this._value) && this._value.isSome()) {
+      // @ts-expect-error
+      fn(this._value.value())
     }
 
     return this

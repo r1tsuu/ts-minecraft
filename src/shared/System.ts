@@ -1,24 +1,71 @@
-import type { EntityConstructor } from '../shared/entities/Entity.ts'
+import type { ContainerScope } from './Container.ts'
+import type { EntityConstructor } from './entities/Entity.ts'
 
-import { HashMap } from '../shared/HashMap.ts'
-import { Maybe, Some } from '../shared/Maybe.ts'
-import { pipe } from '../shared/Pipe.ts'
-import { type ClassConstructor, getObjectConstructor } from '../shared/util.ts'
+import { HashMap } from './HashMap.ts'
+import { Maybe, None, Some } from './Maybe.ts'
+import { pipe } from './Pipe.ts'
+import { type ClassConstructor, getObjectConstructor } from './util.ts'
 
 const updateSystemsMap = new Set<{
   method: string | symbol
   SystemConstructor: ClassConstructor<System>
 }>()
+
+const renderSystemMAp = new Set<{
+  method: string | symbol
+  SystemConstructor: ClassConstructor<System>
+}>()
+
 const entityUpdateSystemsMap = new HashMap<
   EntityConstructor,
   Set<{ method: string | symbol; SystemConstructor: ClassConstructor<System> }>
 >()
+
 const entityRenderSystemsMap = new HashMap<
   EntityConstructor,
   Set<{ method: string | symbol; SystemConstructor: ClassConstructor<System> }>
 >()
 
+// class SystemContext {
+//   private entitiesCache = new HashMap<EntityConstructor, Entity[]>()
+//   constructor(
+//     readonly gameSession: GameSession,
+//     readonly world: World,
+//     readonly delta: number,
+//     readonly input: InputManager,
+//   ) {}
+
+//   fetchWithCache<T extends Entity>(EntityConstructor: EntityConstructor<T>): T[] {
+//     if (!this.entitiesCache.has(EntityConstructor)) {
+//       const entities = pipe(this.world.query().select(EntityConstructor).execute())
+//         .mapIter((e) => e.entity)
+//         .collectArray()
+//         .value()
+
+//       this.entitiesCache.set(EntityConstructor, entities)
+//     }
+
+//     return this.entitiesCache.get(EntityConstructor).unwrap() as T[]
+//   }
+// }
+
 export abstract class System {
+  static Render(): MethodDecorator {
+    // @ts-expect-error
+    return function (
+      SystemConstructor: ClassConstructor<System>,
+      propertyKey: string | symbol,
+      descriptor: PropertyDescriptor,
+    ) {
+      renderSystemMAp.add({
+        method: propertyKey as string,
+        SystemConstructor,
+      })
+
+      return descriptor
+    }
+  }
+
   /**
    * Decorator to mark a method as a render method for a specific entity type.
    * @example
@@ -29,7 +76,8 @@ export abstract class System {
    *     // Render logic for all players here
    *   }
    */
-  static RenderAll(EntityConstructor: EntityConstructor) {
+  static RenderAll(EntityConstructor: EntityConstructor): MethodDecorator {
+    // @ts-expect-error
     return function (
       Constructor: ClassConstructor<System>,
       propertyKey: string | symbol,
@@ -64,7 +112,8 @@ export abstract class System {
    * }
    * ```
    */
-  static Update() {
+  static Update(): MethodDecorator {
+    // @ts-expect-error
     return function (
       SystemConstructor: ClassConstructor<System>,
       propertyKey: string | symbol,
@@ -91,7 +140,8 @@ export abstract class System {
    * }
    * ```
    */
-  static UpdateAll(EntityConstructor: EntityConstructor) {
+  static UpdateAll(EntityConstructor: EntityConstructor): MethodDecorator {
+    // @ts-expect-error
     return function (
       SystemConstructor: ClassConstructor<System>,
       propertyKey: string | symbol,
@@ -118,48 +168,13 @@ export abstract class System {
 export class SystemRegistry {
   private instances: HashMap<ClassConstructor<System>, System> = new HashMap()
 
-  constructor() {}
+  constructor(private readonly scope: ContainerScope) {}
 
-  /**
-   * Get registered entity render systems for a specific entity type.
-   * @example
-   * ```ts
-   * const playerRenderSystems = systemRegistry.getEntityRenderSystems(Player)
-   * for (const { method, system } of playerRenderSystems) {
-   *   system[method](players)
-   * }
-   * ```
-   */
-  getEntityRenderSystems(
-    EntityConstructor: EntityConstructor,
-  ): Iterable<{ method: string | symbol; system: System }> {
-    return pipe(entityRenderSystemsMap.get(EntityConstructor))
-      .map(Maybe.Unwrap)
-      .mapIter(({ method, SystemConstructor }) => {
-        const system = this.getSystem(SystemConstructor)
-        return {
-          method,
-          system,
-        }
-      })
-      .value()
-  }
-
-  /**
-   * Get registered entity update systems for a specific entity type.
-   * @example
-   * ```ts
-   * const playerUpdateSystems = systemRegistry.getEntityUpdateSystems(Player)
-   * for (const { method, system } of playerUpdateSystems) {
-   *   system[method](players)
-   * }
-   * ```
-   */
-  getEntityUpdateSystems(
-    EntityConstructor: EntityConstructor,
-  ): Iterable<{ method: string | symbol; system: System }> {
-    return pipe(entityUpdateSystemsMap.get(EntityConstructor))
-      .map(Maybe.Unwrap)
+  getRenderSystems(): IterableIterator<{
+    method: string | symbol
+    system: System
+  }> {
+    return pipe(renderSystemMAp)
       .mapIter(({ method, SystemConstructor }) => {
         const system = this.getSystem(SystemConstructor)
         return {
@@ -182,7 +197,7 @@ export class SystemRegistry {
     const maybeInstance = this.instances.get(SystemConstructor)
 
     if (maybeInstance.isNone()) {
-      throw new Error(`System ${SystemConstructor.name} is not registered.`)
+      return None()
     }
 
     const instance = maybeInstance.value()
@@ -191,14 +206,65 @@ export class SystemRegistry {
       return Some(instance)
     }
 
-    throw new Error(`System instance is not of type ${SystemConstructor.name}.`)
+    console.error(`System instance is not of type ${SystemConstructor.name}.`)
+    return None()
   }
 
-  getUpdateSystems(): Iterable<{
+  /**
+   * Get registered entity render systems for a specific entity type.
+   * @example
+   * ```ts
+   * const playerRenderSystems = systemRegistry.getEntityRenderSystems(Player)
+   * for (const { method, system } of playerRenderSystems) {
+   *   system[method](players)
+   * }
+   * ```
+   */
+  iterRenderSystemsForEntity(
+    EntityConstructor: EntityConstructor,
+  ): IterableIterator<{ method: string | symbol; system: System }> {
+    return pipe(entityRenderSystemsMap.get(EntityConstructor))
+      .map(Maybe.Unwrap)
+      .mapIter(({ method, SystemConstructor }) => {
+        const system = this.getSystem(SystemConstructor)
+        return {
+          method,
+          system,
+        }
+      })
+      .value()
+  }
+
+  iterUpdateSystems(): IterableIterator<{
     method: string | symbol
     system: System
   }> {
     return pipe(updateSystemsMap)
+      .mapIter(({ method, SystemConstructor }) => {
+        const system = this.getSystem(SystemConstructor)
+        return {
+          method,
+          system,
+        }
+      })
+      .value()
+  }
+
+  /**
+   * Get registered entity update systems for a specific entity type.
+   * @example
+   * ```ts
+   * const playerUpdateSystems = systemRegistry.getEntityUpdateSystems(Player)
+   * for (const { method, system } of playerUpdateSystems) {
+   *   system[method](players)
+   * }
+   * ```
+   */
+  iterUpdateSystemsForEntity(
+    EntityConstructor: EntityConstructor,
+  ): IterableIterator<{ method: string | symbol; system: System }> {
+    return pipe(entityUpdateSystemsMap.get(EntityConstructor))
+      .map(Maybe.Unwrap)
       .mapIter(({ method, SystemConstructor }) => {
         const system = this.getSystem(SystemConstructor)
         return {
@@ -226,5 +292,23 @@ export class SystemRegistry {
     }
 
     this.instances.set(SystemConstructor, system)
+    this.scope.registerSingleton(system) // Register system in the DI container for easier access in other parts of the application
+  }
+
+  unregisterAllSystems() {
+    for (const SystemConstructor of this.instances.keys()) {
+      this.scope.unregister(SystemConstructor)
+    }
+
+    this.instances.clear()
+  }
+
+  unregisterSystem<T extends System>(SystemConstructor: ClassConstructor<T>) {
+    if (!this.instances.has(SystemConstructor)) {
+      throw new Error(`System ${SystemConstructor.name} is not registered.`)
+    }
+
+    this.instances.delete(SystemConstructor)
+    this.scope.unregister(SystemConstructor)
   }
 }

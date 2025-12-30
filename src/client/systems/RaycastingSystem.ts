@@ -1,35 +1,38 @@
 import * as THREE from 'three'
 
-import { Component } from '../shared/Component.ts'
-import { ClientContainer } from './ClientContainer.ts'
-import { GameSession } from './GameSession.ts'
-import { World_Legacy } from './WorldLegacy.ts'
+import { System } from '../../shared/System.ts'
+import { ClientContainer } from '../ClientContainer.ts'
+import { GameSession } from '../GameSession.ts'
+import { World_Legacy } from '../WorldLegacy.ts'
 
 const FAR = 5
 
-@Component()
-export class Raycaster implements Component {
+export class RaycastingSystem extends System {
   lookingAtBlock: { x: number; y: number; z: number } | null = null
   lookingAtNormal: { x: number; y: number; z: number } | null = null
-  private blockPositionMap: Map<number, THREE.Vector3> = new Map()
+  private readonly blockPositionMap: Map<number, THREE.Vector3> = new Map()
+  private readonly camera = ClientContainer.resolve(THREE.PerspectiveCamera).unwrap()
   private lastUpdated: null | number = null
-  private mesh: THREE.Mesh = new THREE.Mesh(
+  private readonly mesh: THREE.Mesh = new THREE.Mesh(
     new THREE.BoxGeometry(1.01, 1.01, 1.01),
     new THREE.MeshStandardMaterial({ opacity: 0.5, transparent: true }),
   )
-  private raycaster: THREE.Raycaster = new THREE.Raycaster()
-
-  private raycastingMesh: THREE.InstancedMesh = new THREE.InstancedMesh(
+  private readonly raycaster: THREE.Raycaster = new THREE.Raycaster()
+  private readonly raycastingMesh: THREE.InstancedMesh = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1),
     new THREE.MeshPhongMaterial({
       visible: false,
     }),
     (FAR * 2 + 1) ** 3,
   )
+  private readonly scene = ClientContainer.resolve(THREE.Scene)
+    .tap((scene) => scene.add(this.raycastingMesh))
+    .unwrap()
+  private readonly sessionPlayer = ClientContainer.resolve(GameSession).unwrap().getSessionPlayer()
+  private readonly world = ClientContainer.resolve(World_Legacy).unwrap()
 
   constructor() {
-    const scene = ClientContainer.resolve(THREE.Scene).unwrap()
-    scene.add(this.raycastingMesh)
+    super()
   }
 
   getPlacementPosition(): { x: number; y: number; z: number } | null {
@@ -42,17 +45,13 @@ export class Raycaster implements Component {
     }
   }
 
+  @System.Update()
   update() {
     if (this.lastUpdated !== null && Date.now() - this.lastUpdated < 20) return
 
-    const scene = ClientContainer.resolve(THREE.Scene).unwrap()
-    const camera = ClientContainer.resolve(THREE.PerspectiveCamera).unwrap()
-    const player = ClientContainer.resolve(GameSession).unwrap().getCurrentPlayer()
-    const world = ClientContainer.resolve(World_Legacy).unwrap()
+    this.scene.remove(this.mesh)
 
-    scene.remove(this.mesh)
-
-    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), camera)
+    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera)
 
     let index = 0
     const matrix = new THREE.Matrix4()
@@ -61,11 +60,11 @@ export class Raycaster implements Component {
     for (let x = -FAR; x <= FAR; x++) {
       for (let y = -FAR; y <= FAR; y++) {
         for (let z = -FAR; z <= FAR; z++) {
-          const worldX = Math.floor(player.position.x + x)
-          const worldY = Math.floor(player.position.y + y)
-          const worldZ = Math.floor(player.position.z + z)
+          const worldX = Math.floor(this.sessionPlayer.position.x + x)
+          const worldY = Math.floor(this.sessionPlayer.position.y + y)
+          const worldZ = Math.floor(this.sessionPlayer.position.z + z)
 
-          if (!world.getBlock(worldX, worldY, worldZ)) continue
+          if (!this.world.getBlock(worldX, worldY, worldZ)) continue
 
           const position = new THREE.Vector3(worldX, worldY, worldZ)
           matrix.setPosition(worldX, worldY, worldZ)
@@ -97,7 +96,7 @@ export class Raycaster implements Component {
 
       if (position) {
         this.mesh.position.set(position.x, position.y, position.z)
-        scene.add(this.mesh)
+        this.scene.add(this.mesh)
 
         this.lookingAtBlock = {
           x: Math.floor(position.x),

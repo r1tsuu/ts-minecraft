@@ -66,8 +66,8 @@ export class World_Legacy implements Component {
 
     const clientRegistry = ClientContainer.resolve(ClientBlocksRegistry).unwrap()
 
-    for (const [id, block] of clientRegistry.registry) {
-      const mesh = new THREE.InstancedMesh(geometry, block.material, MAX_COUNT)
+    for (const { id, material } of clientRegistry.iterateBlocks()) {
+      const mesh = new THREE.InstancedMesh(geometry, material, MAX_COUNT)
       // mesh.frustumCulled = false // Enable frustum culling for performance
       mesh.count = 0 // Start with 0 instances
       scene.add(mesh)
@@ -252,7 +252,7 @@ export class World_Legacy implements Component {
   }
 
   update(): void {
-    const player = ClientContainer.resolve(GameSession).unwrap().getCurrentPlayer()
+    const player = ClientContainer.resolve(GameSession).unwrap().getSessionPlayer()
     const playerChunkX = Math.floor(player.position.x / Config.CHUNK_SIZE)
     const playerChunkZ = Math.floor(player.position.z / Config.CHUNK_SIZE)
 

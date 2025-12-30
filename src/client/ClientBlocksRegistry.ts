@@ -11,7 +11,7 @@ type BlockClientData = {
 }
 
 export class ClientBlocksRegistry {
-  registry: Map<number, BlockClientData> = new Map()
+  private registry: Map<number, BlockClientData> = new Map()
 
   constructor() {
     const blocksRegistry = ClientContainer.resolve(BlocksRegistry).unwrap()
@@ -49,6 +49,18 @@ export class ClientBlocksRegistry {
       }
 
       this.registry.set(id, { material })
+    }
+  }
+
+  *iterateBlocks(): IterableIterator<{
+    id: number
+    material: BlockClientData['material']
+  }> {
+    for (const [id, { material }] of this.registry.entries()) {
+      yield {
+        id,
+        material,
+      }
     }
   }
 }

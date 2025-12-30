@@ -1,11 +1,20 @@
+import type { MinecraftEvent } from '../shared/MinecraftEvent.ts'
+
+import { asyncPipe } from '../shared/AsyncPipe.ts'
 import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { isComponent } from '../shared/Component.ts'
-import { RequestPlayerJoinPayload } from '../shared/events/client/RequestPlayerJoinPayload.ts'
-import {
-  type AnyMinecraftEvent,
-  type MinecraftEvent,
-  MinecraftEventBus,
-} from '../shared/MinecraftEventBus.ts'
+import { serializeEvent } from '../shared/Event.ts'
+import { ExitWorld } from '../shared/events/client/ExitWorld.ts'
+import { JoinedWorld } from '../shared/events/client/JoinedWorld.ts'
+import { JoinWorld } from '../shared/events/client/JoinWorld.ts'
+import { RequestPlayerJoin } from '../shared/events/client/RequestPlayerJoin.ts'
+import { StartLocalServer } from '../shared/events/client/StartLocalServer.ts'
+import { ResponsePlayerJoin } from '../shared/events/server/ResponsePlayerJoin.ts'
+import { ServerStarted } from '../shared/events/single-player-worker/ServerStarted.ts'
+import { WorkerReady } from '../shared/events/single-player-worker/WorkerReady.ts'
+import { type Maybe, None, Some } from '../shared/Maybe.ts'
+import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
+import { pipe } from '../shared/Pipe.ts'
 import { Scheduler } from '../shared/Scheduler.ts'
 import SinglePlayerWorker from '../worker/SinglePlayerWorker.ts?worker'
 import { ClientBlocksRegistry } from './ClientBlocksRegistry.ts'
@@ -16,19 +25,20 @@ import { LocalStorageManager } from './LocalStorageManager.ts'
 
 @MinecraftEventBus.ClientListener()
 export class MinecraftClient {
-  private scope = ClientContainer.createScope()
+  gameSession: Maybe<GameSession> = None()
+  singlePlayerWorker: Maybe<Worker> = None()
 
-  constructor() {
-    const scope = this.scope
-    scope.registerSingleton(new MinecraftEventBus('Client'))
-    scope.registerSingleton(new BlocksRegistry())
-    scope.registerSingleton(new ClientBlocksRegistry())
-    scope.registerSingleton(new Scheduler())
-    scope.registerSingleton(new LocalStorageManager())
-    scope.registerSingleton(new GUI())
+  private scope = pipe(ClientContainer.createScope())
+    .tap((scope) => scope.registerSingleton(new MinecraftEventBus('Client')))
+    .tap((scope) => scope.registerSingleton(new BlocksRegistry()))
+    .tap((scope) => scope.registerSingleton(new ClientBlocksRegistry()))
+    .tap((scope) => scope.registerSingleton(new Scheduler()))
+    .tap((scope) => scope.registerSingleton(new LocalStorageManager()))
+    .tap((scope) => scope.registerSingleton(new GUI()))
+    .value()
 
-    this.scope = scope
-  }
+  private eventBus = this.scope.resolve(MinecraftEventBus).unwrap()
+  private localStorageManager = this.scope.resolve(LocalStorageManager).unwrap()
 
   dispose(): void {
     for (const instance of this.scope.iterateInstances()) {
@@ -37,10 +47,25 @@ export class MinecraftClient {
       }
     }
 
+    this.singlePlayerWorker.tap((worker) => worker.terminate())
+    this.gameSession.tap((session) => session.dispose())
     this.scope.destroyScope()
+    this.gameSession = None()
+    this.singlePlayerWorker = None()
   }
 
-  @MinecraftEventBus.Handler('Client.ExitWorld')
+  @MinecraftEventBus.Handler('*')
+  protected forwardEventsToServer(event: MinecraftEvent): void {
+    if (this.gameSession.isNone() || this.singlePlayerWorker.isNone()) {
+      return
+    }
+
+    if (event.getType().startsWith('Client.Request') || event instanceof StartLocalServer) {
+      this.singlePlayerWorker.value().postMessage(serializeEvent(event))
+    }
+  }
+
+  @MinecraftEventBus.Handler(ExitWorld)
   protected onExitWorld(): void {
     const gameSession = ClientContainer.resolve(GameSession)
 
@@ -49,83 +74,30 @@ export class MinecraftClient {
       ClientContainer.unregister(GameSession)
     }
   }
-
-  @MinecraftEventBus.Handler('Client.JoinWorld')
-  protected async onJoinWorld(event: MinecraftEvent<'Client.JoinWorld'>): Promise<void> {
-    if (ClientContainer.resolve(GameSession).isSome()) {
-      console.warn(`Received ${event.type} but already in a world.`)
+  @MinecraftEventBus.Handler(JoinWorld)
+  protected async onJoinWorld(event: JoinWorld): Promise<void> {
+    if (this.gameSession.isSome()) {
+      console.warn(`Received ${event.getType()} but already in a world.`)
       return
     }
 
-    const singlePlayerWorker = new SinglePlayerWorker()
-
-    const eventBus = ClientContainer.resolve(MinecraftEventBus).unwrap()
-
-    const unsubscribe = eventBus.subscribe('*', (event) => {
-      if (this.shouldForwardEventToServer(event)) {
-        singlePlayerWorker.postMessage(event.intoRaw())
-      }
-    })
-
-    singlePlayerWorker.onmessage = (message: MessageEvent<AnyMinecraftEvent>) => {
-      if (message.data.metadata.environment === 'Server') {
-        eventBus.publish(message.data.type, message.data.payload, message.data.eventUUID, {
-          environment: message.data.metadata.environment,
-          isForwarded: true,
-        })
-      }
-    }
-
-    console.log('Waiting for single player worker to be ready...')
-    await eventBus.waitFor('SinglePlayerWorker.WorkerReady')
-    console.log('Single player worker is ready.')
-    const serverStartedResponse = await eventBus.request(
-      'Client.StartLocalServer',
-      {
-        worldDatabaseName: `world_${event.payload.worldUUID}`,
-      },
-      'SinglePlayerWorker.ServerStarted',
-    )
-
-    console.log('Server started response:', serverStartedResponse)
-
-    const playerJoinResponse = await eventBus.request(
-      'Client.RequestPlayerJoin',
-      {
-        playerUUID: ClientContainer.resolve(LocalStorageManager).unwrap().getPlayerUUID(),
-      },
-      'Server.ResponsePlayerJoin',
-    )
-
-    console.log('Player join response:', playerJoinResponse)
-
-    const gameSession = this.scope.registerSingleton(
-      new GameSession(
-        serverStartedResponse.payload.loadedChunks,
-        playerJoinResponse.payload.playerData,
-      ),
-    )
-
-    gameSession.addOnDisposeCallback(unsubscribe)
-    gameSession.addOnDisposeCallback(() => singlePlayerWorker.terminate())
-    gameSession.enterGameLoop()
-
-    eventBus.reply(event, 'Client.JoinedWorld', {})
-  }
-
-  private shouldForwardEventToServer(event: AnyMinecraftEvent): boolean {
-    if (event.metadata.environment === 'Server') {
-      return false
-    }
-
-    if (event.type.startsWith('Client.Request')) {
-      return true
-    }
-
-    if (event.type === 'Client.StartLocalServer') {
-      return true
-    }
-
-    return false
+    await asyncPipe(new SinglePlayerWorker())
+      .tap((worker) => (worker.onmessage = (msg) => this.forwardEventsToServer(msg.data)))
+      .tap((worker) => (this.singlePlayerWorker = Some(worker)))
+      .tap(() => this.eventBus.waitFor(WorkerReady))
+      .tap(() => this.eventBus.request(new StartLocalServer(event.worldUUID), ServerStarted))
+      .map(() =>
+        this.eventBus.request(
+          new RequestPlayerJoin(this.localStorageManager.getPlayerUUID()),
+          ResponsePlayerJoin,
+        ),
+      )
+      .map(({ world }) => new GameSession(world))
+      .tap((gameSession) => this.scope.registerSingleton(gameSession))
+      .tap((gameSession) => gameSession.enterGameLoop())
+      .tap((gameSession) => (this.gameSession = Some(gameSession)))
+      .tap(() => console.log(`Joined world ${event.worldUUID}`))
+      .tap(() => this.eventBus.reply(event, new JoinedWorld()))
+      .execute()
   }
 }

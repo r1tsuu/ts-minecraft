@@ -40,6 +40,10 @@ export class HashMap<K, V> {
     }
   }
 
+  clear(): void {
+    this.map.clear()
+  }
+
   delete(key: K): boolean {
     return this.map.delete(key)
   }
@@ -51,6 +55,25 @@ export class HashMap<K, V> {
   get(key: K): Maybe<V> {
     const value = this.map.get(key)
     return value !== undefined ? Some(value) : None<V>()
+  }
+
+  /**
+   * Gets the value for the given key, or sets it to the provided default value if it doesn't exist.
+   * @param key The key to retrieve or set.
+   * @param resolve A function that returns the default value to set if the key does not exist.
+   * @returns The existing or newly set value.
+   * @example
+   * ```ts
+   * const hashMap = new HashMap<string, number>()
+   * const value = hashMap.getOrSet('one', () => 1) // Sets and returns 1
+   * const sameValue = hashMap.getOrSet('one', () => 2) // Returns existing value 1
+   * ```
+   */
+  getOrSet(key: K, resolve: () => V): V {
+    if (!this.map.has(key)) {
+      this.map.set(key, resolve())
+    }
+    return this.map.get(key)!
   }
 
   has(key: K): boolean {
