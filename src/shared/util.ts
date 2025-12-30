@@ -473,3 +473,5 @@ export const boxIntersectsWorldBlocks = (world: World, box: THREE.Box3) => {
 
   return false
 }
+
+export type EnvironmentType = 'Client' | 'Server'

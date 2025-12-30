@@ -1,19 +1,15 @@
 import * as THREE from 'three'
 
+import type { MinecraftClient } from '../MinecraftClient.ts'
 import type { GUIActions, GUIConditions, GUIState as GUIState } from './state.ts'
 
-import { Component } from '../../shared/Component.ts'
-import { MinecraftEventBus } from '../../shared/MinecraftEventBus.ts'
-import { Scheduler } from '../../shared/Scheduler.ts'
-import { ClientContainer } from '../ClientContainer.ts'
-import { GameSession } from '../GameSession.ts'
-import { LocalStorageManager } from '../LocalStorageManager.ts'
+import { eventBus, Handler, Listener } from '../../shared/MinecraftEventBus.ts'
+import { Schedulable, ScheduleTask } from '../../shared/Scheduler.ts'
 import { synchronize } from './synchronize.ts'
 
-@Component()
-@MinecraftEventBus.ClientListener()
-@Scheduler.ClientSchedulable()
-export class GUI implements Component {
+@Listener()
+@Schedulable()
+export class GUI {
   state: GUIState
   private actions: GUIActions
   private conditions: GUIConditions
@@ -22,7 +18,7 @@ export class GUI implements Component {
   private worldNameInput: HTMLInputElement
   private worldSeedInput: HTMLInputElement
 
-  constructor() {
+  constructor(private readonly client: MinecraftClient) {
     this.state = {
       activePage: 'start',
       fps: 'Loading...',
@@ -35,7 +31,7 @@ export class GUI implements Component {
       positionZ: '',
       rotationPitch: '',
       rotationYaw: '',
-      worldList: ClientContainer.resolve(LocalStorageManager).unwrap().getListWorlds(),
+      worldList: this.client.localStorageManager.getListWorlds(),
     }
 
     this.worldNameInput = document.querySelector('input[name="worldName"]') as HTMLInputElement
@@ -69,7 +65,7 @@ export class GUI implements Component {
     synchronize(this.state, this.actions, this.conditions, affectedQuerySelectors)
   }
 
-  @MinecraftEventBus.Handler('Client.JoinedWorld')
+  @Handler('Client.JoinedWorld')
   protected onJoinedWorld(): void {
     this.setState({
       activePage: 'game',
@@ -86,17 +82,15 @@ export class GUI implements Component {
     window.addEventListener('resize', this.onResizeSyncRenderer)
   }
 
-  @Scheduler.Every(200)
+  @ScheduleTask(200)
   protected updateGameUI(): void {
-    const maybeGameSession = ClientContainer.resolve(GameSession)
-
-    if (!maybeGameSession.isSome() || this.state.isPaused) return
+    if (!this.client.gameSession.isSome() || this.state.isPaused) return
 
     if (!this.state.initializedGameUI) {
       this.setState({ initializedGameUI: true })
     }
 
-    const gameSession = maybeGameSession.value()
+    const gameSession = this.client.gameSession.value()
 
     const player = gameSession.getSessionPlayer()
     this.setState(
@@ -126,8 +120,6 @@ export class GUI implements Component {
   }
 
   private createActions(): GUIActions {
-    const eventBus = ClientContainer.resolve(MinecraftEventBus).unwrap()
-    const localStorageManager = ClientContainer.resolve(LocalStorageManager).unwrap()
     return {
       backToMenu: () => {
         eventBus.publish('Client.ExitWorld', {})
@@ -153,7 +145,7 @@ export class GUI implements Component {
         const name = this.worldNameInput.value.trim() || 'New World'
         const seed = this.worldSeedInput.value.trim() || crypto.randomUUID()
         button.disabled = true
-        const world = localStorageManager.addWorld(name, seed)
+        const world = this.client.localStorageManager.addWorld(name, seed)
         this.setState({
           worldList: [
             ...this.state.worldList,
@@ -172,7 +164,7 @@ export class GUI implements Component {
       deleteWorld: async ({ event }) => {
         const index = this.getIndexFromEvent(event)
         const world = this.state.worldList[index]
-        localStorageManager.deleteWorld(world.uuid)
+        this.client.localStorageManager.deleteWorld(world.uuid)
         this.setState({
           worldList: this.state.worldList.filter((w) => w.uuid !== world.uuid),
         })
@@ -202,8 +194,8 @@ export class GUI implements Component {
 
   private createConditions(): GUIConditions {
     return {
-      showCrosshair: () => ClientContainer.resolve(GameSession).isSome() && !this.state.isPaused,
-      showGameUI: () => ClientContainer.resolve(GameSession).isSome(),
+      showCrosshair: () => this.client.gameSession.isSome() && !this.state.isPaused,
+      showGameUI: () => this.client.gameSession.isSome(),
       showOverlay: () => ['menuWorlds', 'start', 'worldLoading'].includes(this.state.activePage),
       showPauseMenu: () => this.state.isPaused,
       showWorldsNotFound: () => this.state.worldList.length === 0,
@@ -227,8 +219,7 @@ export class GUI implements Component {
   }
 
   private onPointerLockChange = (): void => {
-    const gameSession = ClientContainer.resolve(GameSession)
-    const eventBus = ClientContainer.resolve(MinecraftEventBus).unwrap()
+    const gameSession = this.client.gameSession
 
     if (gameSession.isNone()) return
 
@@ -253,15 +244,14 @@ export class GUI implements Component {
   }
 
   private onResizeSyncRenderer = () => {
-    const renderer = ClientContainer.resolve(THREE.WebGLRenderer).unwrap()
-    renderer.setSize(window.innerWidth, window.innerHeight)
+    this.client.gameSession
+      .map((session) => session.renderer)
+      .tap((renderer) => renderer.setSize(window.innerWidth, window.innerHeight))
   }
 
   private async resumeGame(): Promise<void> {
-    const gameSession = ClientContainer.resolve(GameSession)
-    if (gameSession.isNone()) return
+    if (this.client.gameSession.isNone()) return
 
-    const eventBus = ClientContainer.resolve(MinecraftEventBus).unwrap()
     if (!this.state.isPaused) return
 
     try {

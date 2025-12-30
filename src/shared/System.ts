@@ -1,4 +1,3 @@
-import type { ContainerScope } from './Container.ts'
 import type { EntityConstructor } from './entities/Entity.ts'
 
 import { HashMap } from './HashMap.ts'
@@ -65,7 +64,6 @@ export abstract class System {
       return descriptor
     }
   }
-
   /**
    * Decorator to mark a method as a render method for a specific entity type.
    * @example
@@ -163,12 +161,14 @@ export abstract class System {
       return descriptor
     }
   }
+
+  dispose(): void {}
 }
 
 export class SystemRegistry {
   private instances: HashMap<ClassConstructor<System>, System> = new HashMap()
 
-  constructor(private readonly scope: ContainerScope) {}
+  constructor() {}
 
   getRenderSystems(): IterableIterator<{
     method: string | symbol
@@ -176,7 +176,9 @@ export class SystemRegistry {
   }> {
     return pipe(renderSystemMAp)
       .mapIter(({ method, SystemConstructor }) => {
-        const system = this.getSystem(SystemConstructor)
+        const system = this.getSystem(SystemConstructor).expect(
+          `System ${SystemConstructor.name} is not registered.`,
+        )
         return {
           method,
           system,
@@ -226,7 +228,9 @@ export class SystemRegistry {
     return pipe(entityRenderSystemsMap.get(EntityConstructor))
       .map(Maybe.Unwrap)
       .mapIter(({ method, SystemConstructor }) => {
-        const system = this.getSystem(SystemConstructor)
+        const system = this.getSystem(SystemConstructor).expect(
+          `System ${SystemConstructor.name} is not registered.`,
+        )
         return {
           method,
           system,
@@ -241,7 +245,9 @@ export class SystemRegistry {
   }> {
     return pipe(updateSystemsMap)
       .mapIter(({ method, SystemConstructor }) => {
-        const system = this.getSystem(SystemConstructor)
+        const system = this.getSystem(SystemConstructor).expect(
+          `System ${SystemConstructor.name} is not registered.`,
+        )
         return {
           method,
           system,
@@ -266,7 +272,9 @@ export class SystemRegistry {
     return pipe(entityUpdateSystemsMap.get(EntityConstructor))
       .map(Maybe.Unwrap)
       .mapIter(({ method, SystemConstructor }) => {
-        const system = this.getSystem(SystemConstructor)
+        const system = this.getSystem(SystemConstructor).expect(
+          `System ${SystemConstructor.name} is not registered.`,
+        )
         return {
           method,
           system,
@@ -284,7 +292,7 @@ export class SystemRegistry {
    * systemRegistry.registerSystem(mySystem)
    * ```
    */
-  registerSystem(system: System) {
+  registerSystem<T extends System>(system: T): T {
     const SystemConstructor = getObjectConstructor(system)
 
     if (this.instances.has(SystemConstructor)) {
@@ -292,23 +300,23 @@ export class SystemRegistry {
     }
 
     this.instances.set(SystemConstructor, system)
-    this.scope.registerSingleton(system) // Register system in the DI container for easier access in other parts of the application
+
+    return system
   }
 
   unregisterAllSystems() {
-    for (const SystemConstructor of this.instances.keys()) {
-      this.scope.unregister(SystemConstructor)
+    for (const system of this.instances.values()) {
+      system.dispose()
     }
 
     this.instances.clear()
   }
 
   unregisterSystem<T extends System>(SystemConstructor: ClassConstructor<T>) {
-    if (!this.instances.has(SystemConstructor)) {
-      throw new Error(`System ${SystemConstructor.name} is not registered.`)
-    }
-
-    this.instances.delete(SystemConstructor)
-    this.scope.unregister(SystemConstructor)
+    this.instances
+      .get(SystemConstructor)
+      .tap((sys) => sys.dispose())
+      .tap(() => this.instances.delete(SystemConstructor))
+      .expect(`System ${SystemConstructor.name} is not registered.`)
   }
 }

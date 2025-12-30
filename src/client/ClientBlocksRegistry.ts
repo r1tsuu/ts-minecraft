@@ -4,7 +4,6 @@ import { type BlockName, BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import dirtTextureImg from '../static/dirt.png?no-inline'
 import grassBlockSideTextureImg from '../static/grass_block_side.png?no-inline'
 import grassBlockTopTextureImg from '../static/grass_block_top.png?no-inline'
-import { ClientContainer } from './ClientContainer.ts'
 
 type BlockClientData = {
   material: THREE.Material | THREE.Material[]
@@ -13,9 +12,7 @@ type BlockClientData = {
 export class ClientBlocksRegistry {
   private registry: Map<number, BlockClientData> = new Map()
 
-  constructor() {
-    const blocksRegistry = ClientContainer.resolve(BlocksRegistry).unwrap()
-
+  constructor(blocksRegistry: BlocksRegistry) {
     const textureLoader = new THREE.TextureLoader()
 
     const dirtTexture = textureLoader.load(dirtTextureImg)

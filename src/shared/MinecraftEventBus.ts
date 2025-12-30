@@ -1,9 +1,9 @@
-import type { MinecraftEvent } from './MinecraftEvent.ts'
-
-import { EventBus, type EventConstructor, type WildcardKey } from './EventBus.ts'
+import { getCurrentEnvironment } from './env.ts'
+import { EventBus } from './EventBus.ts'
 import { ClientEvent } from './events/client/index.ts'
 import { ServerEvent } from './events/server/index.ts'
 import { SinglePlayerWorkerEvent } from './events/single-player-worker/index.ts'
+import { MinecraftEvent } from './MinecraftEvent.ts'
 
 /**
  * MinecraftEventBus class for managing Minecraft-specific event publishing and subscription.
@@ -28,19 +28,12 @@ export class MinecraftEventBus extends EventBus<MinecraftEvent> {
       metadata.isForwarded = metadata.isForwarded ?? false
     })
   }
-
-  /**
-   * Decorator to mark a method as an event handler for a specific event type or for all event types (wildcard).
-   * ```typescript
-   * class MyEventHandler {
-   *   @MinecraftEventBus.Handler(MyEvent)
-   *   handleMyEvent(event: MyEvent) {
-   *     // Handle MyEvent
-   *   }
-   * }
-   * ```
-   */
-  static Handler<T extends EventConstructor<any>>(Constructor: T | WildcardKey) {
-    return EventBus.Handler<T>(Constructor)
-  }
 }
+
+export const Handler = EventBus.Handler
+export const Listener = () => EventBus.Listener(() => eventBus)
+
+/**
+ * The global Minecraft event bus instance.
+ */
+export const eventBus = new MinecraftEventBus(getCurrentEnvironment())

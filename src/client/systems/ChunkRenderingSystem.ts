@@ -1,5 +1,7 @@
 import { BoxGeometry, InstancedMesh, Matrix4 } from 'three'
 
+import type { MinecraftClient } from '../MinecraftClient.ts'
+
 import { Config } from '../../shared/Config.ts'
 import { Chunk } from '../../shared/entities/Chunk.ts'
 import { HashMap } from '../../shared/HashMap.ts'
@@ -7,9 +9,6 @@ import { Maybe } from '../../shared/Maybe.ts'
 import { pipe } from '../../shared/Pipe.ts'
 import { System } from '../../shared/System.ts'
 import { getBlockKey } from '../../shared/util.ts'
-import { ClientBlocksRegistry } from '../ClientBlocksRegistry.ts'
-import { ClientContainer } from '../ClientContainer.ts'
-import { GameSession } from '../GameSession.ts'
 
 const MAX_BLOCK_COUNT_FOR_MESH =
   (Config.RENDER_DISTANCE *
@@ -20,36 +19,34 @@ const MAX_BLOCK_COUNT_FOR_MESH =
   2
 
 export class ChunkRenderingSystem extends System {
+  private blockMeshes: HashMap<number, InstancedMesh>
   private blockMeshesCount = new HashMap<number, number>()
   private blockMeshesFreeIndexes = new HashMap<number, number[]>()
-  private geometry = new BoxGeometry()
-  private blockMeshes: HashMap<number, InstancedMesh> = ClientContainer.resolve(
-    ClientBlocksRegistry,
-  )
-    .map((registry) =>
-      pipe(registry.iterateBlocks())
-        .mapIter(({ id, material }) => {
-          // Share a single geometry instance across all block types for better memory efficiency
-          this.geometry.computeBoundingBox()
-          this.geometry.computeBoundingSphere()
-          this.blockMeshesCount.set(id, 0)
-          this.blockMeshesFreeIndexes.set(id, [])
-          return {
-            id,
-            mesh: new InstancedMesh(this.geometry, material, MAX_BLOCK_COUNT_FOR_MESH),
-          }
-        })
-        .iterToMap((e) => [e.id, e.mesh])
-        .value(),
-    )
-    .unwrap()
   private chunkBlockMeshesIndexes: HashMap<Chunk, HashMap<string, number>> = new HashMap()
-
   private chunksNeedingRender: Set<Chunk> = new Set()
 
-  private gameSession = ClientContainer.resolve(GameSession).unwrap()
+  private geometry = new BoxGeometry()
 
   private matrix = new Matrix4()
+
+  constructor(private readonly client: MinecraftClient) {
+    super()
+
+    this.blockMeshes = pipe(this.client.clientBlocksRegistry.iterateBlocks())
+      .mapIter(({ id, material }) => {
+        // Share a single geometry instance across all block types for better memory efficiency
+        this.geometry.computeBoundingBox()
+        this.geometry.computeBoundingSphere()
+        this.blockMeshesCount.set(id, 0)
+        this.blockMeshesFreeIndexes.set(id, [])
+        return {
+          id,
+          mesh: new InstancedMesh(this.geometry, material, MAX_BLOCK_COUNT_FOR_MESH),
+        }
+      })
+      .iterToMap((e) => [e.id, e.mesh])
+      .value()
+  }
 
   /**
    * Marks a chunk to be rendered on the next render cycle.
@@ -64,7 +61,9 @@ export class ChunkRenderingSystem extends System {
     const meshesNeedUpdate = new Set<InstancedMesh>()
     const meshInstanceCounts = new HashMap<number, number>()
 
-    for (const chunk of this.gameSession.isFirstFrame() ? chunks : this.chunksNeedingRender) {
+    for (const chunk of this.client.gameSession.unwrap().isFirstFrame()
+      ? chunks
+      : this.chunksNeedingRender) {
       for (const { blockID, x, y, z } of chunk.iterateBlocks()) {
         const blockKey = getBlockKey(x, y, z)
         const chunkBlockMeshesIndexes = this.chunkBlockMeshesIndexes.getOrSet(

@@ -6,8 +6,6 @@ import { HashMap } from '../../shared/HashMap.ts'
 import { pipe } from '../../shared/Pipe.ts'
 import { System } from '../../shared/System.ts'
 import { boxIntersectsWorldBlocks, UP_VECTOR } from '../../shared/util.ts'
-import { World } from '../../shared/World.ts'
-import { ClientContainer } from '../ClientContainer.ts'
 import { GameSession } from '../GameSession.ts'
 
 class PlayerMovementState {
@@ -26,7 +24,10 @@ class PlayerMovementState {
 
 export class PlayerUpdateSystem extends System {
   private movementStates: HashMap<string, PlayerMovementState> = new HashMap()
-  private readonly world = ClientContainer.resolve(World).unwrap()
+
+  constructor(private readonly gameSession: GameSession) {
+    super()
+  }
 
   canJump(player: Player): boolean {
     return this.getMovementState(player).canJump
@@ -98,8 +99,7 @@ export class PlayerUpdateSystem extends System {
   }
 
   private update(player: Player): void {
-    const gameSession = ClientContainer.resolve(GameSession).unwrap()
-    const delta = gameSession.getDelta()
+    const delta = this.gameSession.getDelta()
     player.velocity.y -= Config.GRAVITY * delta
     const direction = new THREE.Vector3()
 
@@ -132,7 +132,7 @@ export class PlayerUpdateSystem extends System {
       const attemptedPosition = player.position.clone()
       attemptedPosition.x += horizontalVelocity.x
 
-      if (boxIntersectsWorldBlocks(this.world, Player.boundingBox(attemptedPosition))) {
+      if (boxIntersectsWorldBlocks(this.gameSession.world, Player.boundingBox(attemptedPosition))) {
         player.position.x = attemptedPosition.x
       }
     }
@@ -141,7 +141,9 @@ export class PlayerUpdateSystem extends System {
       const attemptedPosition = player.position.clone()
       attemptedPosition.z += horizontalVelocity.z
 
-      if (!boxIntersectsWorldBlocks(this.world, Player.boundingBox(attemptedPosition))) {
+      if (
+        !boxIntersectsWorldBlocks(this.gameSession.world, Player.boundingBox(attemptedPosition))
+      ) {
         player.position.z = attemptedPosition.z
       }
     }
@@ -150,7 +152,7 @@ export class PlayerUpdateSystem extends System {
       const attemptedPosition = player.position.clone()
       attemptedPosition.y += player.velocity.y * delta
 
-      if (boxIntersectsWorldBlocks(this.world, Player.boundingBox(attemptedPosition))) {
+      if (boxIntersectsWorldBlocks(this.gameSession.world, Player.boundingBox(attemptedPosition))) {
         if (player.velocity.y > 0) {
           // Hitting ceiling
           player.velocity.y = 0
@@ -169,7 +171,7 @@ export class PlayerUpdateSystem extends System {
         const groundCheck = player.position.clone()
         groundCheck.y -= 0.05
 
-        if (boxIntersectsWorldBlocks(this.world, Player.boundingBox(groundCheck))) {
+        if (boxIntersectsWorldBlocks(this.gameSession.world, Player.boundingBox(groundCheck))) {
           this.setCanJump(player, true)
         } else {
           this.setCanJump(player, false)

@@ -1,29 +1,31 @@
 import * as THREE from 'three'
 
-import type { ContainerScope } from '../shared/Container.ts'
+import type { MinecraftClient } from './MinecraftClient.ts'
 
-import { isComponent } from '../shared/Component.ts'
 import { Entity, type EntityConstructor } from '../shared/entities/Entity.ts'
 import { Player } from '../shared/entities/Player.ts'
 import { PauseToggle } from '../shared/events/client/PauseToggle.ts'
 import { HashMap } from '../shared/HashMap.ts'
-import { Maybe } from '../shared/Maybe.ts'
-import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
+import { Listener, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { pipe } from '../shared/Pipe.ts'
-import { Scheduler } from '../shared/Scheduler.ts'
+import { Schedulable } from '../shared/Scheduler.ts'
 import { SystemRegistry } from '../shared/System.ts'
 import { World } from '../shared/World.ts'
-import { ClientContainer } from './ClientContainer.ts'
-import { GUI } from './gui/GUI.ts'
 import { InputManager } from './InputManager.ts'
-import { LocalStorageManager } from './LocalStorageManager.ts'
 import { PlayerUpdateSystem } from './systems/PlayerUpdateSystem.ts'
 import { RaycastingSystem } from './systems/RaycastingSystem.ts'
 import { SessionPlayerControlSystem } from './systems/SessionPlayerControlSystem.ts'
 
-@MinecraftEventBus.ClientListener()
-@Scheduler.ClientSchedulable()
+@Listener()
+@Schedulable()
 export class GameSession {
+  readonly camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000,
+  )
+
   readonly frameCounter = {
     fps: 0,
     lastFrames: 0,
@@ -32,85 +34,63 @@ export class GameSession {
     totalTime: 0,
   }
 
-  paused = false
+  readonly inputManager = new InputManager(this)
 
-  readonly scope: ContainerScope = pipe(ClientContainer.createScope())
-    .tap((scope) => {
-      const renderer = scope.registerSingleton(
-        new THREE.WebGLRenderer({
-          antialias: false,
-          canvas: scope.resolve(GUI).unwrap().getCanvas(),
-          powerPreference: 'high-performance',
-        }),
-      )
-
-      renderer.outputColorSpace = THREE.SRGBColorSpace
-      renderer.toneMapping = THREE.ACESFilmicToneMapping
-      renderer.toneMappingExposure = 1.0
-      renderer.shadowMap.enabled = false // Disable shadows for performance
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)) // Cap pixel ratio
-
-      scope.registerSingleton(
-        new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000),
-      )
-
-      scope.registerSingleton(new THREE.Scene())
-      scope.registerSingleton(new SystemRegistry(scope))
-      scope.registerSingleton(new InputManager())
-    })
-    .value()
-
-  private readonly camera = ClientContainer.resolve(THREE.PerspectiveCamera).unwrap()
+  readonly renderer: THREE.WebGLRenderer
+  readonly scene = new THREE.Scene()
+  readonly systemRegistry = new SystemRegistry()
   private delta: number = 0
   private disposed = false
   private gameLoopClock = new THREE.Clock()
-  private readonly inputManager = ClientContainer.resolve(InputManager).unwrap()
   private isGameLoopClockStopped = false
-  private lastTimeout: null | number = null
-  private readonly renderer = ClientContainer.resolve(THREE.WebGLRenderer).unwrap()
 
-  private readonly scene = ClientContainer.resolve(THREE.Scene).unwrap()
+  private lastTimeout: null | number = null
+  private paused = false
+
   private sessionPlayer: Player
 
-  private readonly systemRegistry = pipe(ClientContainer.resolve(SystemRegistry))
-    .map(Maybe.Unwrap)
-    .tap((registry) => {
-      registry.registerSystem(new PlayerUpdateSystem())
-      registry.registerSystem(new RaycastingSystem())
-      registry.registerSystem(new SessionPlayerControlSystem())
+  constructor(
+    private readonly client: MinecraftClient,
+    readonly world: World,
+  ) {
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: false,
+      canvas: this.client.gui.getCanvas(),
+      powerPreference: 'high-performance',
     })
-    .value()
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 1.0
+    this.renderer.shadowMap.enabled = false // Disable shadows for performance
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)) // Cap pixel ratio
 
-  private readonly world: World
-
-  constructor(initialWorldFromServer: World) {
-    this.world = this.scope.registerSingleton(initialWorldFromServer)
-
-    const localStorageManager = ClientContainer.resolve(LocalStorageManager).unwrap()
-
-    this.sessionPlayer = pipe(localStorageManager.getPlayerUUID())
+    this.sessionPlayer = pipe(this.client.localStorageManager.getPlayerUUID())
       .map((playerUUID) => this.world.getEntity(playerUUID, Player))
       .value()
       .unwrap()
+
+    const playerUpdate = this.systemRegistry.registerSystem(new PlayerUpdateSystem(this))
+    const raycastingSystem = this.systemRegistry.registerSystem(new RaycastingSystem(this))
+
+    this.systemRegistry.registerSystem(
+      new SessionPlayerControlSystem(
+        this,
+        this.client.blocksRegistry,
+        playerUpdate,
+        raycastingSystem,
+      ),
+    )
   }
 
   dispose(): void {
-    for (const child of this.scope.iterateInstances()) {
-      if (isComponent(child) || child instanceof THREE.WebGLRenderer) {
-        child.dispose()
-      }
-
-      if (child instanceof THREE.Scene) {
-        console.log('Disposing scene and its children')
-        child.clear()
-      }
-    }
+    this.inputManager.dispose()
+    this.renderer.dispose()
+    this.scene.clear()
+    this.systemRegistry.unregisterAllSystems()
 
     if (this.lastTimeout) {
       clearTimeout(this.lastTimeout)
     }
-
-    this.scope.destroyScope()
 
     this.disposed = true
   }
@@ -139,6 +119,10 @@ export class GameSession {
 
   isFirstFrame(): boolean {
     return this.frameCounter.totalFrames === 1
+  }
+
+  isPaused(): boolean {
+    return this.paused
   }
 
   @MinecraftEventBus.Handler(PauseToggle)

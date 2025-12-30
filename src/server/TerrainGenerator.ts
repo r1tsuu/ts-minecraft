@@ -4,15 +4,13 @@ import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { Config } from '../shared/Config.ts'
 import { Chunk, type ChunkCoordinates } from '../shared/entities/Chunk.ts'
 import { range } from '../shared/util.ts'
-import { ServerContainer } from './ServerContainer.ts'
 
 export class TerrainGenerator {
   private noise = new SimplexNoise()
 
-  constructor() {}
+  constructor(private readonly blocksRegistry: BlocksRegistry) {}
 
   generateChunkAt(coords: ChunkCoordinates): Chunk {
-    const blocksRegistry = ServerContainer.resolve(BlocksRegistry).unwrap()
     const chunk = new Chunk(coords.x, coords.z)
 
     for (const x of range(Config.CHUNK_SIZE)) {
@@ -33,7 +31,7 @@ export class TerrainGenerator {
 
         for (let y = 0; y <= height; y++) {
           const block = y === height ? 'grass' : 'dirt'
-          chunk.setBlock(x, y, z, blocksRegistry.getBlockIdByName(block))
+          chunk.setBlock(x, y, z, this.blocksRegistry.getBlockIdByName(block))
         }
       }
     }

@@ -1,13 +1,14 @@
-import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { asyncPipe } from '../shared/AsyncPipe.ts'
+import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { Config } from '../shared/Config.ts'
 import { Chunk } from '../shared/entities/Chunk.ts'
-import { Scheduler } from '../shared/Scheduler.ts'
+import { setCurrentEnvironment } from '../shared/env.ts'
 import { World } from '../shared/World.ts'
 import { MinecraftServer } from './MinecraftServer.ts'
-import { ServerContainer } from './ServerContainer.ts'
 import { TerrainGenerator } from './TerrainGenerator.ts'
-import { type WorldStorageAdapter, WorldStorageAdapterSymbol } from './types.ts'
+import { type WorldStorageAdapter } from './types.ts'
+
+setCurrentEnvironment('Server')
 
 /**
  * Factory for creating MinecraftServer instances.
@@ -21,11 +22,8 @@ export class MinecraftServerFactory {
     server: MinecraftServer
     world: World
   }> {
-    const serverScope = ServerContainer.createScope()
-    serverScope.registerSingleton(this.storage, WorldStorageAdapterSymbol)
-    serverScope.registerSingleton(new BlocksRegistry())
-    const terrainGenerator = new TerrainGenerator()
-    serverScope.registerSingleton(terrainGenerator)
+    const blocksRegistry = new BlocksRegistry()
+    const terrainGenerator = new TerrainGenerator(blocksRegistry)
 
     const players = await this.storage.readPlayers()
     const spawnChunks = Chunk.coordsInRadius(0, 0, Config.SPAWN_CHUNK_RADIUS)
@@ -41,11 +39,8 @@ export class MinecraftServerFactory {
       .execute()
 
     world.addEntities(players, chunks)
-    serverScope.registerSingleton(world)
-    serverScope.registerSingleton(new Scheduler())
 
-    const server = new MinecraftServer(serverScope)
-    serverScope.registerSingleton(server)
+    const server = new MinecraftServer(world, terrainGenerator)
 
     return {
       server,

@@ -1,4 +1,3 @@
-import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
 
 const GameKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space'] as const
@@ -7,18 +6,21 @@ const isGameKey = (key: string): key is KeyboardKey => {
   return GameKeys.includes(key as KeyboardKey)
 }
 
-export type KeyboardKey = (typeof GameKeys)[number]
-
-export class InputManager {
-  private dispositions: (() => void)[] = []
-
-  private keyboardState = GameKeys.reduce<Record<KeyboardKey, { isPressed: boolean }>>(
+const initialKeyboardState = () =>
+  GameKeys.reduce<Record<KeyboardKey, { isPressed: boolean }>>(
     (acc, key) => {
       acc[key] = { isPressed: false }
       return acc
     },
     {} as Record<KeyboardKey, { isPressed: boolean }>,
   )
+
+export type KeyboardKey = (typeof GameKeys)[number]
+
+export class InputManager {
+  private dispositions: (() => void)[] = []
+
+  private keyboardState = initialKeyboardState()
 
   private mouseState: {
     deltaX: number
@@ -32,7 +34,7 @@ export class InputManager {
     isPressedRight: false,
   }
 
-  constructor() {
+  constructor(private readonly gameSession: GameSession) {
     const onKeyDown = this.onKeyDown.bind(this)
     const onKeyUp = this.onKeyUp.bind(this)
     const onMouseDown = this.onMouseDown.bind(this)
@@ -91,7 +93,7 @@ export class InputManager {
   }
 
   private onKeyDown = (event: KeyboardEvent) => {
-    if (ClientContainer.resolve(GameSession).unwrap().paused) {
+    if (this.gameSession.isPaused()) {
       this.resetKeyboardState()
       return
     }
@@ -106,7 +108,7 @@ export class InputManager {
   }
 
   private onKeyUp = (event: KeyboardEvent) => {
-    if (ClientContainer.resolve(GameSession).unwrap().paused) {
+    if (this.gameSession.isPaused()) {
       this.resetKeyboardState()
       return
     }
@@ -120,7 +122,7 @@ export class InputManager {
   }
 
   private onMouseDown = (event: MouseEvent) => {
-    if (ClientContainer.resolve(GameSession).unwrap().paused) {
+    if (this.gameSession.isPaused()) {
       return
     }
 
@@ -132,7 +134,7 @@ export class InputManager {
   }
 
   private onMouseMove = (event: MouseEvent) => {
-    if (ClientContainer.resolve(GameSession).unwrap().paused) {
+    if (this.gameSession.isPaused()) {
       return
     }
 
@@ -141,7 +143,7 @@ export class InputManager {
   }
 
   private onMouseUp = (event: MouseEvent) => {
-    if (ClientContainer.resolve(GameSession).unwrap().paused) {
+    if (this.gameSession.isPaused()) {
       return
     }
 

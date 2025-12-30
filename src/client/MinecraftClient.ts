@@ -2,7 +2,6 @@ import type { MinecraftEvent } from '../shared/MinecraftEvent.ts'
 
 import { asyncPipe } from '../shared/AsyncPipe.ts'
 import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
-import { isComponent } from '../shared/Component.ts'
 import { serializeEvent } from '../shared/Event.ts'
 import { ExitWorld } from '../shared/events/client/ExitWorld.ts'
 import { JoinedWorld } from '../shared/events/client/JoinedWorld.ts'
@@ -13,48 +12,31 @@ import { ResponsePlayerJoin } from '../shared/events/server/ResponsePlayerJoin.t
 import { ServerStarted } from '../shared/events/single-player-worker/ServerStarted.ts'
 import { WorkerReady } from '../shared/events/single-player-worker/WorkerReady.ts'
 import { type Maybe, None, Some } from '../shared/Maybe.ts'
-import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
-import { pipe } from '../shared/Pipe.ts'
-import { Scheduler } from '../shared/Scheduler.ts'
+import { eventBus, Handler, Listener } from '../shared/MinecraftEventBus.ts'
 import SinglePlayerWorker from '../worker/SinglePlayerWorker.ts?worker'
 import { ClientBlocksRegistry } from './ClientBlocksRegistry.ts'
-import { ClientContainer } from './ClientContainer.ts'
 import { GameSession } from './GameSession.ts'
 import { GUI } from './gui/GUI.ts'
 import { LocalStorageManager } from './LocalStorageManager.ts'
 
-@MinecraftEventBus.ClientListener()
+@Listener()
 export class MinecraftClient {
+  blocksRegistry = new BlocksRegistry()
+  clientBlocksRegistry = new ClientBlocksRegistry(this.blocksRegistry)
   gameSession: Maybe<GameSession> = None()
+  gui = new GUI(this)
+  localStorageManager = new LocalStorageManager()
   singlePlayerWorker: Maybe<Worker> = None()
 
-  private scope = pipe(ClientContainer.createScope())
-    .tap((scope) => scope.registerSingleton(new MinecraftEventBus('Client')))
-    .tap((scope) => scope.registerSingleton(new BlocksRegistry()))
-    .tap((scope) => scope.registerSingleton(new ClientBlocksRegistry()))
-    .tap((scope) => scope.registerSingleton(new Scheduler()))
-    .tap((scope) => scope.registerSingleton(new LocalStorageManager()))
-    .tap((scope) => scope.registerSingleton(new GUI()))
-    .value()
-
-  private eventBus = this.scope.resolve(MinecraftEventBus).unwrap()
-  private localStorageManager = this.scope.resolve(LocalStorageManager).unwrap()
-
   dispose(): void {
-    for (const instance of this.scope.iterateInstances()) {
-      if (isComponent(instance)) {
-        instance.dispose()
-      }
-    }
-
+    this.gui.dispose()
     this.singlePlayerWorker.tap((worker) => worker.terminate())
     this.gameSession.tap((session) => session.dispose())
-    this.scope.destroyScope()
     this.gameSession = None()
     this.singlePlayerWorker = None()
   }
 
-  @MinecraftEventBus.Handler('*')
+  @Handler('*')
   protected forwardEventsToServer(event: MinecraftEvent): void {
     if (this.gameSession.isNone() || this.singlePlayerWorker.isNone()) {
       return
@@ -65,16 +47,16 @@ export class MinecraftClient {
     }
   }
 
-  @MinecraftEventBus.Handler(ExitWorld)
+  @Handler(ExitWorld)
   protected onExitWorld(): void {
-    const gameSession = ClientContainer.resolve(GameSession)
-
-    if (gameSession.isSome()) {
-      gameSession.value().dispose()
-      ClientContainer.unregister(GameSession)
-    }
+    this.gameSession.tap((session) => session.dispose())
+    this.gameSession = None()
+    this.singlePlayerWorker.tap((worker) => worker.terminate())
+    this.singlePlayerWorker = None()
+    console.log('Exited world.')
   }
-  @MinecraftEventBus.Handler(JoinWorld)
+
+  @Handler(JoinWorld)
   protected async onJoinWorld(event: JoinWorld): Promise<void> {
     if (this.gameSession.isSome()) {
       console.warn(`Received ${event.getType()} but already in a world.`)
@@ -84,20 +66,19 @@ export class MinecraftClient {
     await asyncPipe(new SinglePlayerWorker())
       .tap((worker) => (worker.onmessage = (msg) => this.forwardEventsToServer(msg.data)))
       .tap((worker) => (this.singlePlayerWorker = Some(worker)))
-      .tap(() => this.eventBus.waitFor(WorkerReady))
-      .tap(() => this.eventBus.request(new StartLocalServer(event.worldUUID), ServerStarted))
+      .tap(() => eventBus.waitFor(WorkerReady))
+      .tap(() => eventBus.request(new StartLocalServer(event.worldUUID), ServerStarted))
       .map(() =>
-        this.eventBus.request(
+        eventBus.request(
           new RequestPlayerJoin(this.localStorageManager.getPlayerUUID()),
           ResponsePlayerJoin,
         ),
       )
-      .map(({ world }) => new GameSession(world))
-      .tap((gameSession) => this.scope.registerSingleton(gameSession))
+      .map(({ world }) => new GameSession(this, world))
       .tap((gameSession) => gameSession.enterGameLoop())
       .tap((gameSession) => (this.gameSession = Some(gameSession)))
       .tap(() => console.log(`Joined world ${event.worldUUID}`))
-      .tap(() => this.eventBus.reply(event, new JoinedWorld()))
+      .tap(() => eventBus.reply(event, new JoinedWorld()))
       .execute()
   }
 }

@@ -1,28 +1,30 @@
 import { BlocksRegistry } from '../../shared/BlocksRegistry.ts'
 import { Config } from '../../shared/Config.ts'
 import { PauseToggle } from '../../shared/events/client/PauseToggle.ts'
-import { MinecraftEventBus } from '../../shared/MinecraftEventBus.ts'
-import { System, SystemRegistry } from '../../shared/System.ts'
+import { Listener, MinecraftEventBus } from '../../shared/MinecraftEventBus.ts'
+import { System } from '../../shared/System.ts'
 import { Throttle } from '../../shared/util.ts'
-import { ClientContainer } from '../ClientContainer.ts'
 import { GameSession } from '../GameSession.ts'
-import { InputManager } from '../InputManager.ts'
-import { World_Legacy } from '../WorldLegacy.ts'
 import { PlayerUpdateSystem } from './PlayerUpdateSystem.ts'
 import { RaycastingSystem } from './RaycastingSystem.ts'
 
-@MinecraftEventBus.ClientListener()
+@Listener()
 export class SessionPlayerControlSystem extends System {
   private static readonly THROTTLE_DELAY_MS = 500
-  private readonly gameSession = ClientContainer.resolve(GameSession).unwrap()
-  private readonly inputManager = ClientContainer.resolve(InputManager).unwrap()
-  private readonly playerUpdateSystem = ClientContainer.resolve(SystemRegistry)
-    .andThen((registry) => registry.getSystem(PlayerUpdateSystem))
-    .unwrap()
+
+  constructor(
+    private readonly gameSession: GameSession,
+    private readonly blocksRegistry: BlocksRegistry,
+    private readonly playerUpdateSystem: PlayerUpdateSystem,
+    private readonly raycastingSystem: RaycastingSystem,
+  ) {
+    super()
+  }
 
   @System.Update()
   update(): void {
-    const mouseMove = this.inputManager.getMouseDelta()
+    const inputManager = this.gameSession.inputManager
+    const mouseMove = inputManager.getMouseDelta()
 
     const player = this.gameSession.getSessionPlayer()
 
@@ -37,32 +39,29 @@ export class SessionPlayerControlSystem extends System {
       player.rotation.y -= Math.PI * 2
     }
 
-    this.playerUpdateSystem.setMovingLeft(player, this.inputManager.isKeyPressed('KeyA'))
-    this.playerUpdateSystem.setMovingRight(player, this.inputManager.isKeyPressed('KeyD'))
-    this.playerUpdateSystem.setMovingBackward(player, this.inputManager.isKeyPressed('KeyS'))
-    this.playerUpdateSystem.setMovingForward(player, this.inputManager.isKeyPressed('KeyW'))
+    this.playerUpdateSystem.setMovingLeft(player, inputManager.isKeyPressed('KeyA'))
+    this.playerUpdateSystem.setMovingRight(player, inputManager.isKeyPressed('KeyD'))
+    this.playerUpdateSystem.setMovingBackward(player, inputManager.isKeyPressed('KeyS'))
+    this.playerUpdateSystem.setMovingForward(player, inputManager.isKeyPressed('KeyW'))
 
-    if (this.inputManager.isKeyPressed('Space')) {
+    if (inputManager.isKeyPressed('Space')) {
       this.playerUpdateSystem.tryJump(player)
     }
 
-    if (this.inputManager.isPressedLeftMouse()) {
+    if (inputManager.isPressedLeftMouse()) {
       this.handleBlockRemove()
     }
 
-    if (this.inputManager.isPressedRightMouse()) {
+    if (inputManager.isPressedRightMouse()) {
       this.handleBlockPlace()
     }
   }
 
   @MinecraftEventBus.Handler(PauseToggle)
   protected onPauseToggle(): void {
-    const player = ClientContainer.resolve(GameSession).unwrap().getSessionPlayer()
-    const playerUpdateSystem = ClientContainer.resolve(SystemRegistry)
-      .andThen((registry) => registry.getSystem(PlayerUpdateSystem))
-      .unwrap()
+    const player = this.gameSession.getSessionPlayer()
 
-    const state = playerUpdateSystem.getMovementState(player)
+    const state = this.playerUpdateSystem.getMovementState(player)
 
     state.movingLeft = false
     state.movingRight = false
@@ -72,14 +71,11 @@ export class SessionPlayerControlSystem extends System {
 
   @Throttle(SessionPlayerControlSystem.THROTTLE_DELAY_MS)
   private handleBlockPlace(): void {
-    const world = ClientContainer.resolve(World_Legacy).unwrap()
-    const raycaster = ClientContainer.resolve(RaycastingSystem).unwrap()
-    const blocksRegistry = ClientContainer.resolve(BlocksRegistry).unwrap()
-
+    const raycaster = this.raycastingSystem
     if (raycaster.lookingAtBlock && raycaster.lookingAtNormal) {
-      const blockToPlace = blocksRegistry.getBlockIdByName('grass')
+      const blockToPlace = this.blocksRegistry.getBlockIdByName('grass')
 
-      world.addBlock(
+      this.gameSession.world.addBlock(
         raycaster.lookingAtBlock.x + raycaster.lookingAtNormal.x,
         raycaster.lookingAtBlock.y + raycaster.lookingAtNormal.y,
         raycaster.lookingAtBlock.z + raycaster.lookingAtNormal.z,
@@ -90,11 +86,10 @@ export class SessionPlayerControlSystem extends System {
 
   @Throttle(SessionPlayerControlSystem.THROTTLE_DELAY_MS)
   private handleBlockRemove(): void {
-    const world = ClientContainer.resolve(World_Legacy).unwrap()
-    const raycaster = ClientContainer.resolve(RaycastingSystem).unwrap()
+    const raycaster = this.raycastingSystem
 
     if (raycaster.lookingAtBlock) {
-      world.removeBlock(
+      this.gameSession.world.removeBlock(
         raycaster.lookingAtBlock.x,
         raycaster.lookingAtBlock.y,
         raycaster.lookingAtBlock.z,
