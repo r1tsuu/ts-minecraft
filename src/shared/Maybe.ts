@@ -113,6 +113,24 @@ class MaybeImpl<T> {
     return MaybeImpl.None()
   }
 
+  /**
+   * Maps a function over the Maybe if it is None.
+   * @param fn - The function to produce a value if the Maybe is None.
+   * @returns A new Maybe.
+   * @example
+   * ```typescript
+   * const result = maybe.mapNone(() => 42)
+   * ```
+   */
+  mapNone(fn: () => T): Maybe<T> {
+    if (this.isNone()) {
+      return MaybeImpl.Some(fn())
+    }
+
+    // @ts-expect-error
+    return this
+  }
+
   orElse(resolveFallback: () => Maybe<T>): Maybe<T> {
     if (this._type === 'none') {
       return resolveFallback()
@@ -161,6 +179,15 @@ class MaybeImpl<T> {
   unwrapOr(resolveFallback: () => T): T {
     if (this._type === 'none') {
       return resolveFallback()
+    }
+
+    // @ts-expect-error type guard
+    return this._value
+  }
+
+  unwrapOrDefault(defaultValue: T): T {
+    if (this._type === 'none') {
+      return defaultValue
     }
 
     // @ts-expect-error type guard

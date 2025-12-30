@@ -1,9 +1,10 @@
 import * as THREE from 'three'
 
 import { System } from '../../shared/System.ts'
+import { getBlockInWorld } from '../../shared/util.ts'
+import { World } from '../../shared/World.ts'
 import { ClientContainer } from '../ClientContainer.ts'
 import { GameSession } from '../GameSession.ts'
-import { World_Legacy } from '../WorldLegacy.ts'
 
 const FAR = 5
 
@@ -12,7 +13,6 @@ export class RaycastingSystem extends System {
   lookingAtNormal: { x: number; y: number; z: number } | null = null
   private readonly blockPositionMap: Map<number, THREE.Vector3> = new Map()
   private readonly camera = ClientContainer.resolve(THREE.PerspectiveCamera).unwrap()
-  private lastUpdated: null | number = null
   private readonly mesh: THREE.Mesh = new THREE.Mesh(
     new THREE.BoxGeometry(1.01, 1.01, 1.01),
     new THREE.MeshStandardMaterial({ opacity: 0.5, transparent: true }),
@@ -29,7 +29,7 @@ export class RaycastingSystem extends System {
     .tap((scene) => scene.add(this.raycastingMesh))
     .unwrap()
   private readonly sessionPlayer = ClientContainer.resolve(GameSession).unwrap().getSessionPlayer()
-  private readonly world = ClientContainer.resolve(World_Legacy).unwrap()
+  private readonly world = ClientContainer.resolve(World).unwrap()
 
   constructor() {
     super()
@@ -47,8 +47,6 @@ export class RaycastingSystem extends System {
 
   @System.Update()
   update() {
-    if (this.lastUpdated !== null && Date.now() - this.lastUpdated < 20) return
-
     this.scene.remove(this.mesh)
 
     this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera)
@@ -64,7 +62,7 @@ export class RaycastingSystem extends System {
           const worldY = Math.floor(this.sessionPlayer.position.y + y)
           const worldZ = Math.floor(this.sessionPlayer.position.z + z)
 
-          if (!this.world.getBlock(worldX, worldY, worldZ)) continue
+          if (getBlockInWorld(this.world, worldX, worldY, worldZ).isNone()) continue
 
           const position = new THREE.Vector3(worldX, worldY, worldZ)
           matrix.setPosition(worldX, worldY, worldZ)
@@ -123,7 +121,5 @@ export class RaycastingSystem extends System {
       this.lookingAtBlock = null
       this.lookingAtNormal = null
     }
-
-    this.lastUpdated = Date.now()
   }
 }

@@ -50,6 +50,32 @@ export class Chunk extends Entity {
     return `chunk_${coords.x}_${coords.z}`
   }
 
+  static mapToChunkCoordinates(worldX: number, worldZ: number): ChunkCoordinates {
+    return {
+      x: Math.floor(worldX / Config.CHUNK_SIZE),
+      z: Math.floor(worldZ / Config.CHUNK_SIZE),
+    }
+  }
+
+  /**
+   * Maps world coordinates to local chunk coordinates
+   * @example
+   * const local = Chunk.mapToLocalCoordinates(-1, 17)
+   * console.log(local) // { x: 15, z: 1 } assuming CHUNK_SIZE is 16
+   */
+  static mapToLocalCoordinates(
+    worldX: number,
+    worldZ: number,
+  ): {
+    x: number
+    z: number
+  } {
+    return {
+      x: ((worldX % Config.CHUNK_SIZE) + Config.CHUNK_SIZE) % Config.CHUNK_SIZE,
+      z: ((worldZ % Config.CHUNK_SIZE) + Config.CHUNK_SIZE) % Config.CHUNK_SIZE,
+    }
+  }
+
   static serialize(chunk: Chunk): any {
     return chunk.serialize()
   }
@@ -64,6 +90,22 @@ export class Chunk extends Entity {
     }
 
     return Some(blockID)
+  }
+
+  getBlockWorldCoordinates(
+    localX: number,
+    localY: number,
+    localZ: number,
+  ): {
+    x: number
+    y: number
+    z: number
+  } {
+    return {
+      x: this.x * Config.CHUNK_SIZE + localX,
+      y: localY,
+      z: this.z * Config.CHUNK_SIZE + localZ,
+    }
   }
 
   getWorldID(): string {

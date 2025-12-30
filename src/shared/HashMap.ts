@@ -57,6 +57,10 @@ export class HashMap<K, V> {
     return value !== undefined ? Some(value) : None<V>()
   }
 
+  getOrDefault(key: K, defaultValue: V): V {
+    return this.map.get(key) ?? defaultValue
+  }
+
   /**
    * Gets the value for the given key, or sets it to the provided default value if it doesn't exist.
    * @param key The key to retrieve or set.

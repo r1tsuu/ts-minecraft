@@ -1,9 +1,12 @@
 import * as THREE from 'three'
 
 import type { RawVector3 } from '../types.ts'
-import type { ChunkCoordinates } from './entities/Chunk.ts'
+import type { Maybe } from './Maybe.ts'
+import type { World } from './World.ts'
 
 import { Config } from './Config.ts'
+import { Chunk, type ChunkCoordinates } from './entities/Chunk.ts'
+import { pipe } from './Pipe.ts'
 
 export const minutes = (m: number): number => {
   return m * 60 * 1000
@@ -406,4 +409,67 @@ export function reduce<T, U>(iter: Iterable<T>, reducer: (acc: U, value: T) => U
     acc = reducer(acc, value)
   }
   return acc
+}
+
+/**
+ * Gets the block at the specified world coordinates.
+ * @param world The world instance to get the block from.
+ * @param x The x-coordinate of the block in the world.
+ * @param y The y-coordinate of the block in the world.
+ * @param z The z-coordinate of the block in the world.
+ * @returns A Maybe containing the block ID if it exists, or None if it doesn't.
+ * @example
+ * const block = getBlockInWorld(world, 10, 64, -5)
+ * if (block.isSome()) {
+ *   console.log('Block ID:', block.unwrap())
+ * } else {
+ *   console.log('No block at the specified coordinates.')
+ * }
+ */
+export const getBlockInWorld = (world: World, x: number, y: number, z: number): Maybe<number> => {
+  return pipe(Chunk.mapToChunkCoordinates(x, z))
+    .map((chunkCoordinates) =>
+      world
+        .getEntity(Chunk.getWorldID(chunkCoordinates), Chunk)
+        .map((chunk) => ({
+          chunk,
+          local: Chunk.mapToLocalCoordinates(x, z),
+        }))
+        .map(({ chunk, local }) => chunk.getBlock(local.x, y, local.z))
+        .andThen((block) => block),
+    )
+    .value()
+}
+
+export const boxIntersectsWorldBlocks = (world: World, box: THREE.Box3) => {
+  const minX = Math.floor(box.min.x)
+  const maxX = Math.floor(box.max.x)
+  const minY = Math.floor(box.min.y)
+  const maxY = Math.floor(box.max.y)
+  const minZ = Math.floor(box.min.z)
+  const maxZ = Math.floor(box.max.z)
+
+  // Check all blocks that could intersect with box
+  for (let x = minX; x <= maxX; x++) {
+    for (let y = minY; y <= maxY; y++) {
+      for (let z = minZ; z <= maxZ; z++) {
+        if (getBlockInWorld(world, x, y, z).isSome()) {
+          // Block AABB: [x, x+1), [y, y+1), [z, z+1)
+
+          if (
+            box.max.x > x &&
+            box.min.x < x + 1 &&
+            box.max.y > y &&
+            box.min.y < y + 1 &&
+            box.max.z > z &&
+            box.min.z < z + 1
+          ) {
+            return true
+          }
+        }
+      }
+    }
+  }
+
+  return false
 }
