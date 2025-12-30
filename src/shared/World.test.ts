@@ -530,3 +530,172 @@ describe('boxIntersectsWorldBlocks', () => {
     expect(world.boxIntersectsWorldBlocks(box)).toBe(true)
   })
 })
+
+describe('addBlock', () => {
+  test('adds a block to an existing chunk', () => {
+    const world = new World()
+    const chunk = new Chunk(0, 0)
+    world.addEntity(chunk)
+
+    // Initially no block
+    expect(world.getBlock(5, 10, 7).isNone()).toBe(true)
+
+    // Add block
+    world.addBlock(5, 10, 7, 2)
+
+    // Block should now exist
+    const block = world.getBlock(5, 10, 7)
+    expect(block.isSome()).toBe(true)
+    expect(block.unwrap()).toBe(2)
+  })
+
+  test('adds a block with negative coordinates', () => {
+    const world = new World()
+    const chunk = new Chunk(-1, -1)
+    world.addEntity(chunk)
+
+    world.addBlock(-1, 10, -1, 3)
+
+    const block = world.getBlock(-1, 10, -1)
+    expect(block.isSome()).toBe(true)
+    expect(block.unwrap()).toBe(3)
+  })
+
+  test('adds blocks across multiple chunks', () => {
+    const world = new World()
+    const chunk1 = new Chunk(0, 0)
+    const chunk2 = new Chunk(1, 0)
+    world.addEntity(chunk1)
+    world.addEntity(chunk2)
+
+    // Add block in chunk 1
+    world.addBlock(5, 10, 7, 1)
+
+    // Add block in chunk 2
+    const worldX = Config.CHUNK_SIZE + 2
+    world.addBlock(worldX, 15, 3, 2)
+
+    // Verify both blocks exist
+    expect(world.getBlock(5, 10, 7).unwrap()).toBe(1)
+    expect(world.getBlock(worldX, 15, 3).unwrap()).toBe(2)
+  })
+
+  test('updates an existing block', () => {
+    const world = new World()
+    const chunk = new Chunk(0, 0)
+    chunk.setBlock(5, 10, 7, 1)
+    world.addEntity(chunk)
+
+    // Verify initial block
+    expect(world.getBlock(5, 10, 7).unwrap()).toBe(1)
+
+    // Update block
+    world.addBlock(5, 10, 7, 5)
+
+    // Verify block was updated
+    expect(world.getBlock(5, 10, 7).unwrap()).toBe(5)
+  })
+
+  test('adds block at chunk boundary', () => {
+    const world = new World()
+    const chunk = new Chunk(0, 0)
+    world.addEntity(chunk)
+
+    // Last block in chunk 0
+    world.addBlock(Config.CHUNK_SIZE - 1, 10, 5, 3)
+
+    const block = world.getBlock(Config.CHUNK_SIZE - 1, 10, 5)
+    expect(block.unwrap()).toBe(3)
+  })
+
+  test('does nothing when chunk does not exist', () => {
+    const world = new World()
+
+    // Try to add block without creating chunk
+    world.addBlock(5, 10, 7, 1)
+
+    // Block should not exist
+    expect(world.getBlock(5, 10, 7).isNone()).toBe(true)
+  })
+})
+
+describe('removeBlock', () => {
+  test('removes an existing block', () => {
+    const world = new World()
+    const chunk = new Chunk(0, 0)
+    chunk.setBlock(5, 10, 7, 1)
+    world.addEntity(chunk)
+
+    // Verify block exists
+    expect(world.getBlock(5, 10, 7).isSome()).toBe(true)
+
+    // Remove block
+    world.removeBlock(5, 10, 7)
+
+    // Block should be gone
+    expect(world.getBlock(5, 10, 7).isNone()).toBe(true)
+  })
+
+  test('removes block with negative coordinates', () => {
+    const world = new World()
+    const chunk = new Chunk(-1, -1)
+    const localX = Config.CHUNK_SIZE - 1
+    const localZ = Config.CHUNK_SIZE - 1
+    chunk.setBlock(localX, 10, localZ, 2)
+    world.addEntity(chunk)
+
+    // Verify block exists
+    expect(world.getBlock(-1, 10, -1).unwrap()).toBe(2)
+
+    // Remove block
+    world.removeBlock(-1, 10, -1)
+
+    // Block should be gone
+    expect(world.getBlock(-1, 10, -1).isNone()).toBe(true)
+  })
+
+  test('handles removing a non-existent block', () => {
+    const world = new World()
+    const chunk = new Chunk(0, 0)
+    world.addEntity(chunk)
+
+    // Try to remove block that doesn't exist (should not throw)
+    expect(() => world.removeBlock(5, 10, 7)).not.toThrow()
+
+    // Still no block
+    expect(world.getBlock(5, 10, 7).isNone()).toBe(true)
+  })
+
+  test('does nothing when chunk does not exist', () => {
+    const world = new World()
+
+    // Try to remove block without creating chunk (should not throw)
+    expect(() => world.removeBlock(5, 10, 7)).not.toThrow()
+  })
+
+  test('removes and re-adds a block', () => {
+    const world = new World()
+    const chunk = new Chunk(0, 0)
+    chunk.setBlock(5, 10, 7, 1)
+    world.addEntity(chunk)
+
+    // Remove block
+    world.removeBlock(5, 10, 7)
+    expect(world.getBlock(5, 10, 7).isNone()).toBe(true)
+
+    // Re-add with different ID
+    world.addBlock(5, 10, 7, 3)
+    expect(world.getBlock(5, 10, 7).unwrap()).toBe(3)
+  })
+
+  test('removes block at chunk boundary', () => {
+    const world = new World()
+    const chunk = new Chunk(0, 0)
+    chunk.setBlock(Config.CHUNK_SIZE - 1, 10, 5, 1)
+    world.addEntity(chunk)
+
+    world.removeBlock(Config.CHUNK_SIZE - 1, 10, 5)
+
+    expect(world.getBlock(Config.CHUNK_SIZE - 1, 10, 5).isNone()).toBe(true)
+  })
+})
