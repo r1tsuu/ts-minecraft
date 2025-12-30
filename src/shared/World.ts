@@ -1,3 +1,6 @@
+import type { Box3 } from 'three'
+
+import { Chunk } from './entities/Chunk.ts'
 import {
   deserializeEntity,
   Entity,
@@ -6,6 +9,7 @@ import {
 } from './entities/Entity.ts'
 import { HashMap } from './HashMap.ts'
 import { Maybe, None, Some } from './Maybe.ts'
+import { pipe } from './Pipe.ts'
 import { Result } from './Result.ts'
 import { type ClassConstructor } from './util.ts'
 
@@ -110,6 +114,14 @@ export class World {
     return world
   }
 
+  addBlock(x: number, y: number, z: number, blockID: number): void {
+    pipe(Chunk.mapToChunkCoordinates(x, z)).map((chunk) =>
+      this.getEntity(Chunk.getWorldID(chunk), Chunk)
+        .map((chunk) => ({ chunk, local: Chunk.mapToLocalCoordinates(x, z) }))
+        .tap(({ chunk, local }) => chunk.setBlock(local.x, y, local.z, blockID)),
+    )
+  }
+
   /**
    * Add an entity to the world and mark it as dirty.
    * @param resolveEntity - A function that resolves to the entity to add.
@@ -157,6 +169,54 @@ export class World {
     }
     this.entitiesByType.get(entityConstructor).unwrap().add(id)
   }
+
+  boxIntersectsWorldBlocks(box: Box3): boolean {
+    const minX = Math.floor(box.min.x)
+    const maxX = Math.floor(box.max.x)
+    const minY = Math.floor(box.min.y)
+    const maxY = Math.floor(box.max.y)
+    const minZ = Math.floor(box.min.z)
+    const maxZ = Math.floor(box.max.z)
+
+    // Check all blocks that could intersect with box
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        for (let z = minZ; z <= maxZ; z++) {
+          if (this.getBlock(x, y, z).isSome()) {
+            // Block AABB: [x, x+1), [y, y+1), [z, z+1)
+
+            if (
+              box.max.x > x &&
+              box.min.x < x + 1 &&
+              box.max.y > y &&
+              box.min.y < y + 1 &&
+              box.max.z > z &&
+              box.min.z < z + 1
+            ) {
+              return true
+            }
+          }
+        }
+      }
+    }
+
+    return false
+  }
+
+  getBlock(x: number, y: number, z: number): Maybe<number> {
+    return pipe(Chunk.mapToChunkCoordinates(x, z))
+      .map((chunkCoordinates) =>
+        this.getEntity(Chunk.getWorldID(chunkCoordinates), Chunk)
+          .map((chunk) => ({
+            chunk,
+            local: Chunk.mapToLocalCoordinates(x, z),
+          }))
+          .map(({ chunk, local }) => chunk.getBlock(local.x, y, local.z))
+          .flatten(),
+      )
+      .value()
+  }
+
   /**
    * Get an entity by its ID
    */
@@ -183,7 +243,6 @@ export class World {
 
     return None()
   }
-
   markEntityAsDirty(id: string): void {
     this.dirtyEntities.add(id)
   }
@@ -194,6 +253,14 @@ export class World {
 
   queryDirty(): WorldQuery {
     return this.query().whereID((id) => this.dirtyEntities.has(id))
+  }
+
+  removeBlock(x: number, y: number, z: number): void {
+    pipe(Chunk.mapToChunkCoordinates(x, z)).map((chunk) =>
+      this.getEntity(Chunk.getWorldID(chunk), Chunk)
+        .map((chunk) => ({ chunk, local: Chunk.mapToLocalCoordinates(x, z) }))
+        .tap(({ chunk, local }) => chunk.removeBlock(local.x, y, local.z)),
+    )
   }
 
   removeEntity(id: string): Result<

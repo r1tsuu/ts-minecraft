@@ -149,6 +149,10 @@ export class Chunk extends Entity {
     }
   }
 
+  removeBlock(x: number, y: number, z: number): void {
+    this.setBlock(x, y, z, 0)
+  }
+
   serialize(): any {
     return {
       blocks: this.blocks,

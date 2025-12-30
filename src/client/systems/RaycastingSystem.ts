@@ -1,7 +1,6 @@
 import * as THREE from 'three'
 
 import { System } from '../../shared/System.ts'
-import { getBlockInWorld } from '../../shared/util.ts'
 import { GameSession } from '../GameSession.ts'
 
 const FAR = 5
@@ -56,7 +55,7 @@ export class RaycastingSystem extends System {
           const worldY = Math.floor(sessionPlayer.position.y + y)
           const worldZ = Math.floor(sessionPlayer.position.z + z)
 
-          if (getBlockInWorld(this.gameSession.world, worldX, worldY, worldZ).isNone()) continue
+          if (this.gameSession.world.getBlock(worldX, worldY, worldZ).isNone()) continue
 
           const position = new THREE.Vector3(worldX, worldY, worldZ)
           matrix.setPosition(worldX, worldY, worldZ)

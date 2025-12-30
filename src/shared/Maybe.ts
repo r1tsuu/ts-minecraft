@@ -81,6 +81,7 @@ class MaybeImpl<T> {
     }
     return MaybeImpl.None()
   }
+
   expect(message: string): T {
     if (this._type === 'none') {
       throw new Error(message)
@@ -94,6 +95,22 @@ class MaybeImpl<T> {
       return fn(this._value as T)
     }
 
+    return MaybeImpl.None()
+  }
+
+  /**
+   * Flattens a nested Maybe.
+   * @returns A flattened Maybe.
+   * @example
+   * ```typescript
+   * const nested: Maybe<Maybe<number>> = Maybe.Some(Maybe.Some(42))
+   * const flattened: Maybe<number> = nested.flatten()
+   * ```
+   */
+  flatten<U>(this: Maybe<Maybe<U>>): Maybe<U> {
+    if (this.isSome()) {
+      return this._value as Maybe<U>
+    }
     return MaybeImpl.None()
   }
 

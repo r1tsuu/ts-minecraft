@@ -5,7 +5,7 @@ import { Player } from '../../shared/entities/Player.ts'
 import { HashMap } from '../../shared/HashMap.ts'
 import { pipe } from '../../shared/Pipe.ts'
 import { System } from '../../shared/System.ts'
-import { boxIntersectsWorldBlocks, UP_VECTOR } from '../../shared/util.ts'
+import { UP_VECTOR } from '../../shared/util.ts'
 import { GameSession } from '../GameSession.ts'
 
 class PlayerMovementState {
@@ -132,7 +132,7 @@ export class PlayerUpdateSystem extends System {
       const attemptedPosition = player.position.clone()
       attemptedPosition.x += horizontalVelocity.x
 
-      if (boxIntersectsWorldBlocks(this.gameSession.world, Player.boundingBox(attemptedPosition))) {
+      if (this.gameSession.world.boxIntersectsWorldBlocks(Player.boundingBox(attemptedPosition))) {
         player.position.x = attemptedPosition.x
       }
     }
@@ -141,9 +141,7 @@ export class PlayerUpdateSystem extends System {
       const attemptedPosition = player.position.clone()
       attemptedPosition.z += horizontalVelocity.z
 
-      if (
-        !boxIntersectsWorldBlocks(this.gameSession.world, Player.boundingBox(attemptedPosition))
-      ) {
+      if (!this.gameSession.world.boxIntersectsWorldBlocks(Player.boundingBox(attemptedPosition))) {
         player.position.z = attemptedPosition.z
       }
     }
@@ -152,7 +150,7 @@ export class PlayerUpdateSystem extends System {
       const attemptedPosition = player.position.clone()
       attemptedPosition.y += player.velocity.y * delta
 
-      if (boxIntersectsWorldBlocks(this.gameSession.world, Player.boundingBox(attemptedPosition))) {
+      if (this.gameSession.world.boxIntersectsWorldBlocks(Player.boundingBox(attemptedPosition))) {
         if (player.velocity.y > 0) {
           // Hitting ceiling
           player.velocity.y = 0
@@ -171,7 +169,7 @@ export class PlayerUpdateSystem extends System {
         const groundCheck = player.position.clone()
         groundCheck.y -= 0.05
 
-        if (boxIntersectsWorldBlocks(this.gameSession.world, Player.boundingBox(groundCheck))) {
+        if (this.gameSession.world.boxIntersectsWorldBlocks(Player.boundingBox(groundCheck))) {
           this.setCanJump(player, true)
         } else {
           this.setCanJump(player, false)
