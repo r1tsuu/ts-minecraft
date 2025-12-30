@@ -94,6 +94,53 @@ export class Scheduler {
 const GLOBAL_SCHEDULER = new Scheduler()
 
 /**
+ * Decorator to run a method at regular intervals.
+ * @param intervalMs - The interval in milliseconds at which to run the method.
+ * @param options - Additional options.
+ * @param options.runImmediately - If true, the method will be run immediately upon scheduling.
+ * @param options.allowOverlapping - If true, allows the task to be scheduled again even if the previous execution is still running.
+ * @returns A method decorator.
+ * @example
+ * ```typescript
+ * class MyClass {
+ *   @RunTask(1000, { runImmediately: true })
+ *   myMethod() {
+ *     console.log('This method runs every second, starting immediately.');
+ *   }
+ * }
+ * ```
+ */
+export function RunTask(
+  intervalMs: number,
+  options: {
+    allowOverlapping?: boolean
+    disabled?: boolean
+    runImmediately?: boolean
+  } = {},
+) {
+  return function (target: any, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+    if (options.disabled) {
+      return descriptor
+    }
+
+    if (!target.constructor[SCHEDULER_EVERY_KEY]) {
+      target.constructor[SCHEDULER_EVERY_KEY] = []
+    }
+
+    const metadata: ScheduleEveryMetadata = {
+      allowOverlapping: options.allowOverlapping ?? false,
+      intervalMs,
+      propertyKey,
+      runImmediately: options.runImmediately ?? false,
+    }
+
+    target.constructor[SCHEDULER_EVERY_KEY].push(metadata)
+
+    return descriptor
+  }
+}
+
+/**
  * Decorator to mark a class as schedulable.
  * The class will be registered with the provided scheduler instance upon instantiation.
  * @param resolveScheduler - Optional function to resolve the scheduler instance. If not provided, the global scheduler will be used.
@@ -128,52 +175,5 @@ export function Schedulable(resolveScheduler?: () => Scheduler): ClassDecorator 
         }
       }
     }
-  }
-}
-
-/**
- * Decorator to run a method at regular intervals.
- * @param intervalMs - The interval in milliseconds at which to run the method.
- * @param options - Additional options.
- * @param options.runImmediately - If true, the method will be run immediately upon scheduling.
- * @param options.allowOverlapping - If true, allows the task to be scheduled again even if the previous execution is still running.
- * @returns A method decorator.
- * @example
- * ```typescript
- * class MyClass {
- *   @RunTask(1000, { runImmediately: true })
- *   myMethod() {
- *     console.log('This method runs every second, starting immediately.');
- *   }
- * }
- * ```
- */
-export function ScheduleTask(
-  intervalMs: number,
-  options: {
-    allowOverlapping?: boolean
-    disabled?: boolean
-    runImmediately?: boolean
-  } = {},
-) {
-  return function (target: any, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
-    if (options.disabled) {
-      return descriptor
-    }
-
-    if (!target.constructor[SCHEDULER_EVERY_KEY]) {
-      target.constructor[SCHEDULER_EVERY_KEY] = []
-    }
-
-    const metadata: ScheduleEveryMetadata = {
-      allowOverlapping: options.allowOverlapping ?? false,
-      intervalMs,
-      propertyKey,
-      runImmediately: options.runImmediately ?? false,
-    }
-
-    target.constructor[SCHEDULER_EVERY_KEY].push(metadata)
-
-    return descriptor
   }
 }

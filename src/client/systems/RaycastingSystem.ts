@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 
+import { HashMap } from '../../shared/HashMap.ts'
 import { System } from '../../shared/System.ts'
 import { GameLoop } from '../GameLoop.ts'
 
@@ -8,7 +9,7 @@ const FAR = 5
 export class RaycastingSystem extends System {
   lookingAtBlock: { x: number; y: number; z: number } | null = null
   lookingAtNormal: { x: number; y: number; z: number } | null = null
-  private readonly blockPositionMap: Map<number, THREE.Vector3> = new Map()
+  private readonly blockPositionMap = new HashMap<number, THREE.Vector3>()
   private readonly mesh: THREE.Mesh = new THREE.Mesh(
     new THREE.BoxGeometry(1.01, 1.01, 1.01),
     new THREE.MeshStandardMaterial({ opacity: 0.5, transparent: true }),
@@ -83,9 +84,10 @@ export class RaycastingSystem extends System {
       intersects.object instanceof THREE.InstancedMesh &&
       typeof intersects.instanceId === 'number'
     ) {
-      const position = this.blockPositionMap.get(intersects.instanceId)
+      const maybePosition = this.blockPositionMap.get(intersects.instanceId)
 
-      if (position) {
+      if (maybePosition.isSome()) {
+        const position = maybePosition.value()
         this.mesh.position.set(position.x, position.y, position.z)
         this.gameLoop.scene.add(this.mesh)
 

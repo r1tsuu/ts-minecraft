@@ -2,7 +2,7 @@ import type { MinecraftEvent } from '../shared/MinecraftEvent.ts'
 
 import { asyncPipe } from '../shared/AsyncPipe.ts'
 import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
-import { serializeEvent } from '../shared/Event.ts'
+import { deserializeEvent, serializeEvent } from '../shared/Event.ts'
 import { ExitWorld } from '../shared/events/client/ExitWorld.ts'
 import { JoinedWorld } from '../shared/events/client/JoinedWorld.ts'
 import { JoinWorld } from '../shared/events/client/JoinWorld.ts'
@@ -13,7 +13,7 @@ import { ServerStarted } from '../shared/events/single-player-worker/ServerStart
 import { WorkerReady } from '../shared/events/single-player-worker/WorkerReady.ts'
 import { type Maybe, None, Some } from '../shared/Maybe.ts'
 import { eventBus, Handler, Listener } from '../shared/MinecraftEventBus.ts'
-import SinglePlayerWorker from '../worker/SinglePlayerWorker.ts?worker'
+import SinglePlayerWorker from '../singleplayer/SinglePlayerWorker.ts?worker'
 import { ClientBlocksRegistry } from './ClientBlocksRegistry.ts'
 import { GameLoop } from './GameLoop.ts'
 import { GUI } from './gui/GUI.ts'
@@ -24,9 +24,13 @@ export class MinecraftClient {
   blocksRegistry = new BlocksRegistry()
   clientBlocksRegistry = new ClientBlocksRegistry(this.blocksRegistry)
   gameLoop: Maybe<GameLoop> = None()
-  gui = new GUI(this)
+  gui: GUI
   localStorageManager = new LocalStorageManager()
   singlePlayerWorker: Maybe<Worker> = None()
+
+  constructor() {
+    this.gui = new GUI(this)
+  }
 
   dispose(): void {
     this.gui.dispose()
@@ -38,7 +42,7 @@ export class MinecraftClient {
 
   @Handler('*')
   protected forwardEventsToServer(event: MinecraftEvent): void {
-    if (this.gameLoop.isNone() || this.singlePlayerWorker.isNone()) {
+    if (this.singlePlayerWorker.isNone()) {
       return
     }
 
@@ -64,10 +68,15 @@ export class MinecraftClient {
     }
 
     await asyncPipe(new SinglePlayerWorker())
-      .tap((worker) => (worker.onmessage = (msg) => this.forwardEventsToServer(msg.data)))
+      .tap(
+        (worker) =>
+          (worker.onmessage = (msg) => eventBus.publish(deserializeEvent(eventBus, msg.data))),
+      )
       .tap((worker) => (this.singlePlayerWorker = Some(worker)))
       .tap(() => eventBus.waitFor(WorkerReady))
+      .tap(() => console.log('Single-player worker is ready.'))
       .tap(() => eventBus.request(new StartLocalServer(event.worldUUID), ServerStarted))
+      .tap(() => console.log(`Local server started for world ${event.worldUUID}.`))
       .map(() =>
         eventBus.request(
           new RequestPlayerJoin(this.localStorageManager.getPlayerUUID()),

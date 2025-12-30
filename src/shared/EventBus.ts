@@ -60,9 +60,6 @@ export class EventBus<E extends Event<EventMetadata>> {
    */
   static Handler<T extends EventConstructor<any>>(Constructor: T | WildcardKey) {
     return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-      console.log(
-        `Registering event handler for ${typeof Constructor === 'string' ? Constructor : Constructor.type} on ${target.constructor.name}.${propertyKey}`,
-      )
       // Store metadata about this event handler
       if (!target.constructor[EVENT_HANDLERS_KEY]) {
         target.constructor[EVENT_HANDLERS_KEY] = []
@@ -108,10 +105,7 @@ export class EventBus<E extends Event<EventMetadata>> {
           this.dispose = () => {
             originalDispose?.()
             eventBus.unregisterHandlers(this)
-            console.log(`Unregistered Minecraft client event handlers for ${Target.name}`)
           }
-
-          console.log(`Registered Minecraft client event handlers for ${Target.name}`)
         }
       }
     }
@@ -197,7 +191,7 @@ export class EventBus<E extends Event<EventMetadata>> {
    * ```
    */
   registerEventType<T extends Event<any>>(EventConstructor: EventConstructor<T>): void {
-    this.eventTypesRegistry.set(EventConstructor.name, EventConstructor)
+    this.eventTypesRegistry.set(EventConstructor.type, EventConstructor)
   }
 
   /**
@@ -208,21 +202,22 @@ export class EventBus<E extends Event<EventMetadata>> {
    * @returns Array of unsubscribe functions
    */
   registerHandlers(instance: Record<string, any>): Array<() => void> {
-    const constructor = instance.constructor as any
-    const handlers: EventHandlerMetadata[] = constructor[EVENT_HANDLERS_KEY] || []
+    const Constructor = instance.constructor as any
+    const handlers: EventHandlerMetadata[] = Constructor[EVENT_HANDLERS_KEY] || []
     const unsubscribers: Array<() => void> = []
 
     for (const handler of handlers) {
       const method = (instance as any)[handler.methodName]
 
       if (typeof method !== 'function') {
-        console.warn(`Event handler ${handler.methodName} is not a function on ${constructor.name}`)
+        console.warn(`Event handler ${handler.methodName} is not a function on ${Constructor.name}`)
         continue
       }
 
       // Bind the method and register it
       const boundMethod = method.bind(instance)
-      const unsubscribe = this.subscribe(handler.Constructor, boundMethod)
+      this.validateEventType(handler.type)
+      const unsubscribe = this.subscribe(handler.type, boundMethod)
       unsubscribers.push(unsubscribe)
     }
 
@@ -389,6 +384,7 @@ export class EventBus<E extends Event<EventMetadata>> {
   private validateEventType(type: '*' | EventConstructor<any> | string): void {
     const typeStr = typeof type === 'string' ? type : type.type
     if (!this.eventTypesRegistry.has(typeStr) && type !== WILDCARD) {
+      console.log(this.eventTypesRegistry)
       throw new Error(`Event type "${typeStr}" is not registered in the EventBus.`)
     }
   }

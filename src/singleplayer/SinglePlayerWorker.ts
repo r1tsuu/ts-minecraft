@@ -1,6 +1,3 @@
-import { setCurrentEnvironment } from '../shared/env.ts'
-setCurrentEnvironment('Server')
-
 import type { StartLocalServer } from '../shared/events/client/StartLocalServer.ts'
 import type { MinecraftEvent } from '../shared/MinecraftEvent.ts'
 
@@ -9,6 +6,7 @@ import { MinecraftServer } from '../server/MinecraftServer.ts'
 import { deserializeEvent, serializeEvent } from '../shared/Event.ts'
 import { ClientEvent } from '../shared/events/client/index.ts'
 import { SinglePlayerWorkerEvent } from '../shared/events/single-player-worker/index.ts'
+import { WorkerReady } from '../shared/events/single-player-worker/WorkerReady.ts'
 import { Maybe, None, Some } from '../shared/Maybe.ts'
 import { eventBus, Handler, Listener } from '../shared/MinecraftEventBus.ts'
 import { PrivateFileSystemWorldStorage } from './PrivateFileSystemWorldStorage.ts'
@@ -29,6 +27,7 @@ class SinglePlayerServerImpl {
 
   @Handler('*')
   protected forwardEventsToClient(event: MinecraftEvent): void {
+    console.log(`SinglePlayerServerImpl forwarding event of type ${event.getType()} to client.`)
     if (
       event.getType().startsWith('Server.Response') ||
       event instanceof SinglePlayerWorkerEvent.WorkerReady ||
@@ -65,3 +64,5 @@ const singlePlayerServer = new SinglePlayerServerImpl()
 self.onmessage = (message: MessageEvent<MinecraftEvent>) => {
   singlePlayerServer.handleMessage(message)
 }
+
+eventBus.publish(new WorkerReady())

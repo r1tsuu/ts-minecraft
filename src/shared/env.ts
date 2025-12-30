@@ -1,15 +1,11 @@
 import type { EnvironmentType } from './util.ts'
 
-import { type Maybe, None, Some } from './Maybe.ts'
-
-let environment: Maybe<EnvironmentType> = None()
-
 export function getCurrentEnvironment(): EnvironmentType {
-  return environment.expect('Environment has not been set yet.')
-}
+  if (typeof window !== 'undefined') {
+    return 'Client'
+  }
 
-export function setCurrentEnvironment(env: EnvironmentType): void {
-  environment = Some(env)
+  return 'Server'
 }
 
 export const isClient = (): boolean => getCurrentEnvironment() === 'Client'

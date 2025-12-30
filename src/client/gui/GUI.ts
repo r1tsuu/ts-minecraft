@@ -8,7 +8,7 @@ import { JoinedWorld } from '../../shared/events/client/JoinedWorld.ts'
 import { JoinWorld } from '../../shared/events/client/JoinWorld.ts'
 import { PauseToggle } from '../../shared/events/client/PauseToggle.ts'
 import { eventBus, Handler, Listener } from '../../shared/MinecraftEventBus.ts'
-import { Schedulable, ScheduleTask } from '../../shared/Scheduler.ts'
+import { RunTask, Schedulable } from '../../shared/Scheduler.ts'
 import { synchronize } from './synchronize.ts'
 
 @Listener()
@@ -86,7 +86,7 @@ export class GUI {
     window.addEventListener('resize', this.onResizeSyncRenderer)
   }
 
-  @ScheduleTask(200)
+  @RunTask(200)
   protected updateGameUI(): void {
     if (!this.client.gameLoop.isSome() || this.state.isPaused) return
 
