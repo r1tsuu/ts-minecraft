@@ -23,7 +23,7 @@ class PlayerMovementState {
  */
 
 export class PlayerUpdateSystem extends System {
-  private movementStates: HashMap<string, PlayerMovementState> = new HashMap()
+  private playerMovementStates: HashMap<string, PlayerMovementState> = new HashMap()
 
   constructor(private readonly gameLoop: GameLoop) {
     super()
@@ -34,15 +34,7 @@ export class PlayerUpdateSystem extends System {
   }
 
   getMovementState(player: Player): PlayerMovementState {
-    return pipe(this.movementStates.get(player.uuid))
-      .map((maybePlayer) =>
-        maybePlayer.unwrapOr(() => {
-          const newState = new PlayerMovementState()
-          this.movementStates.set(player.uuid, newState)
-          return newState
-        }),
-      )
-      .value()
+    return this.playerMovementStates.getOrSet(player.uuid, () => new PlayerMovementState())
   }
 
   isMovingBackward(player: Player): boolean {

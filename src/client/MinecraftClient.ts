@@ -75,7 +75,7 @@ export class MinecraftClient {
         ),
       )
       .map(({ world }) => new GameLoop(this, world))
-      .tap((gameLoop) => gameLoop.enterGameLoop())
+      .tap((gameLoop) => gameLoop.execute())
       .tap((gameLoop) => (this.gameLoop = Some(gameLoop)))
       .tap(() => console.log(`Joined world ${event.worldUUID}`))
       .tap(() => eventBus.reply(event, new JoinedWorld()))

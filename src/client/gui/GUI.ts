@@ -3,6 +3,10 @@ import * as THREE from 'three'
 import type { MinecraftClient } from '../MinecraftClient.ts'
 import type { GUIActions, GUIConditions, GUIState as GUIState } from './state.ts'
 
+import { ExitWorld } from '../../shared/events/client/ExitWorld.ts'
+import { JoinedWorld } from '../../shared/events/client/JoinedWorld.ts'
+import { JoinWorld } from '../../shared/events/client/JoinWorld.ts'
+import { PauseToggle } from '../../shared/events/client/PauseToggle.ts'
 import { eventBus, Handler, Listener } from '../../shared/MinecraftEventBus.ts'
 import { Schedulable, ScheduleTask } from '../../shared/Scheduler.ts'
 import { synchronize } from './synchronize.ts'
@@ -65,7 +69,7 @@ export class GUI {
     synchronize(this.state, this.actions, this.conditions, affectedQuerySelectors)
   }
 
-  @Handler('Client.JoinedWorld')
+  @Handler(JoinedWorld)
   protected onJoinedWorld(): void {
     this.setState({
       activePage: 'game',
@@ -122,7 +126,7 @@ export class GUI {
   private createActions(): GUIActions {
     return {
       backToMenu: () => {
-        eventBus.publish('Client.ExitWorld', {})
+        eventBus.publish(new ExitWorld())
         this.setState({
           activePage: 'start',
           fps: 'Loading...',
@@ -177,9 +181,7 @@ export class GUI {
           loadingWorldName: world.name,
         })
 
-        eventBus.publish('Client.JoinWorld', {
-          worldUUID: world.uuid,
-        })
+        eventBus.publish(new JoinWorld(world.uuid))
       },
       resumeGame: async () => {
         await this.resumeGame()
@@ -238,7 +240,7 @@ export class GUI {
         pauseText: 'Click to Resume',
       })
 
-      eventBus.publish('Client.PauseToggle', {})
+      eventBus.publish(new PauseToggle())
       return
     }
   }
@@ -260,7 +262,7 @@ export class GUI {
         isPaused: false,
         pauseText: 'Press Escape to Pause',
       })
-      eventBus.publish('Client.PauseToggle', {})
+      eventBus.publish(new PauseToggle())
     } catch (e) {
       console.warn('Pointer lock request failed', e)
     }

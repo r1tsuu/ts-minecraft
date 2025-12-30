@@ -95,7 +95,7 @@ export class GameLoop {
     this.disposed = true
   }
 
-  enterGameLoop() {
+  execute() {
     const frame = () => {
       if (this.disposed) {
         return

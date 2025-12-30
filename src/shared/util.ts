@@ -375,6 +375,7 @@ export function* combineIterators<T extends unknown[]>(
     }
   }
 }
+
 export function range(end: number): IterableIterator<number>
 export function range(start: number, end: number): IterableIterator<number>
 

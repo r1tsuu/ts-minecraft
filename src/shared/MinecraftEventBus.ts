@@ -1,3 +1,5 @@
+import type { EnvironmentType } from './util.ts'
+
 import { getCurrentEnvironment } from './env.ts'
 import { EventBus } from './EventBus.ts'
 import { ClientEvent } from './events/client/index.ts'
@@ -9,7 +11,7 @@ import { MinecraftEvent } from './MinecraftEvent.ts'
  * MinecraftEventBus class for managing Minecraft-specific event publishing and subscription.
  */
 export class MinecraftEventBus extends EventBus<MinecraftEvent> {
-  constructor(environment: 'Client' | 'Server') {
+  constructor(environment: EnvironmentType) {
     super()
 
     const eventConstructors = [
