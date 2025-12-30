@@ -84,18 +84,18 @@ export class GUI {
 
   @ScheduleTask(200)
   protected updateGameUI(): void {
-    if (!this.client.gameSession.isSome() || this.state.isPaused) return
+    if (!this.client.gameLoop.isSome() || this.state.isPaused) return
 
     if (!this.state.initializedGameUI) {
       this.setState({ initializedGameUI: true })
     }
 
-    const gameSession = this.client.gameSession.value()
+    const gameLoop = this.client.gameLoop.value()
 
-    const player = gameSession.getSessionPlayer()
+    const player = gameLoop.getClientPlayer()
     this.setState(
       {
-        fps: gameSession.frameCounter.fps.toFixed(0),
+        fps: gameLoop.frameCounter.fps.toFixed(0),
         positionX: player.position.x.toFixed(),
         positionY: player.position.y.toFixed(),
         positionZ: player.position.z.toFixed(),
@@ -108,9 +108,9 @@ export class GUI {
 
     let performance: 'average' | 'bad' | 'good'
 
-    if (gameSession.frameCounter.fps < 30) {
+    if (gameLoop.frameCounter.fps < 30) {
       performance = 'bad'
-    } else if (gameSession.frameCounter.fps < 60) {
+    } else if (gameLoop.frameCounter.fps < 60) {
       performance = 'average'
     } else {
       performance = 'good'
@@ -194,8 +194,8 @@ export class GUI {
 
   private createConditions(): GUIConditions {
     return {
-      showCrosshair: () => this.client.gameSession.isSome() && !this.state.isPaused,
-      showGameUI: () => this.client.gameSession.isSome(),
+      showCrosshair: () => this.client.gameLoop.isSome() && !this.state.isPaused,
+      showGameUI: () => this.client.gameLoop.isSome(),
       showOverlay: () => ['menuWorlds', 'start', 'worldLoading'].includes(this.state.activePage),
       showPauseMenu: () => this.state.isPaused,
       showWorldsNotFound: () => this.state.worldList.length === 0,
@@ -219,9 +219,9 @@ export class GUI {
   }
 
   private onPointerLockChange = (): void => {
-    const gameSession = this.client.gameSession
+    const gameLoop = this.client.gameLoop
 
-    if (gameSession.isNone()) return
+    if (gameLoop.isNone()) return
 
     const isLocked = document.pointerLockElement === this.getCanvas()
 
@@ -244,13 +244,13 @@ export class GUI {
   }
 
   private onResizeSyncRenderer = () => {
-    this.client.gameSession
-      .map((session) => session.renderer)
+    this.client.gameLoop
+      .map((game) => game.renderer)
       .tap((renderer) => renderer.setSize(window.innerWidth, window.innerHeight))
   }
 
   private async resumeGame(): Promise<void> {
-    if (this.client.gameSession.isNone()) return
+    if (this.client.gameLoop.isNone()) return
 
     if (!this.state.isPaused) return
 

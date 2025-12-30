@@ -4,16 +4,16 @@ import { PauseToggle } from '../../shared/events/client/PauseToggle.ts'
 import { Listener, MinecraftEventBus } from '../../shared/MinecraftEventBus.ts'
 import { System } from '../../shared/System.ts'
 import { Throttle } from '../../shared/util.ts'
-import { GameSession } from '../GameSession.ts'
+import { GameLoop } from '../GameLoop.ts'
 import { PlayerUpdateSystem } from './PlayerUpdateSystem.ts'
 import { RaycastingSystem } from './RaycastingSystem.ts'
 
 @Listener()
-export class SessionPlayerControlSystem extends System {
+export class ClientPlayerControlSystem extends System {
   private static readonly THROTTLE_DELAY_MS = 500
 
   constructor(
-    private readonly gameSession: GameSession,
+    private readonly gameLoop: GameLoop,
     private readonly blocksRegistry: BlocksRegistry,
     private readonly playerUpdateSystem: PlayerUpdateSystem,
     private readonly raycastingSystem: RaycastingSystem,
@@ -23,10 +23,10 @@ export class SessionPlayerControlSystem extends System {
 
   @System.Update()
   update(): void {
-    const inputManager = this.gameSession.inputManager
+    const inputManager = this.gameLoop.inputManager
     const mouseMove = inputManager.getMouseDelta()
 
-    const player = this.gameSession.getSessionPlayer()
+    const player = this.gameLoop.getClientPlayer()
 
     player.rotation.y -= mouseMove.deltaX * Config.MOUSE_SENSITIVITY
     player.rotation.x -= mouseMove.deltaY * Config.MOUSE_SENSITIVITY
@@ -59,7 +59,7 @@ export class SessionPlayerControlSystem extends System {
 
   @MinecraftEventBus.Handler(PauseToggle)
   protected onPauseToggle(): void {
-    const player = this.gameSession.getSessionPlayer()
+    const player = this.gameLoop.getClientPlayer()
 
     const state = this.playerUpdateSystem.getMovementState(player)
 
@@ -69,13 +69,13 @@ export class SessionPlayerControlSystem extends System {
     state.movingForward = false
   }
 
-  @Throttle(SessionPlayerControlSystem.THROTTLE_DELAY_MS)
+  @Throttle(ClientPlayerControlSystem.THROTTLE_DELAY_MS)
   private handleBlockPlace(): void {
     const raycaster = this.raycastingSystem
     if (raycaster.lookingAtBlock && raycaster.lookingAtNormal) {
       const blockToPlace = this.blocksRegistry.getBlockIdByName('grass')
 
-      this.gameSession.world.addBlock(
+      this.gameLoop.world.addBlock(
         raycaster.lookingAtBlock.x + raycaster.lookingAtNormal.x,
         raycaster.lookingAtBlock.y + raycaster.lookingAtNormal.y,
         raycaster.lookingAtBlock.z + raycaster.lookingAtNormal.z,
@@ -84,12 +84,12 @@ export class SessionPlayerControlSystem extends System {
     }
   }
 
-  @Throttle(SessionPlayerControlSystem.THROTTLE_DELAY_MS)
+  @Throttle(ClientPlayerControlSystem.THROTTLE_DELAY_MS)
   private handleBlockRemove(): void {
     const raycaster = this.raycastingSystem
 
     if (raycaster.lookingAtBlock) {
-      this.gameSession.world.removeBlock(
+      this.gameLoop.world.removeBlock(
         raycaster.lookingAtBlock.x,
         raycaster.lookingAtBlock.y,
         raycaster.lookingAtBlock.z,

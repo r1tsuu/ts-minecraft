@@ -61,7 +61,7 @@ export class ChunkRenderingSystem extends System {
     const meshesNeedUpdate = new Set<InstancedMesh>()
     const meshInstanceCounts = new HashMap<number, number>()
 
-    for (const chunk of this.client.gameSession.unwrap().isFirstFrame()
+    for (const chunk of this.client.gameLoop.unwrap().isFirstFrame()
       ? chunks
       : this.chunksNeedingRender) {
       for (const { blockID, x, y, z } of chunk.iterateBlocks()) {

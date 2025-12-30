@@ -10,7 +10,7 @@ import { Scheduler } from '../shared/Scheduler.ts'
 import { getBlockIndex, getBlockKey, getChunkCoordinates } from '../shared/util.ts'
 import { ClientBlocksRegistry } from './ClientBlocksRegistry.ts'
 import { ClientContainer } from './ClientContainer.ts'
-import { GameSession } from './GameSession.ts'
+import { GameLoop } from './GameLoop.ts'
 
 const chunkKey = (x: number, z: number) => `${x},${z}`
 
@@ -252,7 +252,7 @@ export class World_Legacy implements Component {
   }
 
   update(): void {
-    const player = ClientContainer.resolve(GameSession).unwrap().getSessionPlayer()
+    const player = ClientContainer.resolve(GameLoop).unwrap().getClientPlayer()
     const playerChunkX = Math.floor(player.position.x / Config.CHUNK_SIZE)
     const playerChunkZ = Math.floor(player.position.z / Config.CHUNK_SIZE)
 

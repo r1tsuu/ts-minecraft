@@ -28,7 +28,7 @@ const entityRenderSystemsMap = new HashMap<
 // class SystemContext {
 //   private entitiesCache = new HashMap<EntityConstructor, Entity[]>()
 //   constructor(
-//     readonly gameSession: GameSession,
+//     readonly gameLoop: gameLoop,
 //     readonly world: World,
 //     readonly delta: number,
 //     readonly input: InputManager,

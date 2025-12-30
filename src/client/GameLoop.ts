@@ -12,13 +12,13 @@ import { Schedulable } from '../shared/Scheduler.ts'
 import { SystemRegistry } from '../shared/System.ts'
 import { World } from '../shared/World.ts'
 import { InputManager } from './InputManager.ts'
+import { ClientPlayerControlSystem } from './systems/ClientPlayerControlSystem.ts'
 import { PlayerUpdateSystem } from './systems/PlayerUpdateSystem.ts'
 import { RaycastingSystem } from './systems/RaycastingSystem.ts'
-import { SessionPlayerControlSystem } from './systems/SessionPlayerControlSystem.ts'
 
 @Listener()
 @Schedulable()
-export class GameSession {
+export class GameLoop {
   readonly camera = new THREE.PerspectiveCamera(
     75,
     window.innerWidth / window.innerHeight,
@@ -39,15 +39,15 @@ export class GameSession {
   readonly renderer: THREE.WebGLRenderer
   readonly scene = new THREE.Scene()
   readonly systemRegistry = new SystemRegistry()
+  private clientPlayer: Player
   private delta: number = 0
   private disposed = false
   private gameLoopClock = new THREE.Clock()
+
   private isGameLoopClockStopped = false
-
   private lastTimeout: null | number = null
-  private paused = false
 
-  private sessionPlayer: Player
+  private paused = false
 
   constructor(
     private readonly client: MinecraftClient,
@@ -64,8 +64,8 @@ export class GameSession {
     this.renderer.shadowMap.enabled = false // Disable shadows for performance
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)) // Cap pixel ratio
 
-    this.sessionPlayer = pipe(this.client.localStorageManager.getPlayerUUID())
-      .map((playerUUID) => this.world.getEntity(playerUUID, Player))
+    this.clientPlayer = pipe(this.client.localStorageManager.getPlayerUUID())
+      .map((uuid) => this.world.getEntity(uuid, Player))
       .value()
       .unwrap()
 
@@ -73,7 +73,7 @@ export class GameSession {
     const raycastingSystem = this.systemRegistry.registerSystem(new RaycastingSystem(this))
 
     this.systemRegistry.registerSystem(
-      new SessionPlayerControlSystem(
+      new ClientPlayerControlSystem(
         this,
         this.client.blocksRegistry,
         playerUpdate,
@@ -109,12 +109,12 @@ export class GameSession {
     requestAnimationFrame(frame)
   }
 
-  getDelta(): number {
-    return this.delta
+  getClientPlayer(): Player {
+    return this.clientPlayer
   }
 
-  getSessionPlayer(): Player {
-    return this.sessionPlayer
+  getDelta(): number {
+    return this.delta
   }
 
   isFirstFrame(): boolean {
@@ -200,8 +200,8 @@ export class GameSession {
 
     // Sync camera with player
 
-    this.camera.position.copy(this.sessionPlayer.position)
-    this.camera.rotation.copy(this.sessionPlayer.rotation)
+    this.camera.position.copy(this.clientPlayer.position)
+    this.camera.rotation.copy(this.clientPlayer.rotation)
 
     // Reset mouse delta each frame
     this.inputManager.resetMouseDelta()

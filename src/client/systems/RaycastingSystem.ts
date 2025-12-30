@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 
 import { System } from '../../shared/System.ts'
-import { GameSession } from '../GameSession.ts'
+import { GameLoop } from '../GameLoop.ts'
 
 const FAR = 5
 
@@ -22,7 +22,7 @@ export class RaycastingSystem extends System {
     (FAR * 2 + 1) ** 3,
   )
 
-  constructor(private readonly gameSession: GameSession) {
+  constructor(private readonly gameLoop: GameLoop) {
     super()
   }
 
@@ -38,24 +38,24 @@ export class RaycastingSystem extends System {
 
   @System.Update()
   update() {
-    this.gameSession.scene.remove(this.mesh)
+    this.gameLoop.scene.remove(this.mesh)
 
-    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.gameSession.camera)
+    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.gameLoop.camera)
 
     let index = 0
     const matrix = new THREE.Matrix4()
     this.blockPositionMap.clear()
 
-    const sessionPlayer = this.gameSession.getSessionPlayer()
+    const clientPlayer = this.gameLoop.getClientPlayer()
 
     for (let x = -FAR; x <= FAR; x++) {
       for (let y = -FAR; y <= FAR; y++) {
         for (let z = -FAR; z <= FAR; z++) {
-          const worldX = Math.floor(sessionPlayer.position.x + x)
-          const worldY = Math.floor(sessionPlayer.position.y + y)
-          const worldZ = Math.floor(sessionPlayer.position.z + z)
+          const worldX = Math.floor(clientPlayer.position.x + x)
+          const worldY = Math.floor(clientPlayer.position.y + y)
+          const worldZ = Math.floor(clientPlayer.position.z + z)
 
-          if (this.gameSession.world.getBlock(worldX, worldY, worldZ).isNone()) continue
+          if (this.gameLoop.world.getBlock(worldX, worldY, worldZ).isNone()) continue
 
           const position = new THREE.Vector3(worldX, worldY, worldZ)
           matrix.setPosition(worldX, worldY, worldZ)
@@ -87,7 +87,7 @@ export class RaycastingSystem extends System {
 
       if (position) {
         this.mesh.position.set(position.x, position.y, position.z)
-        this.gameSession.scene.add(this.mesh)
+        this.gameLoop.scene.add(this.mesh)
 
         this.lookingAtBlock = {
           x: Math.floor(position.x),
