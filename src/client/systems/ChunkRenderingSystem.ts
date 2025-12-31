@@ -15,7 +15,10 @@ const MAX_BLOCK_COUNT_FOR_MESH =
   Config.CHUNK_SIZE *
   Config.WORLD_HEIGHT
 
-export type ChunkRenderingSystem = ReturnType<typeof chunkRenderingSystemFactory>
+export interface ChunkRenderingSystem {
+  queueChunksForRender(chunks: Chunk[]): void
+  queueChunksForUnrender(chunks: Chunk[]): void
+}
 
 export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   const blockMeshesCount = new HashMap<number, number>()
@@ -130,9 +133,13 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     chunksNeedingRender.clear()
   })
 
-  return {
-    name: 'ChunkRenderingSystem',
+  const api: ChunkRenderingSystem = {
     queueChunksForRender,
     queueChunksForUnrender,
+  }
+
+  return {
+    name: 'ChunkRenderingSystem',
+    ...api,
   }
 })

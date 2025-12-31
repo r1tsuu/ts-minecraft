@@ -8,7 +8,15 @@ import { pipe } from '../../shared/Pipe.ts'
 import { UP_VECTOR } from '../../shared/util.ts'
 import { createSystemFactory } from './createSystem.ts'
 
-export type PlayerUpdateSystem = ReturnType<typeof playerUpdateSystemFactory>
+export interface PlayerUpdateSystem {
+  getMovementState(player: Player): PlayerMovementState
+  getPlayerChunk(player: Player): Chunk
+  setMovingBackward(player: Player, moving: boolean): void
+  setMovingForward(player: Player, moving: boolean): void
+  setMovingLeft(player: Player, moving: boolean): void
+  setMovingRight(player: Player, moving: boolean): void
+  tryJump(player: Player): boolean
+}
 
 class PlayerMovementState {
   canJump: boolean = false
@@ -170,14 +178,18 @@ export const playerUpdateSystemFactory = createSystemFactory((ctx) => {
     }
   })
 
-  return {
+  const api: PlayerUpdateSystem = {
     getMovementState,
     getPlayerChunk,
-    name: 'PlayerUpdateSystem',
     setMovingBackward,
     setMovingForward,
     setMovingLeft,
     setMovingRight,
     tryJump,
+  }
+
+  return {
+    name: 'PlayerUpdateSystem',
+    ...api,
   }
 })

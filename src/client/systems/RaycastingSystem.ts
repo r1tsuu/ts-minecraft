@@ -16,7 +16,11 @@ import { createSystemFactory } from './createSystem.ts'
 
 const FAR = 5
 
-export type RaycastingSystem = ReturnType<typeof raycastingSystemFactory>
+export interface RaycastingSystem {
+  getLookingAtBlock(): Maybe<Vector3>
+  getLookingAtNormal(): Maybe<Vector3>
+  getPlacementPosition(): Maybe<Vector3>
+}
 
 export const raycastingSystemFactory = createSystemFactory((ctx) => {
   let maybeLookingAtBlock: Maybe<Vector3> = None()
@@ -125,13 +129,14 @@ export const raycastingSystemFactory = createSystemFactory((ctx) => {
     }
   })
 
-  const getLookingAtBlock = (): Maybe<Vector3> => maybeLookingAtBlock
-  const getLookingAtNormal = (): Maybe<Vector3> => maybeLookingAtNormal
+  const api: RaycastingSystem = {
+    getLookingAtBlock: () => maybeLookingAtBlock,
+    getLookingAtNormal: () => maybeLookingAtNormal,
+    getPlacementPosition,
+  }
 
   return {
-    getLookingAtBlock,
-    getLookingAtNormal,
-    getPlacementPosition,
     name: 'RaycastingSystem',
+    ...api,
   }
 })
