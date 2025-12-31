@@ -7,7 +7,8 @@
     "build": "vite build",
     "dev": "vite",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "gen-event": "node ./generateEventType.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.14",

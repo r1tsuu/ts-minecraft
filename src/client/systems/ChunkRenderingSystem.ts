@@ -20,7 +20,7 @@ export type ChunkRenderingSystem = ReturnType<typeof chunkRenderingSystemFactory
 export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   const blockMeshesCount = new HashMap<number, number>()
   const blockMeshesFreeIndexes = new HashMap<number, number[]>()
-  const chunkBlockMeshesIndexes: HashMap<Chunk, HashMap<string, number>> = new HashMap()
+  const blockMeshesIndexes: HashMap<string, number> = new HashMap()
   const chunksNeedingRender: Set<Chunk> = new Set()
 
   const matrix = new Matrix4()
@@ -55,9 +55,32 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     return currentCount
   }
 
-  const queueChunksForRender = (...chunks: Chunk[]): void => {
+  const queueChunksForRender = (chunks: Chunk[]): void => {
     for (const chunk of chunks) {
       chunksNeedingRender.add(chunk)
+    }
+  }
+
+  const hideMatrix = new Matrix4().makeScale(0, 0, 0)
+
+  const queueChunksForUnrender = (chunks: Chunk[]): void => {
+    const meshesNeedUpdate = new Set<InstancedMesh>()
+
+    for (const chunk of chunks) {
+      for (const { blockID, x, y, z } of chunk.iterateBlocks()) {
+        blockMeshesIndexes.get(getBlockKey(x, y, z)).tap((blockMeshIndex) => {
+          const mesh = blockMeshes.get(blockID).unwrap()
+          mesh.setMatrixAt(blockMeshIndex, hideMatrix)
+          blockMeshesFreeIndexes.get(blockID).tap((indexes) => indexes.push(blockMeshIndex))
+          meshesNeedUpdate.add(mesh)
+        })
+      }
+
+      chunksNeedingRender.delete(chunk)
+    }
+
+    for (const mesh of meshesNeedUpdate) {
+      mesh.instanceMatrix.needsUpdate = true
     }
   }
 
@@ -68,7 +91,6 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     for (const chunk of ctx.isFirstFrame() ? chunks : chunksNeedingRender) {
       for (const { blockID, x, y, z } of chunk.iterateBlocks()) {
         const blockKey = getBlockKey(x, y, z)
-        const blockMeshesIndexes = chunkBlockMeshesIndexes.getOrSet(chunk, () => new HashMap())
 
         if (blockMeshesIndexes.has(blockKey)) {
           continue
@@ -111,5 +133,6 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   return {
     name: 'ChunkRenderingSystem',
     queueChunksForRender,
+    queueChunksForUnrender,
   }
 })

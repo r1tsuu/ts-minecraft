@@ -250,6 +250,28 @@ export class World {
     )
   }
 
+  removeEntities(ids: string[]): Result<
+    Entity[],
+    {
+      id: string
+      type: 'EntityNotFound'
+    }
+  > {
+    const removedEntities: Entity[] = []
+
+    for (const id of ids) {
+      const result = this.removeEntity(id)
+
+      if (result.isErr()) {
+        return Result.Err(result.error())
+      }
+
+      removedEntities.push(result.unwrap())
+    }
+
+    return Result.Ok(removedEntities)
+  }
+
   removeEntity(id: string): Result<
     Entity,
     {

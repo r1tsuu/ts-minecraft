@@ -9,6 +9,7 @@ import { Config } from '../shared/Config.ts'
 import { Chunk, type ChunkCoordinates } from '../shared/entities/Chunk.ts'
 import { Player } from '../shared/entities/Player.ts'
 import { RequestChunksLoad } from '../shared/events/client/RequestChunksLoad.ts'
+import { RequestChunksUnload } from '../shared/events/client/RequestChunksUnload.ts'
 import { RequestPlayerJoin } from '../shared/events/client/RequestPlayerJoin.ts'
 import { ResponseChunksLoad } from '../shared/events/server/ResponseChunksLoad.ts'
 import { ResponsePlayerJoin } from '../shared/events/server/ResponsePlayerJoin.ts'
@@ -57,6 +58,10 @@ export const createMinecraftServer = async ({
       .map((chunks) => new ResponseChunksLoad(chunks))
       .tap((response) => eventBus.reply(event, response))
       .execute(),
+  )
+
+  eventBus.subscribe(RequestChunksUnload, (event) =>
+    world.removeEntities(event.chunks.map(Chunk.getWorldID)),
   )
 
   eventBus.subscribe(RequestPlayerJoin, (event) => {
