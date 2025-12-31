@@ -275,7 +275,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   }
 
   return {
+    api,
     name: 'ChunkRenderingSystem',
-    ...api,
   }
 })

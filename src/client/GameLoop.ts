@@ -62,7 +62,7 @@ export interface SystemFactoryContextData {
 
 export interface SystemInRegistry {
   factoryData: SystemFactoryContextData
-  system: System<string>
+  system: System<string, object>
 }
 
 type OnEvent<E extends MinecraftEvent> = {
@@ -291,9 +291,7 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
 
   const getClientPlayer = () => clientPlayer
 
-  const registerSystem = <T extends Record<string, unknown>>(
-    factory: SystemFactory<string, T>,
-  ): T => {
+  const registerSystem = <T extends object>(factory: SystemFactory<string, T>): T => {
     const systemData: SystemFactoryContextData = {
       dispose: new Set<Callback>(),
       eventHandlers: new HashMap<EventConstructor<MinecraftEvent>, OnEvent<MinecraftEvent>>(),
@@ -364,9 +362,18 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
       system,
     })
 
+    if (!system.api) {
+      Object.defineProperty(system, 'api', {
+        configurable: false,
+        enumerable: true,
+        value: {},
+        writable: false,
+      })
+    }
+
     console.log(`Registered system: ${system.name}`)
 
-    return system as unknown as T
+    return system.api as T
   }
 
   // ---------------------------------
@@ -375,6 +382,7 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
   const chunkRenderingSystem = registerSystem(chunkRenderingSystemFactory)
   const raycastingSystem = registerSystem(raycastingSystemFactory)
   const playerUpdateSystem = registerSystem(playerUpdateSystemFactory)
+
   registerSystem(
     createClientPlayerControlSystemFactory({
       chunkRenderingSystem,

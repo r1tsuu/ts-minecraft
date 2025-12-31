@@ -13,12 +13,13 @@ import type { MinecraftClientContext } from '../MinecraftClient.ts'
 
 import { type Entity, type EntityConstructor } from '../../shared/entities/Entity.ts'
 
-export type System<Name extends string, Extra extends Record<string, unknown> = {}> = {
+export interface System<Name extends string, API extends object> {
   readonly name: Name
-} & Extra
+  readonly api?: API
+}
 
-export interface SystemFactory<K extends string, Extra extends Record<string, unknown>> {
-  (ctx: SystemFactoryContext): System<K, Extra>
+export interface SystemFactory<Name extends string, API extends object> {
+  (ctx: SystemFactoryContext): System<Name, API>
 }
 
 /**
@@ -33,7 +34,7 @@ export interface SystemFactory<K extends string, Extra extends Record<string, un
  * }
  * })
  */
-export const createSystemFactory = <Name extends string, Extra extends Record<string, unknown>>(
+export const createSystemFactory = <Name extends string, API extends object>(
   /**
    * The factory function that creates the system instance
    * @example
@@ -47,8 +48,8 @@ export const createSystemFactory = <Name extends string, Extra extends Record<st
    * })
    * ```
    */
-  factory: SystemFactory<Name, Extra>,
-): SystemFactory<Name, Extra> => {
+  factory: SystemFactory<Name, API>,
+): SystemFactory<Name, API> => {
   return factory
 }
 

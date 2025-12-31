@@ -136,7 +136,7 @@ export const raycastingSystemFactory = createSystemFactory((ctx) => {
   }
 
   return {
+    api,
     name: 'RaycastingSystem',
-    ...api,
   }
 })

@@ -192,7 +192,7 @@ export const playerUpdateSystemFactory = createSystemFactory((ctx) => {
   }
 
   return {
+    api,
     name: 'PlayerUpdateSystem',
-    ...api,
   }
 })
