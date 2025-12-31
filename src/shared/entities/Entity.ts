@@ -33,16 +33,14 @@ export abstract class Entity {
    * }
    * ```
    */
-  static *iterEntityConstructors(): Iterable<{
+  static iterEntityConstructors(): Iterable<{
     Constructor: EntityConstructor<Entity>
     type: string
   }> {
-    for (const [type, Constructor] of entityTypeMap) {
-      yield {
-        Constructor,
-        type,
-      }
-    }
+    return Iterator.from(entityTypeMap).map(([type, Constructor]) => ({
+      Constructor,
+      type,
+    }))
   }
 
   abstract getWorldID(): string

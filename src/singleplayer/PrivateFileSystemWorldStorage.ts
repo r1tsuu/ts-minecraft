@@ -17,7 +17,8 @@ export class PrivateFileSystemWorldStorage implements WorldStorageAdapter {
       .map((directoryHandle) => directoryHandle.getDirectoryHandle('worlds', { create: true }))
       .map((worldsDirectory) => worldsDirectory.getDirectoryHandle(worldName, { create: true }))
       .map((worldDirectory) => new PrivateFileSystemWorldStorage(worldDirectory))
-      .tapError((error) => console.error('Error accessing file system:', error))
+      .tapError((error) => console.error('Error   accessing file system:', error))
+      .tap(() => console.log(`World storage for "${worldName}" initialized.`))
       .execute()
   }
 
@@ -78,6 +79,7 @@ export class PrivateFileSystemWorldStorage implements WorldStorageAdapter {
       .map(readBufferIntoString)
       .map((buffer) => JSON.parse(buffer))
       .mapArray(Player.deserialize)
+      .catch(() => [])
       .execute()
   }
 

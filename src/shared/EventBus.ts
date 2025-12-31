@@ -1,12 +1,12 @@
 import type { UUID } from '../types.ts'
+
+import { Event, type EventMetadata } from './Event.ts'
+import { Maybe, Some } from './Maybe.ts'
 /**
  * Event Bus system for publishing and subscribing to events.
  * Supports event metadata and pre-publish hooks.
  */
-import type { ClassConstructor } from './util.ts'
-
-import { Event, type EventMetadata } from './Event.ts'
-import { Maybe, Some } from './Maybe.ts'
+import { type ClassConstructor, preserveClassOriginalClassConstructor } from './util.ts'
 
 const EVENT_HANDLERS_KEY = Symbol('EVENT_HANDLERS')
 const WILDCARD = '*'
@@ -94,6 +94,7 @@ export class EventBus<E extends Event<EventMetadata>> {
   ): ClassDecorator {
     // @ts-expect-error
     return function <T extends new (...args: any[]) => any>(Target: T): T {
+      preserveClassOriginalClassConstructor(Target)
       return class extends Target {
         constructor(...args: any[]) {
           super(...args)
@@ -216,8 +217,8 @@ export class EventBus<E extends Event<EventMetadata>> {
 
       // Bind the method and register it
       const boundMethod = method.bind(instance)
-      this.validateEventType(handler.type)
-      const unsubscribe = this.subscribe(handler.type, boundMethod)
+      this.validateEventType(handler.Constructor)
+      const unsubscribe = this.subscribe(handler.Constructor, boundMethod)
       unsubscribers.push(unsubscribe)
     }
 

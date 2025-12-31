@@ -40,6 +40,10 @@ class MaybeImpl<T> {
     }
   }
 
+  static IsSome<T>(maybe: Maybe<T>): maybe is MaybeSome<T> {
+    return maybe.isSome()
+  }
+
   static None<T>(): Maybe<T> {
     return new MaybeNone()
   }
@@ -253,4 +257,5 @@ export namespace Maybe {
   export const fromPromise = MaybeImpl.fromPromise
   export const Unwrap = MaybeImpl.Unwrap
   export const When = MaybeImpl.When
+  export const IsSome = MaybeImpl.IsSome
 }

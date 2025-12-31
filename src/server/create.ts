@@ -13,6 +13,7 @@ export const createMinecraftServer = async (
   server: MinecraftServer
   world: World
 }> => {
+  console.log('Creating Minecraft server...')
   const blocksRegistry = new BlocksRegistry()
   const terrainGenerator = new TerrainGenerator(blocksRegistry)
 
@@ -32,6 +33,8 @@ export const createMinecraftServer = async (
   world.addEntities(players, chunks)
 
   const server = new MinecraftServer(world, terrainGenerator)
+
+  console.log('Minecraft server created.')
 
   return {
     server,

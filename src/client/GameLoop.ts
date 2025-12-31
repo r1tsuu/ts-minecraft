@@ -1,20 +1,59 @@
 import * as THREE from 'three'
 
+import type { EventConstructor } from '../shared/EventBus.ts'
+import type { MinecraftEvent } from '../shared/MinecraftEvent.ts'
+import type { Callback } from '../shared/util.ts'
 import type { MinecraftClient } from './MinecraftClient.ts'
 
 import { Entity, type EntityConstructor } from '../shared/entities/Entity.ts'
 import { Player } from '../shared/entities/Player.ts'
 import { PauseToggle } from '../shared/events/client/PauseToggle.ts'
 import { HashMap } from '../shared/HashMap.ts'
-import { Listener, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
+import { Maybe } from '../shared/Maybe.ts'
+import { eventBus, Listener, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { pipe } from '../shared/Pipe.ts'
 import { Schedulable } from '../shared/Scheduler.ts'
-import { SystemRegistry } from '../shared/System.ts'
 import { World } from '../shared/World.ts'
 import { InputManager } from './InputManager.ts'
-import { ClientPlayerControlSystem } from './systems/ClientPlayerControlSystem.ts'
-import { PlayerUpdateSystem } from './systems/PlayerUpdateSystem.ts'
-import { RaycastingSystem } from './systems/RaycastingSystem.ts'
+import { chunkRenderingSystemFactory } from './systems/ChunkRenderingSystem.ts'
+import { createClientPlayerControlSystemFactory } from './systems/ClientPlayerControlSystem.ts'
+import {
+  type System,
+  type SystemFactory,
+  type SystemFactoryContext,
+} from './systems/createSystem.ts'
+import { playerUpdateSystemFactory } from './systems/PlayerUpdateSystem.ts'
+import { raycastingSystemFactory } from './systems/RaycastingSystem.ts'
+
+export type OnEvent<E extends MinecraftEvent> = {
+  EventConstructor: EventConstructor<E>
+  handler: (event: E) => void
+}
+
+export type OnRenderBatch<T extends Entity> = (entities: T[]) => void
+
+export type OnRenderEach<T extends Entity> = (entity: T) => void
+
+export type OnUpdateBatch<T extends Entity> = (entities: T[]) => void
+
+export type OnUpdateEach<T extends Entity> = (entity: T) => void
+
+export interface SystemFactoryContextData {
+  dispose: Set<Callback>
+  eventHandlers: HashMap<EventConstructor<MinecraftEvent>, OnEvent<MinecraftEvent>>
+  init: Set<Callback>
+  render: Set<Callback>
+  renderBatch: HashMap<EntityConstructor, OnRenderBatch<Entity>>
+  renderEach: HashMap<EntityConstructor, OnRenderEach<Entity>>
+  updateBatch: HashMap<EntityConstructor, OnUpdateBatch<Entity>>
+  updateEach: HashMap<EntityConstructor, OnUpdateEach<Entity>>
+  updates: Set<Callback>
+}
+
+export interface SystemInRegistry {
+  factoryData: SystemFactoryContextData
+  system: System<string>
+}
 
 @Listener()
 @Schedulable()
@@ -38,21 +77,23 @@ export class GameLoop {
 
   readonly renderer: THREE.WebGLRenderer
   readonly scene = new THREE.Scene()
-  readonly systemRegistry = new SystemRegistry()
   private clientPlayer: Player
   private delta: number = 0
   private disposed = false
   private gameLoopClock = new THREE.Clock()
-
   private isGameLoopClockStopped = false
-  private lastTimeout: null | number = null
 
+  private lastTimeout: null | number = null
   private paused = false
+
+  private systems: HashMap<string, SystemInRegistry> = new HashMap()
+  private systemsUnsubscriptions: Callback[] = []
 
   constructor(
     private readonly client: MinecraftClient,
     readonly world: World,
   ) {
+    // SETUP RENDERER HERE
     this.renderer = new THREE.WebGLRenderer({
       antialias: false,
       canvas: this.client.gui.getCanvas(),
@@ -64,29 +105,47 @@ export class GameLoop {
     this.renderer.shadowMap.enabled = false // Disable shadows for performance
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)) // Cap pixel ratio
 
+    // FETCH CLIENT PLAYER ENTITY
     this.clientPlayer = pipe(this.client.localStorageManager.getPlayerUUID())
       .map((uuid) => this.world.getEntity(uuid, Player))
       .value()
       .unwrap()
 
-    const playerUpdate = this.systemRegistry.registerSystem(new PlayerUpdateSystem(this))
-    const raycastingSystem = this.systemRegistry.registerSystem(new RaycastingSystem(this))
-
-    this.systemRegistry.registerSystem(
-      new ClientPlayerControlSystem(
-        this,
-        this.client.blocksRegistry,
-        playerUpdate,
-        raycastingSystem,
-      ),
+    // REGISTER SYSTEMS HERE
+    this.registerSystem(chunkRenderingSystemFactory)
+    const raycastingSystem = this.registerSystem(raycastingSystemFactory)
+    const playerUpdateSystem = this.registerSystem(playerUpdateSystemFactory)
+    this.registerSystem(
+      createClientPlayerControlSystemFactory({ playerUpdateSystem, raycastingSystem }),
     )
+
+    // INIT SYSTEMS
+    for (const init of this.iterInitFunctions()) {
+      init()
+    }
+
+    // SETUP EVENT LISTENERS
+    for (const { EventConstructor, handler } of this.iterEventHandlers()) {
+      const unsubscribe = eventBus.subscribe(EventConstructor, handler)
+      this.systemsUnsubscriptions.push(unsubscribe)
+    }
   }
 
   dispose(): void {
+    // DISPOSE NON SYSTEM COMPONENTS
     this.inputManager.dispose()
     this.renderer.dispose()
     this.scene.clear()
-    this.systemRegistry.unregisterAllSystems()
+
+    // UNSUBSCRIBE EVENT LISTENERS
+    for (const unsubscribe of this.systemsUnsubscriptions) {
+      unsubscribe()
+    }
+
+    // DISPOSE SYSTEMS
+    for (const dispose of this.iterDisposeFunctions()) {
+      dispose()
+    }
 
     if (this.lastTimeout) {
       clearTimeout(this.lastTimeout)
@@ -123,6 +182,88 @@ export class GameLoop {
 
   isPaused(): boolean {
     return this.paused
+  }
+
+  /**
+   * Registers a new system in the game loop.
+   * @param factory The system factory function.
+   * @returns The created system instance.
+   * @example
+   * ```typescript
+   * const mySystem = gameLoop.registerSystem((ctx) => {
+   *   ctx.onUpdate(() => {
+   *     // Update logic here
+   *   })
+   *
+   *   return {
+   *     name: 'MySystem',
+   *   }
+   * })
+   * ```
+   */
+  registerSystem<T extends Record<string, unknown>>(factory: SystemFactory<string, T>): T {
+    const systemData: SystemFactoryContextData = {
+      dispose: new Set<Callback>(),
+      eventHandlers: new HashMap<EventConstructor<MinecraftEvent>, OnEvent<MinecraftEvent>>(),
+      init: new Set<Callback>(),
+      render: new Set<Callback>(),
+      renderBatch: new HashMap<EntityConstructor, OnRenderBatch<Entity>>(),
+      renderEach: new HashMap<EntityConstructor, OnRenderEach<Entity>>(),
+      updateBatch: new HashMap<EntityConstructor, OnUpdateBatch<Entity>>(),
+      updateEach: new HashMap<EntityConstructor, OnUpdateEach<Entity>>(),
+      updates: new Set<Callback>(),
+    }
+
+    const factoryCtx: SystemFactoryContext = {
+      client: this.client,
+      gameLoop: this,
+      onDispose(disposeFn) {
+        systemData.dispose.add(disposeFn)
+      },
+      onEvent(Event, handler) {
+        systemData.eventHandlers.set(Event, {
+          EventConstructor: Event,
+          handler: handler as (event: MinecraftEvent) => void,
+        })
+      },
+      onInit(initFn) {
+        systemData.init.add(initFn)
+      },
+      onRender(renderFn) {
+        systemData.render.add(renderFn)
+      },
+      onRenderBatch(EntityConstructor, renderFn) {
+        systemData.renderBatch.set(EntityConstructor, renderFn as OnRenderBatch<Entity>)
+      },
+      onRenderEach(EntityConstructor, renderFn) {
+        systemData.renderEach.set(EntityConstructor, renderFn as OnRenderEach<Entity>)
+      },
+      onUpdate(updateFn) {
+        systemData.updates.add(updateFn)
+      },
+      onUpdateBatch(EntityConstructor, updateFn) {
+        systemData.updateBatch.set(EntityConstructor, updateFn as OnUpdateBatch<Entity>)
+      },
+      onUpdateEach(EntityConstructor, updateFn) {
+        systemData.updateEach.set(EntityConstructor, updateFn as OnUpdateEach<Entity>)
+      },
+      world: this.world,
+    }
+
+    const system = factory(factoryCtx)
+
+    if (this.systems.has(system.name)) {
+      throw new Error(`System with name "${system.name}" is already registered.`)
+    }
+
+    this.systems.set(system.name, {
+      factoryData: systemData,
+      system,
+    })
+
+    console.log(`Registered system: ${system.name}`)
+
+    return system as unknown as T
   }
 
   @MinecraftEventBus.Handler(PauseToggle)
@@ -172,34 +313,28 @@ export class GameLoop {
 
     // UPDATE SYSTEMS WITH ENTITY ARGUMENTS, FOR EXAMPLE: PLAYER MOVEMENT, PHYSICS, ETC.
     for (const { Constructor: EntityConstructor } of Entity.iterEntityConstructors()) {
-      const systems = this.systemRegistry.iterUpdateSystemsForEntity(EntityConstructor)
+      const entities = fetchEntities(EntityConstructor)
+      for (const updateBatch of this.iterUpdateBatchFunctions(EntityConstructor)) {
+        updateBatch(entities)
+      }
 
-      for (const { method, system } of systems) {
-        const entities = fetchEntities(EntityConstructor)
-
-        // @ts-expect-error
-        if (method in system && typeof system[method] === 'function') {
-          // @ts-expect-error
-          system[method](entities)
-        } else {
-          throw new Error(`Method ${String(method)} not found in system ${system.constructor.name}`)
+      for (const updateEach of this.iterUpdateEachFunctions(EntityConstructor)) {
+        for (const entity of entities) {
+          updateEach(entity)
         }
       }
     }
 
+    for (const update of this.iterUpdateFunctions()) {
+      update()
+    }
+
     // UPDATE SYSTEMS WITHOUT ENTITY ARGUMENTS, FOR EXAMPLE: INPUT, CAMERA CONTROLS, ETC.
-    for (const { method, system } of this.systemRegistry.iterUpdateSystems()) {
-      // @ts-expect-error
-      if (method in system && typeof system[method] === 'function') {
-        // @ts-expect-error
-        system[method]()
-      } else {
-        throw new Error(`Method ${String(method)} not found in system ${system.constructor.name}`)
-      }
+    for (const update of this.iterUpdateFunctions()) {
+      update()
     }
 
     // Sync camera with player
-
     this.camera.position.copy(this.clientPlayer.position)
     this.camera.rotation.copy(this.clientPlayer.rotation)
 
@@ -208,33 +343,82 @@ export class GameLoop {
 
     // RENDER SYSTEMS WITH ENTITY ARGUMENTS, FOR EXAMPLE: RENDERABLE ENTITIES
     for (const { Constructor: EntityConstructor } of Entity.iterEntityConstructors()) {
-      const systems = this.systemRegistry.iterRenderSystemsForEntity(EntityConstructor)
-
-      for (const { method, system } of systems) {
+      for (const renderBatch of this.iterRenderBatchFunctions(EntityConstructor)) {
         const entities = fetchEntities(EntityConstructor)
+        renderBatch(entities)
+      }
 
-        // @ts-expect-error
-        if (method in system && typeof system[method] === 'function') {
-          // @ts-expect-error
-          system[method](entities)
-        } else {
-          throw new Error(`Method ${String(method)} not found in system ${system.constructor.name}`)
+      for (const renderEach of this.iterRenderEachFunctions(EntityConstructor)) {
+        const entities = fetchEntities(EntityConstructor)
+        for (const entity of entities) {
+          renderEach(entity)
         }
       }
     }
 
-    // RENDER SYSTEMS WITHOUT ENTITY ARGUMENTS, FOR EXAMPLE: POST-PROCESSING, ETC.
-    for (const { method, system } of this.systemRegistry.getRenderSystems()) {
-      // @ts-expect-error
-      if (method in system && typeof system[method] === 'function') {
-        // @ts-expect-error
-        system[method]()
-      } else {
-        throw new Error(`Method ${String(method)} not found in system ${system.constructor.name}`)
-      }
+    for (const render of this.iterRenderFunctions()) {
+      render()
     }
 
-    // FINAL RENDER CALL
+    // FINAL RENDER CALL TO RENDER THE SCENE
     this.renderer.render(this.scene, this.camera)
+  }
+
+  private iterDisposeFunctions(): Iterable<Callback> {
+    return Iterator.from(this.systems.values()).flatMap(({ factoryData }) => factoryData.dispose)
+  }
+
+  private iterEventHandlers(): Iterable<OnEvent<MinecraftEvent>> {
+    return Iterator.from(this.systems.values())
+      .flatMap(({ factoryData }) => factoryData.eventHandlers.values())
+      .map((handler) => handler)
+  }
+
+  private iterInitFunctions(): Iterable<Callback> {
+    return Iterator.from(this.systems.values()).flatMap(({ factoryData }) => factoryData.init)
+  }
+
+  private iterRenderBatchFunctions(
+    EntityConstructor: EntityConstructor<any>,
+  ): Iterable<OnRenderBatch<any>> {
+    return Iterator.from(this.systems.values())
+      .map(({ factoryData }) => factoryData.renderBatch.get(EntityConstructor))
+      .filter(Maybe.IsSome)
+      .map((maybe) => maybe.value())
+  }
+
+  private iterRenderEachFunctions(
+    EntityConstructor: EntityConstructor<any>,
+  ): Iterable<OnRenderEach<any>> {
+    return Iterator.from(this.systems.values())
+      .map(({ factoryData }) => factoryData.renderEach.get(EntityConstructor))
+      .filter(Maybe.IsSome)
+      .map((maybe) => maybe.value())
+  }
+
+  private iterRenderFunctions(): Iterable<Callback> {
+    return Iterator.from(this.systems.values()).flatMap(({ factoryData }) => factoryData.render)
+  }
+
+  private iterUpdateBatchFunctions(
+    EntityConstructor: EntityConstructor<any>,
+  ): Iterable<OnUpdateBatch<any>> {
+    return Iterator.from(this.systems.values())
+      .map(({ factoryData }) => factoryData.updateBatch.get(EntityConstructor))
+      .filter(Maybe.IsSome)
+      .map((maybe) => maybe.value())
+  }
+
+  private iterUpdateEachFunctions(
+    EntityConstructor: EntityConstructor<any>,
+  ): Iterable<OnUpdateEach<any>> {
+    return Iterator.from(this.systems.values())
+      .map(({ factoryData }) => factoryData.updateEach.get(EntityConstructor))
+      .filter(Maybe.IsSome)
+      .map((maybe) => maybe.value())
+  }
+
+  private iterUpdateFunctions(): Iterable<Callback> {
+    return Iterator.from(this.systems.values()).flatMap(({ factoryData }) => factoryData.updates)
   }
 }

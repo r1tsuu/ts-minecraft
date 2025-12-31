@@ -473,3 +473,29 @@ export function reduce<T, U>(iter: Iterable<T>, reducer: (acc: U, value: T) => U
   }
   return acc
 }
+
+export const preserveClassOriginalClassConstructor = (Constructor: ClassConstructor<any>) => {
+  // @ts-expect-error
+  Constructor[OG_CLASS] = Constructor[OG_CLASS] ?? Constructor
+}
+
+export const getOriginalClassConstructor = <T extends object>(
+  Constructor: ClassConstructor<T>,
+): ClassConstructor<T> => {
+  // @ts-expect-error
+  return Constructor[OG_CLASS] ?? Constructor
+}
+
+export const throttle = <F extends (...args: any[]) => void>(fn: F, delayMs: number): F => {
+  let lastCall = 0
+
+  return function (...args: Parameters<F>): void {
+    const now = Date.now()
+    if (now - lastCall >= delayMs) {
+      lastCall = now
+      fn(...args)
+    }
+  } as F
+}
+
+export type Callback = () => void

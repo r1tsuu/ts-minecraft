@@ -1,7 +1,6 @@
 import type { Chunk, ChunkCoordinates } from '../shared/entities/Chunk.ts'
 import type { Player } from '../shared/entities/Player.ts'
 import type { Maybe } from '../shared/Maybe.ts'
-import type { Result } from '../shared/Result.ts'
 import type { ChunkIndex, UUID } from '../types.ts'
 
 export interface WorldMetadata {

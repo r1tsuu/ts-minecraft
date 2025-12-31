@@ -50,12 +50,8 @@ const entityRenderSystemsMap = new HashMap<
 
 export abstract class System {
   static Render(): MethodDecorator {
-    // @ts-expect-error
-    return function (
-      SystemConstructor: ClassConstructor<System>,
-      propertyKey: string | symbol,
-      descriptor: PropertyDescriptor,
-    ) {
+    return function (system: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+      const SystemConstructor = getObjectConstructor(system) as ClassConstructor<System>
       renderSystemMAp.add({
         method: propertyKey as string,
         SystemConstructor,
@@ -75,12 +71,8 @@ export abstract class System {
    *   }
    */
   static RenderAll(EntityConstructor: EntityConstructor): MethodDecorator {
-    // @ts-expect-error
-    return function (
-      Constructor: ClassConstructor<System>,
-      propertyKey: string | symbol,
-      descriptor: PropertyDescriptor,
-    ) {
+    return function (system: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+      const SystemConstructor = getObjectConstructor(system) as ClassConstructor<System>
       const maybeSystems = entityRenderSystemsMap.get(EntityConstructor)
 
       if (maybeSystems.isNone()) {
@@ -91,7 +83,7 @@ export abstract class System {
 
       systems.add({
         method: propertyKey as string,
-        SystemConstructor: Constructor,
+        SystemConstructor,
       })
 
       return descriptor
@@ -111,12 +103,9 @@ export abstract class System {
    * ```
    */
   static Update(): MethodDecorator {
-    // @ts-expect-error
-    return function (
-      SystemConstructor: ClassConstructor<System>,
-      propertyKey: string | symbol,
-      descriptor: PropertyDescriptor,
-    ) {
+    return function (system: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+      console.log('Applying Update decorator to', getObjectConstructor(system).name)
+      const SystemConstructor = getObjectConstructor(system) as ClassConstructor<System>
       updateSystemsMap.add({
         method: propertyKey as string,
         SystemConstructor,
@@ -139,12 +128,9 @@ export abstract class System {
    * ```
    */
   static UpdateAll(EntityConstructor: EntityConstructor): MethodDecorator {
-    // @ts-expect-error
-    return function (
-      SystemConstructor: ClassConstructor<System>,
-      propertyKey: string | symbol,
-      descriptor: PropertyDescriptor,
-    ) {
+    return function (system: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+      const SystemConstructor = getObjectConstructor(system) as ClassConstructor<System>
+
       const maybeSystems = entityUpdateSystemsMap.get(EntityConstructor)
 
       if (maybeSystems.isNone()) {
@@ -157,6 +143,8 @@ export abstract class System {
         method: propertyKey as string,
         SystemConstructor,
       })
+
+      console.log(entityUpdateSystemsMap)
 
       return descriptor
     }
@@ -204,9 +192,9 @@ export class SystemRegistry {
 
     const instance = maybeInstance.value()
 
-    if (instance instanceof SystemConstructor) {
-      return Some(instance)
-    }
+    // if (instance instanceof SystemConstructor) {
+    return Some(instance)
+    // }
 
     console.error(`System instance is not of type ${SystemConstructor.name}.`)
     return None()
@@ -225,8 +213,7 @@ export class SystemRegistry {
   iterRenderSystemsForEntity(
     EntityConstructor: EntityConstructor,
   ): IterableIterator<{ method: string | symbol; system: System }> {
-    return pipe(entityRenderSystemsMap.get(EntityConstructor))
-      .map(Maybe.Unwrap)
+    return pipe(entityRenderSystemsMap.get(EntityConstructor).unwrapOrDefault(new Set()))
       .mapIter(({ method, SystemConstructor }) => {
         const system = this.getSystem(SystemConstructor).expect(
           `System ${SystemConstructor.name} is not registered.`,
@@ -269,11 +256,11 @@ export class SystemRegistry {
   iterUpdateSystemsForEntity(
     EntityConstructor: EntityConstructor,
   ): IterableIterator<{ method: string | symbol; system: System }> {
-    return pipe(entityUpdateSystemsMap.get(EntityConstructor))
-      .map(Maybe.Unwrap)
+    console.log(entityUpdateSystemsMap)
+    return pipe(entityUpdateSystemsMap.get(EntityConstructor).unwrapOrDefault(new Set()))
       .mapIter(({ method, SystemConstructor }) => {
         const system = this.getSystem(SystemConstructor).expect(
-          `System ${SystemConstructor.name} is not registered.`,
+          `System ${SystemConstructor} is not registered.`,
         )
         return {
           method,

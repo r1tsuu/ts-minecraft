@@ -1,3 +1,5 @@
+import { preserveClassOriginalClassConstructor } from './util.ts'
+
 interface ScheduleEveryMetadata {
   /**
    * If true, allows the task to be scheduled again even if the previous execution is still running.
@@ -159,6 +161,7 @@ export function RunTask(
 export function Schedulable(resolveScheduler?: () => Scheduler): ClassDecorator {
   // @ts-expect-error
   return function <T extends new (...args: any[]) => any>(Target: T): T {
+    preserveClassOriginalClassConstructor(Target)
     return class extends Target {
       constructor(...args: any[]) {
         super(...args)

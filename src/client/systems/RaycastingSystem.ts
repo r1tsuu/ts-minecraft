@@ -1,21 +1,25 @@
 import * as THREE from 'three'
 
 import { HashMap } from '../../shared/HashMap.ts'
-import { System } from '../../shared/System.ts'
-import { GameLoop } from '../GameLoop.ts'
+import { type Maybe, None, Some } from '../../shared/Maybe.ts'
+import { createSystemFactory } from './createSystem.ts'
 
 const FAR = 5
 
-export class RaycastingSystem extends System {
-  lookingAtBlock: { x: number; y: number; z: number } | null = null
-  lookingAtNormal: { x: number; y: number; z: number } | null = null
-  private readonly blockPositionMap = new HashMap<number, THREE.Vector3>()
-  private readonly mesh: THREE.Mesh = new THREE.Mesh(
+export type RaycastingSystem = ReturnType<typeof raycastingSystemFactory>
+
+export const raycastingSystemFactory = createSystemFactory((ctx) => {
+  let maybeLookingAtBlock: Maybe<THREE.Vector3> = None()
+  let maybeLookingAtNormal: Maybe<THREE.Vector3> = None()
+
+  const blockPositionMap = new HashMap<number, THREE.Vector3>()
+  const mesh: THREE.Mesh = new THREE.Mesh(
     new THREE.BoxGeometry(1.01, 1.01, 1.01),
     new THREE.MeshStandardMaterial({ opacity: 0.5, transparent: true }),
   )
-  private readonly raycaster: THREE.Raycaster = new THREE.Raycaster()
-  private readonly raycastingMesh: THREE.InstancedMesh = new THREE.InstancedMesh(
+
+  const raycaster: THREE.Raycaster = new THREE.Raycaster()
+  const raycastingMesh: THREE.InstancedMesh = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1),
     new THREE.MeshPhongMaterial({
       visible: false,
@@ -23,31 +27,30 @@ export class RaycastingSystem extends System {
     (FAR * 2 + 1) ** 3,
   )
 
-  constructor(private readonly gameLoop: GameLoop) {
-    super()
+  const getPlacementPosition = (): Maybe<THREE.Vector3> => {
+    if (!maybeLookingAtBlock.isSome() || !maybeLookingAtNormal.isSome()) return None()
+    const lookingAtBlock = maybeLookingAtBlock.value()
+    const lookingAtNormal = maybeLookingAtNormal.value()
+
+    return Some(
+      new THREE.Vector3(
+        lookingAtBlock.x + lookingAtNormal.x,
+        lookingAtBlock.y + lookingAtNormal.y,
+        lookingAtBlock.z + lookingAtNormal.z,
+      ),
+    )
   }
 
-  getPlacementPosition(): { x: number; y: number; z: number } | null {
-    if (!this.lookingAtBlock || !this.lookingAtNormal) return null
+  ctx.onUpdate(() => {
+    ctx.gameLoop.scene.remove(mesh)
 
-    return {
-      x: this.lookingAtBlock.x + this.lookingAtNormal.x,
-      y: this.lookingAtBlock.y + this.lookingAtNormal.y,
-      z: this.lookingAtBlock.z + this.lookingAtNormal.z,
-    }
-  }
-
-  @System.Update()
-  update() {
-    this.gameLoop.scene.remove(this.mesh)
-
-    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.gameLoop.camera)
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), ctx.gameLoop.camera)
 
     let index = 0
     const matrix = new THREE.Matrix4()
-    this.blockPositionMap.clear()
+    blockPositionMap.clear()
 
-    const clientPlayer = this.gameLoop.getClientPlayer()
+    const clientPlayer = ctx.gameLoop.getClientPlayer()
 
     for (let x = -FAR; x <= FAR; x++) {
       for (let y = -FAR; y <= FAR; y++) {
@@ -56,65 +59,69 @@ export class RaycastingSystem extends System {
           const worldY = Math.floor(clientPlayer.position.y + y)
           const worldZ = Math.floor(clientPlayer.position.z + z)
 
-          if (this.gameLoop.world.getBlock(worldX, worldY, worldZ).isNone()) continue
+          if (ctx.gameLoop.world.getBlock(worldX, worldY, worldZ).isNone()) continue
 
           const position = new THREE.Vector3(worldX, worldY, worldZ)
           matrix.setPosition(worldX, worldY, worldZ)
-          this.raycastingMesh.setMatrixAt(index, matrix)
-          this.blockPositionMap.set(index, position)
+          raycastingMesh.setMatrixAt(index, matrix)
+          blockPositionMap.set(index, position)
           index++
         }
       }
     }
 
     // Set unused instances far away to avoid raycasting them
-    for (let i = index; i < this.raycastingMesh.count; i++) {
+    for (let i = index; i < raycastingMesh.count; i++) {
       matrix.setPosition(0, -1000, 0)
-      this.raycastingMesh.setMatrixAt(i, matrix)
+      raycastingMesh.setMatrixAt(i, matrix)
     }
 
-    this.raycastingMesh.instanceMatrix.needsUpdate = true
-    this.raycastingMesh.computeBoundingSphere()
-    this.raycastingMesh.computeBoundingBox()
+    raycastingMesh.instanceMatrix.needsUpdate = true
+    raycastingMesh.computeBoundingSphere()
+    raycastingMesh.computeBoundingBox()
 
-    const [intersects] = this.raycaster.intersectObject(this.raycastingMesh, false)
+    const [intersects] = raycaster.intersectObject(raycastingMesh, false)
 
     if (
       intersects &&
       intersects.object instanceof THREE.InstancedMesh &&
       typeof intersects.instanceId === 'number'
     ) {
-      const maybePosition = this.blockPositionMap.get(intersects.instanceId)
+      const maybePosition = blockPositionMap.get(intersects.instanceId)
 
       if (maybePosition.isSome()) {
         const position = maybePosition.value()
-        this.mesh.position.set(position.x, position.y, position.z)
-        this.gameLoop.scene.add(this.mesh)
+        mesh.position.set(position.x, position.y, position.z)
+        ctx.gameLoop.scene.add(mesh)
 
-        this.lookingAtBlock = {
-          x: Math.floor(position.x),
-          y: Math.floor(position.y),
-          z: Math.floor(position.z),
-        }
+        maybeLookingAtBlock = Some(position.clone())
 
         // Calculate the normal of the face that was hit
         if (intersects.face) {
           const normal = intersects.face.normal.clone()
-          this.lookingAtNormal = {
-            x: Math.round(normal.x),
-            y: Math.round(normal.y),
-            z: Math.round(normal.z),
-          }
+          maybeLookingAtNormal = Some(
+            new THREE.Vector3(Math.round(normal.x), Math.round(normal.y), Math.round(normal.z)),
+          )
         } else {
-          this.lookingAtNormal = null
+          maybeLookingAtNormal = None()
         }
       } else {
-        this.lookingAtBlock = null
-        this.lookingAtNormal = null
+        maybeLookingAtBlock = None()
+        maybeLookingAtNormal = None()
       }
     } else {
-      this.lookingAtBlock = null
-      this.lookingAtNormal = null
+      maybeLookingAtBlock = None()
+      maybeLookingAtNormal = None()
     }
+  })
+
+  const getLookingAtBlock = (): Maybe<THREE.Vector3> => maybeLookingAtBlock
+  const getLookingAtNormal = (): Maybe<THREE.Vector3> => maybeLookingAtNormal
+
+  return {
+    getLookingAtBlock,
+    getLookingAtNormal,
+    getPlacementPosition,
+    name: 'RaycastingSystem',
   }
-}
+})

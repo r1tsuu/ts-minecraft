@@ -16,7 +16,7 @@ import { Maybe, None, Some } from './Maybe.ts'
  * ```
  */
 export class HashMap<K, V> {
-  private readonly map: Map<K, V> = new Map()
+  private readonly _map: Map<K, V> = new Map()
 
   static deserializer<V, K = string>(valueDeserializer: (value: any) => V) {
     return function (obj: any): HashMap<K, V> {
@@ -41,24 +41,24 @@ export class HashMap<K, V> {
   }
 
   clear(): void {
-    this.map.clear()
+    this._map.clear()
   }
 
   delete(key: K): boolean {
-    return this.map.delete(key)
+    return this._map.delete(key)
   }
 
   entries(): IterableIterator<[K, V]> {
-    return this.map.entries()
+    return this._map.entries()
   }
 
   get(key: K): Maybe<V> {
-    const value = this.map.get(key)
+    const value = this._map.get(key)
     return value !== undefined ? Some(value) : None<V>()
   }
 
   getOrDefault(key: K, defaultValue: V): V {
-    return this.map.get(key) ?? defaultValue
+    return this._map.get(key) ?? defaultValue
   }
 
   /**
@@ -74,33 +74,33 @@ export class HashMap<K, V> {
    * ```
    */
   getOrSet(key: K, resolve: () => V): V {
-    if (!this.map.has(key)) {
-      this.map.set(key, resolve())
+    if (!this._map.has(key)) {
+      this._map.set(key, resolve())
     }
-    return this.map.get(key)!
+    return this._map.get(key)!
   }
 
   has(key: K): boolean {
-    return this.map.has(key)
+    return this._map.has(key)
   }
 
   keys(): IterableIterator<K> {
-    return this.map.keys()
+    return this._map.keys()
   }
 
   set(key: K, value: V): void {
-    this.map.set(key, value)
+    this._map.set(key, value)
   }
 
   size(): number {
-    return this.map.size
+    return this._map.size
   }
 
   [Symbol.iterator](): IterableIterator<[K, V]> {
-    return this.map[Symbol.iterator]()
+    return this._map[Symbol.iterator]()
   }
 
   values(): IterableIterator<V> {
-    return this.map.values()
+    return this._map.values()
   }
 }
