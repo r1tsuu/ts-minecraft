@@ -50,6 +50,12 @@ export class Chunk extends Entity {
     return `chunk_${coords.x}_${coords.z}`
   }
 
+  /**
+   * Maps world coordinates to chunk coordinates
+   * @example
+   * const chunkCoords = Chunk.mapToChunkCoordinates(-1, 17)
+   * console.log(chunkCoords) // { x: -1, z: 1 } assuming CHUNK_SIZE is 16
+   */
   static mapToChunkCoordinates(worldX: number, worldZ: number): ChunkCoordinates {
     return {
       x: Math.floor(worldX / Config.CHUNK_SIZE),

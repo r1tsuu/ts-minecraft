@@ -43,8 +43,10 @@ export const createClientPlayerControlSystemFactory = ({
       const maybeLookingAtBlock = raycastingSystem.getLookingAtBlock()
       if (maybeLookingAtBlock.isSome()) {
         const lookingAtBlock = maybeLookingAtBlock.value()
-        ctx.world.removeBlockAt(lookingAtBlock.x, lookingAtBlock.y, lookingAtBlock.z)
-        chunkRenderingSystem.unrenderBlocksAt([lookingAtBlock])
+
+        chunkRenderingSystem.unrenderBlocksAt([lookingAtBlock], () =>
+          ctx.world.removeBlockAt(lookingAtBlock.x, lookingAtBlock.y, lookingAtBlock.z),
+        )
       }
     }, THROTTLE_DELAY_MS)
 
