@@ -1,3 +1,5 @@
+import type { Euler, Vector3 } from 'three'
+
 import type { RawVector3 } from '../../types.ts'
 import type { ChunkRenderingSystem } from './ChunkRenderingSystem.ts'
 import type { PlayerUpdateSystem } from './PlayerUpdateSystem.ts'
@@ -5,6 +7,11 @@ import type { RaycastingSystem } from './RaycastingSystem.ts'
 
 import { Config } from '../../shared/Config.ts'
 import { PauseToggle } from '../../shared/events/client/PauseToggle.ts'
+import {
+  type BlockUpdateAction,
+  RequestBlocksUpdate,
+} from '../../shared/events/client/RequestBlocksUpdate.ts'
+import { RequestPlayerUpdate } from '../../shared/events/client/RequestPlayerUpdate.ts'
 import { throttle } from '../../shared/util.ts'
 import { createSystemFactory } from './createSystem.ts'
 
@@ -20,6 +27,8 @@ export const createClientPlayerControlSystemFactory = ({
   raycastingSystem: RaycastingSystem
 }) =>
   createSystemFactory((ctx) => {
+    let queuedActionsToSend: BlockUpdateAction[] = []
+
     const handleBlockPlace = throttle(() => {
       const maybeLookingAtBlock = raycastingSystem.getLookingAtBlock()
       const maybeLookingAtNormal = raycastingSystem.getLookingAtNormal()
@@ -36,6 +45,7 @@ export const createClientPlayerControlSystemFactory = ({
 
         ctx.world.addBlock(position.x, position.y, position.z, blockToPlace)
         chunkRenderingSystem.renderBlockAt(position)
+        queuedActionsToSend.push({ blockID: blockToPlace, position, type: 'SET' })
       }
     }, THROTTLE_DELAY_MS)
 
@@ -45,6 +55,7 @@ export const createClientPlayerControlSystemFactory = ({
         const lookingAtBlock = maybeLookingAtBlock.value()
         chunkRenderingSystem.unrenderBlockAt(lookingAtBlock)
         ctx.world.removeBlockAt(lookingAtBlock.x, lookingAtBlock.y, lookingAtBlock.z)
+        queuedActionsToSend.push({ position: lookingAtBlock, type: 'REMOVE' })
       }
     }, THROTTLE_DELAY_MS)
 
@@ -93,6 +104,35 @@ export const createClientPlayerControlSystemFactory = ({
       state.movingBackward = false
       state.movingForward = false
     })
+
+    const lastPlayerState: {
+      position: Vector3
+      rotation: Euler
+      velocity: Vector3
+    } = {
+      position: ctx.getClientPlayer().position.clone(),
+      rotation: ctx.getClientPlayer().rotation.clone(),
+      velocity: ctx.getClientPlayer().velocity.clone(),
+    }
+
+    ctx.onInterval(() => {
+      const player = ctx.getClientPlayer()
+
+      const positionChanged = !player.position.equals(lastPlayerState.position)
+      const rotationChanged = !player.rotation.equals(lastPlayerState.rotation)
+      const velocityChanged = !player.velocity.equals(lastPlayerState.velocity)
+
+      if (positionChanged || rotationChanged || velocityChanged) {
+        ctx.eventBus.publish(
+          new RequestPlayerUpdate(player.uuid, player.position, player.rotation, player.velocity),
+        )
+      }
+
+      if (queuedActionsToSend.length > 0) {
+        ctx.eventBus.publish(new RequestBlocksUpdate(queuedActionsToSend))
+        queuedActionsToSend = []
+      }
+    }, 350) // Send player and block updates every 350ms
 
     return {
       name: 'ClientPlayerControlSystem',

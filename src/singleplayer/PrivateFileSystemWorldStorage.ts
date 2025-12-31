@@ -95,7 +95,7 @@ export const createPrivateFileSystemWorldStorage = async (
       await asyncPipe(data)
         .mapArray(Player.serialize)
         .map(JSON.stringify)
-        .map(new TextEncoder().encode)
+        .map((json) => new TextEncoder().encode(json))
         .tap((buffer) => writeFile(PLAYERS_FILE_NAME, buffer))
         .tapError((error) => console.warn('Error writing players file:', error))
         .execute()

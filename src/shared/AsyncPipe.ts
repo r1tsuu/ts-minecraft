@@ -19,9 +19,11 @@ class AsyncPipeline<T> {
    * Collect an AsyncIterable into an array
    */
   collect<U>(this: AsyncPipeline<AsyncIterable<U>>): AsyncPipeline<U[]> {
+    const promiseFn = this.promise instanceof Promise ? this.promise : Promise.resolve(this.promise)
     return new AsyncPipeline(
-      this.promise.then(async (iterable) => {
+      promiseFn.then(async (iterable) => {
         if (!isIterable(iterable)) {
+          console.log(iterable)
           throw new Error('collect can only be called on ChainAsync wrapping an AsyncIterable')
         }
 
@@ -238,6 +240,34 @@ class AsyncPipeline<T> {
     return new AsyncPipeline(
       this.promise.finally(async () => {
         await fn()
+      }),
+    )
+  }
+
+  tapIter(
+    fn: (value: T extends Iterable<infer R> ? R : never) => any | Promise<void>,
+  ): AsyncPipeline<T> {
+    const promiseFn = this.promise instanceof Promise ? this.promise : Promise.resolve(this.promise)
+    return new AsyncPipeline(
+      promiseFn.then(async (value) => {
+        console.log(value)
+        if (!isIterable(value)) {
+          throw new Error('tapIter can only be called on ChainAsync wrapping an iterable')
+        }
+
+        // @ts-expect-error
+        if (value[Symbol.asyncIterator]) {
+          // @ts-expect-error
+          for await (const item of value as AsyncIterable<any>) {
+            await fn(item)
+          }
+        } else {
+          for (const item of value as Iterable<any>) {
+            await fn(item)
+          }
+        }
+
+        return value
       }),
     )
   }

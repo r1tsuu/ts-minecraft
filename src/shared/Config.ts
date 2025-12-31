@@ -10,6 +10,10 @@ export class Config {
   static readonly PLAYER_WALK_SPEED = 5
   static readonly PLAYER_WIDTH = 0.6
   static readonly RENDER_DISTANCE = 2
+  /**
+   * Server autosave interval in milliseconds
+   */
+  static readonly SERVER_AUTOSAVE_INTERVAL_MS = 5_000
   static readonly SPAWN_CHUNK_RADIUS = 3
   static readonly TICK_RATE = 20
 

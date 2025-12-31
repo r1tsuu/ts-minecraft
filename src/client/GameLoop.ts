@@ -52,6 +52,7 @@ export interface SystemFactoryContextData {
   dispose: Set<Callback>
   eventHandlers: HashMap<EventConstructor<MinecraftEvent>, OnEvent<MinecraftEvent>>
   init: Set<Callback>
+  intervals: Set<number>
   render: Set<Callback>
   renderBatch: HashMap<EntityConstructor, OnRenderBatch<Entity>>
   renderEach: HashMap<EntityConstructor, OnRenderEach<Entity>>
@@ -264,10 +265,19 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
       dispose()
     }
 
+    // DISPOSE SYSTEM INTERVALS
+    for (const interval of Iterator.from(systems.values()).flatMap(
+      ({ factoryData }) => factoryData.intervals,
+    )) {
+      clearInterval(interval)
+    }
+
+    // UNSUBSCRIBE OTHER EVENT LISTENERS
     for (const unsubscribe of subscriptions) {
       unsubscribe()
     }
 
+    // MARK GAME LOOP AS DISPOSED, STOPPING THE FRAME LOOP
     disposed = true
   }
 
@@ -296,6 +306,7 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
       dispose: new Set<Callback>(),
       eventHandlers: new HashMap<EventConstructor<MinecraftEvent>, OnEvent<MinecraftEvent>>(),
       init: new Set<Callback>(),
+      intervals: new Set<number>(),
       render: new Set<Callback>(),
       renderBatch: new HashMap<EntityConstructor, OnRenderBatch<Entity>>(),
       renderEach: new HashMap<EntityConstructor, OnRenderEach<Entity>>(),
@@ -327,6 +338,10 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
       },
       onInit(initFn) {
         systemData.init.add(initFn)
+      },
+      onInterval: (callback: Callback, intervalMs: number) => {
+        const intervalId = setInterval(callback, intervalMs)
+        systemData.intervals.add(intervalId)
       },
       onRender(renderFn) {
         systemData.render.add(renderFn)

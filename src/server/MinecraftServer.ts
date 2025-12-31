@@ -8,9 +8,11 @@ import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { Config } from '../shared/Config.ts'
 import { Chunk, type ChunkCoordinates } from '../shared/entities/Chunk.ts'
 import { Player } from '../shared/entities/Player.ts'
+import { RequestBlocksUpdate } from '../shared/events/client/RequestBlocksUpdate.ts'
 import { RequestChunksLoad } from '../shared/events/client/RequestChunksLoad.ts'
 import { RequestChunksUnload } from '../shared/events/client/RequestChunksUnload.ts'
 import { RequestPlayerJoin } from '../shared/events/client/RequestPlayerJoin.ts'
+import { RequestPlayerUpdate } from '../shared/events/client/RequestPlayerUpdate.ts'
 import { ResponseChunksLoad } from '../shared/events/server/ResponseChunksLoad.ts'
 import { ResponsePlayerJoin } from '../shared/events/server/ResponsePlayerJoin.ts'
 import { pipe } from '../shared/Pipe.ts'
@@ -79,6 +81,35 @@ export const createMinecraftServer = async ({
       .tap((response) => eventBus.reply(event, response))
   })
 
+  eventBus.subscribe(RequestPlayerUpdate, (event) =>
+    pipe(world.getEntity(event.playerID, Player)).tapSome((player) => {
+      player.position.copy(event.position)
+      player.rotation.copy(event.rotation)
+      player.velocity.copy(event.velocity)
+    }),
+  )
+
+  eventBus.subscribe(RequestBlocksUpdate, (event) => {
+    for (const action of event.actions) {
+      const chunkCoords = Chunk.mapToChunkCoordinates(action.position.x, action.position.z)
+      const maybeChunk = world.getEntity(Chunk.getWorldID(chunkCoords), Chunk)
+      if (maybeChunk.isNone()) continue
+      const chunk = maybeChunk.value()
+      const { x, z } = Chunk.mapToLocalCoordinates(action.position.x, action.position.z)
+
+      switch (action.type) {
+        case 'REMOVE': {
+          chunk.removeBlock(x, action.position.y, z)
+          break
+        }
+        case 'SET': {
+          chunk.setBlock(x, action.position.y, z, action.blockID)
+          break
+        }
+      }
+    }
+  })
+
   const getPlayerSpawnPosition = (): Vector3 => {
     const centralChunk = world.getEntity(Chunk.getWorldID({ x: 0, z: 0 }), Chunk).unwrap()
 
@@ -89,6 +120,20 @@ export const createMinecraftServer = async ({
       .map((y) => new Vector3(0, y + 2, 0))
       .unwrap()
   }
+
+  // AUTOSAVE LOOP
+  setInterval(async () => {
+    const now = Date.now()
+    asyncPipe(world.query().select(Player).execute())
+      .mapIter((each) => each.entity)
+      .collect()
+      .tap((players) => storage.writePlayers(players))
+      .map(() => world.query().select(Chunk).execute())
+      .mapIter((each) => each.entity)
+      .tapIter((chunk) => storage.writeChunk(chunk))
+      .execute()
+      .then(() => console.log(`Server autosave complete. Took ${Date.now() - now} ms.`))
+  }, Config.SERVER_AUTOSAVE_INTERVAL_MS)
 
   console.log('Minecraft server created.')
 

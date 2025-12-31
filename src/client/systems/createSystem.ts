@@ -13,12 +13,12 @@ import type { MinecraftClientContext } from '../MinecraftClient.ts'
 
 import { type Entity, type EntityConstructor } from '../../shared/entities/Entity.ts'
 
-export interface System<Name extends string, API extends object> {
+export interface System<Name extends string, API extends object = {}> {
   readonly name: Name
   readonly api?: API
 }
 
-export interface SystemFactory<Name extends string, API extends object> {
+export interface SystemFactory<Name extends string, API extends object = {}> {
   (ctx: SystemFactoryContext): System<Name, API>
 }
 
@@ -34,7 +34,7 @@ export interface SystemFactory<Name extends string, API extends object> {
  * }
  * })
  */
-export const createSystemFactory = <Name extends string, API extends object>(
+export const createSystemFactory = <Name extends string, API extends object = {}>(
   /**
    * The factory function that creates the system instance
    * @example
@@ -163,6 +163,17 @@ export interface SystemFactoryContext extends EngineContext {
    * ```
    */
   onEvent<E extends MinecraftEvent>(Event: EventConstructor<E>, handler: (event: E) => void): void
+  /**
+   * Registers a callback to be called at specified intervals
+   * @example
+   * ```ts
+   * ctx.intervalTask(() => {
+   *   // Logic to run at specified intervals
+   * }, 1000) // Runs every 1000 milliseconds
+   * ```
+   * Automatically cleans up the interval when the system is disposed.
+   */
+  onInterval(taskFn: Callback, intervalMs: number): void
 }
 
 /**

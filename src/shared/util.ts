@@ -358,7 +358,10 @@ export function compose(...fns: Function[]) {
 export const apply = <A, B>(fn: (arg: A) => B, arg: A): B => fn(arg)
 
 export const isIterable = <T>(obj: any): obj is Iterable<T> => {
-  return obj != null && typeof obj[Symbol.iterator] === 'function'
+  return (
+    obj != null &&
+    (typeof obj[Symbol.iterator] === 'function' || typeof obj[Symbol.asyncIterator] === 'function')
+  )
 }
 
 export type EnvironmentType = 'Client' | 'Server'
