@@ -1,13 +1,15 @@
-import { GameLoop } from './GameLoop.ts'
-
 const GameKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space'] as const
 
 const isGameKey = (key: string): key is KeyboardKey => {
   return GameKeys.includes(key as KeyboardKey)
 }
 
-const initialKeyboardState = () =>
-  GameKeys.reduce<Record<KeyboardKey, { isPressed: boolean }>>(
+export type InputManager = ReturnType<typeof createInputManager>
+
+export type KeyboardKey = (typeof GameKeys)[number]
+
+export const createInputManager = (isPaused: () => boolean) => {
+  const keyboardState = GameKeys.reduce<Record<KeyboardKey, { isPressed: boolean }>>(
     (acc, key) => {
       acc[key] = { isPressed: false }
       return acc
@@ -15,86 +17,16 @@ const initialKeyboardState = () =>
     {} as Record<KeyboardKey, { isPressed: boolean }>,
   )
 
-export type KeyboardKey = (typeof GameKeys)[number]
-
-export class InputManager {
-  private dispositions: (() => void)[] = []
-
-  private keyboardState = initialKeyboardState()
-
-  private mouseState: {
-    deltaX: number
-    deltaY: number
-    isPressedLeft: boolean
-    isPressedRight: boolean
-  } = {
+  const mouseState = {
     deltaX: 0,
     deltaY: 0,
     isPressedLeft: false,
     isPressedRight: false,
   }
 
-  constructor(private readonly gameLoop: GameLoop) {
-    const onKeyDown = this.onKeyDown.bind(this)
-    const onKeyUp = this.onKeyUp.bind(this)
-    const onMouseDown = this.onMouseDown.bind(this)
-    const onMouseUp = this.onMouseUp.bind(this)
-    const onMouseMove = this.onMouseMove.bind(this)
-
-    window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('keyup', onKeyUp)
-    window.addEventListener('mousedown', onMouseDown)
-    window.addEventListener('mouseup', onMouseUp)
-    window.addEventListener('mousemove', onMouseMove)
-
-    this.dispositions.push(() => {
-      window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('keyup', onKeyUp)
-      window.removeEventListener('mousedown', onMouseDown)
-      window.removeEventListener('mouseup', onMouseUp)
-      window.removeEventListener('mousemove', onMouseMove)
-    })
-  }
-
-  dispose(): void {
-    for (const dispose of this.dispositions) {
-      dispose()
-    }
-  }
-
-  getMouseDelta() {
-    return {
-      deltaX: this.mouseState.deltaX,
-      deltaY: this.mouseState.deltaY,
-    }
-  }
-
-  isKeyPressed(key: KeyboardKey): boolean {
-    return this.keyboardState[key].isPressed
-  }
-
-  isPressedLeftMouse(): boolean {
-    return this.mouseState.isPressedLeft
-  }
-
-  isPressedRightMouse(): boolean {
-    return this.mouseState.isPressedRight
-  }
-
-  resetKeyboardState() {
-    for (const key of GameKeys) {
-      this.keyboardState[key].isPressed = false
-    }
-  }
-
-  resetMouseDelta() {
-    this.mouseState.deltaX = 0
-    this.mouseState.deltaY = 0
-  }
-
-  private onKeyDown = (event: KeyboardEvent) => {
-    if (this.gameLoop.isPaused()) {
-      this.resetKeyboardState()
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (isPaused()) {
+      resetKeyboardState()
       return
     }
 
@@ -102,55 +34,109 @@ export class InputManager {
       return
     }
 
-    const keyState = this.keyboardState[event.code]
+    const keyState = keyboardState[event.code]
 
     keyState.isPressed = true
   }
 
-  private onKeyUp = (event: KeyboardEvent) => {
-    if (this.gameLoop.isPaused()) {
-      this.resetKeyboardState()
+  const onKeyUp = (event: KeyboardEvent) => {
+    if (isPaused()) {
+      resetKeyboardState()
       return
     }
 
     if (!isGameKey(event.code)) {
       return
     }
-    const keyState = this.keyboardState[event.code]
+    const keyState = keyboardState[event.code]
 
     keyState.isPressed = false
   }
 
-  private onMouseDown = (event: MouseEvent) => {
-    if (this.gameLoop.isPaused()) {
+  const onMouseDown = (event: MouseEvent) => {
+    if (isPaused()) {
       return
     }
 
     if (event.button === 0) {
-      this.mouseState.isPressedLeft = true
+      mouseState.isPressedLeft = true
     } else if (event.button === 2) {
-      this.mouseState.isPressedRight = true
+      mouseState.isPressedRight = true
     }
   }
 
-  private onMouseMove = (event: MouseEvent) => {
-    if (this.gameLoop.isPaused()) {
+  const onMouseMove = (event: MouseEvent) => {
+    if (isPaused()) {
       return
     }
 
-    this.mouseState.deltaX += event.movementX
-    this.mouseState.deltaY += event.movementY
+    mouseState.deltaX += event.movementX
+    mouseState.deltaY += event.movementY
   }
 
-  private onMouseUp = (event: MouseEvent) => {
-    if (this.gameLoop.isPaused()) {
+  const onMouseUp = (event: MouseEvent) => {
+    if (isPaused()) {
       return
     }
 
     if (event.button === 0) {
-      this.mouseState.isPressedLeft = false
+      mouseState.isPressedLeft = false
     } else if (event.button === 2) {
-      this.mouseState.isPressedRight = false
+      mouseState.isPressedRight = false
     }
+  }
+
+  window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('keyup', onKeyUp)
+  window.addEventListener('mousedown', onMouseDown)
+  window.addEventListener('mouseup', onMouseUp)
+  window.addEventListener('mousemove', onMouseMove)
+
+  const dispose = () => {
+    window.removeEventListener('keydown', onKeyDown)
+    window.removeEventListener('keyup', onKeyUp)
+    window.removeEventListener('mousedown', onMouseDown)
+    window.removeEventListener('mouseup', onMouseUp)
+    window.removeEventListener('mousemove', onMouseMove)
+  }
+
+  const resetKeyboardState = () => {
+    for (const key of GameKeys) {
+      keyboardState[key].isPressed = false
+    }
+  }
+
+  const resetMouseDelta = () => {
+    mouseState.deltaX = 0
+    mouseState.deltaY = 0
+  }
+
+  const getMouseDelta = () => {
+    return {
+      deltaX: mouseState.deltaX,
+      deltaY: mouseState.deltaY,
+    }
+  }
+
+  const isKeyPressed = (key: KeyboardKey): boolean => {
+    return keyboardState[key].isPressed
+  }
+
+  const isPressedLeftMouse = (): boolean => {
+    return mouseState.isPressedLeft
+  }
+
+  const isPressedRightMouse = (): boolean => {
+    return mouseState.isPressedRight
+  }
+
+  return {
+    dispose,
+    getMouseDelta,
+    isKeyPressed,
+    isPressedLeftMouse,
+    isPressedRightMouse,
+    resetKeyboardState,
+    resetMouseDelta,
   }
 }

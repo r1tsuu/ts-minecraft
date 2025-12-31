@@ -50,15 +50,13 @@ export class ClientBlocksRegistry {
     }
   }
 
-  *iterateBlocks(): IterableIterator<{
+  iterateBlocks(): IterableIterator<{
     id: number
     material: BlockClientData['material']
   }> {
-    for (const [id, { material }] of this.registry.entries()) {
-      yield {
-        id,
-        material,
-      }
-    }
+    return Iterator.from(this.registry.entries()).map(([id, { material }]) => ({
+      id,
+      material,
+    }))
   }
 }

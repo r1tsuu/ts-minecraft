@@ -1,9 +1,16 @@
-import * as THREE from 'three'
+import {
+  ACESFilmicToneMapping,
+  Clock,
+  PerspectiveCamera,
+  Scene,
+  SRGBColorSpace,
+  WebGLRenderer,
+} from 'three'
 
 import type { EventConstructor } from '../shared/EventBus.ts'
 import type { MinecraftEvent } from '../shared/MinecraftEvent.ts'
 import type { Callback } from '../shared/util.ts'
-import type { MinecraftClient } from './MinecraftClient.ts'
+import type { MinecraftClientContext } from './MinecraftClient.ts'
 
 import { Entity, type EntityConstructor } from '../shared/entities/Entity.ts'
 import { Player } from '../shared/entities/Player.ts'
@@ -12,7 +19,7 @@ import { HashMap } from '../shared/HashMap.ts'
 import { Maybe } from '../shared/Maybe.ts'
 import { pipe } from '../shared/Pipe.ts'
 import { World } from '../shared/World.ts'
-import { InputManager } from './InputManager.ts'
+import { createInputManager } from './InputManager.ts'
 import { chunkRenderingSystemFactory } from './systems/ChunkRenderingSystem.ts'
 import { createClientPlayerControlSystemFactory } from './systems/ClientPlayerControlSystem.ts'
 import {
@@ -22,6 +29,22 @@ import {
 } from './systems/createSystem.ts'
 import { playerUpdateSystemFactory } from './systems/PlayerUpdateSystem.ts'
 import { raycastingSystemFactory } from './systems/RaycastingSystem.ts'
+
+export type FrameCounter = {
+  fps: number
+  lastFrames: number
+  lastTime: number
+  totalFrames: number
+  totalTime: number
+}
+
+export interface GameLoop {
+  dispose(): void
+  execute(): void
+  getClientPlayer(): Player
+  getFrameCounter(): Readonly<FrameCounter>
+  setRendererSize(width: number, height: number): void
+}
 
 export type OnEvent<E extends MinecraftEvent> = {
   EventConstructor: EventConstructor<E>
@@ -53,15 +76,10 @@ export interface SystemInRegistry {
   system: System<string>
 }
 
-export class GameLoop {
-  readonly camera = new THREE.PerspectiveCamera(
-    75,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000,
-  )
+export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameLoop => {
+  const camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
 
-  readonly frameCounter = {
+  const frameCounter = {
     fps: 0,
     lastFrames: 0,
     lastTime: 0,
@@ -69,96 +87,219 @@ export class GameLoop {
     totalTime: 0,
   }
 
-  readonly inputManager = new InputManager(this)
+  const scene = new Scene()
 
-  readonly renderer: THREE.WebGLRenderer
-  readonly scene = new THREE.Scene()
-  private clientPlayer: Player
-  private delta: number = 0
-  private disposed = false
-  private gameLoopClock = new THREE.Clock()
-  private isGameLoopClockStopped = false
+  let delta = 0
+  let disposed = false
+  const gameLoopClock = new Clock()
+  let isGameLoopClockStopped = false
+  const lastTimeout: null | number = null
+  let paused = false
 
-  private lastTimeout: null | number = null
-  private paused = false
+  const systems: HashMap<string, SystemInRegistry> = new HashMap()
+  const systemsUnsubscriptions: Callback[] = []
 
-  private systems: HashMap<string, SystemInRegistry> = new HashMap()
-  private systemsUnsubscriptions: Callback[] = []
+  // SETUP RENDERER HERE
+  const renderer = new WebGLRenderer({
+    antialias: false,
+    canvas: ctx.gui.getCanvas(),
+    powerPreference: 'high-performance',
+  })
+  renderer.outputColorSpace = SRGBColorSpace
+  renderer.toneMapping = ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1.0
+  renderer.shadowMap.enabled = false // Disable shadows for performance
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)) // Cap pixel ratio
 
-  constructor(
-    private client: MinecraftClient,
-    readonly world: World,
-  ) {
-    // SETUP RENDERER HERE
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: false,
-      canvas: this.client.gui.getCanvas(),
-      powerPreference: 'high-performance',
-    })
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.0
-    this.renderer.shadowMap.enabled = false // Disable shadows for performance
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)) // Cap pixel ratio
+  // FETCH CLIENT PLAYER ENTITY
+  const clientPlayer = pipe(ctx.localStorageManager.getPlayerUUID())
+    .map((uuid) => world.getEntity(uuid, Player))
+    .value()
+    .unwrap()
 
-    client.eventBus.subscribe(PauseToggle, () => (this.paused = !this.paused))
+  const inputManager = createInputManager(() => paused)
 
-    // FETCH CLIENT PLAYER ENTITY
-    this.clientPlayer = pipe(this.client.localStorageManager.getPlayerUUID())
-      .map((uuid) => this.world.getEntity(uuid, Player))
-      .value()
-      .unwrap()
-
-    // REGISTER SYSTEMS HERE
-    this.registerSystem(chunkRenderingSystemFactory)
-    const raycastingSystem = this.registerSystem(raycastingSystemFactory)
-    const playerUpdateSystem = this.registerSystem(playerUpdateSystemFactory)
-    this.registerSystem(
-      createClientPlayerControlSystemFactory({ playerUpdateSystem, raycastingSystem }),
-    )
-
-    // INIT SYSTEMS
-    for (const init of this.iterInitFunctions()) {
-      init()
-    }
-
-    // SETUP EVENT LISTENERS
-    for (const { EventConstructor, handler } of this.iterEventHandlers()) {
-      const unsubscribe = client.eventBus.subscribe(EventConstructor, handler)
-      this.systemsUnsubscriptions.push(unsubscribe)
-    }
+  const iterDisposeFunctions = (): Iterable<Callback> => {
+    return Iterator.from(systems.values()).flatMap(({ factoryData }) => factoryData.dispose)
   }
 
-  dispose(): void {
+  const iterEventHandlers = (): Iterable<OnEvent<MinecraftEvent>> => {
+    return Iterator.from(systems.values())
+      .flatMap(({ factoryData }) => factoryData.eventHandlers.values())
+      .map((handler) => handler)
+  }
+
+  const iterInitFunctions = (): Iterable<Callback> => {
+    return Iterator.from(systems.values()).flatMap(({ factoryData }) => factoryData.init)
+  }
+
+  const iterRenderBatchFunctions = (
+    EntityConstructor: EntityConstructor<any>,
+  ): Iterable<OnRenderBatch<any>> => {
+    return Iterator.from(systems.values())
+      .map(({ factoryData }) => factoryData.renderBatch.get(EntityConstructor))
+      .filter(Maybe.IsSome)
+      .map((maybe) => maybe.value())
+  }
+
+  const iterRenderEachFunctions = (
+    EntityConstructor: EntityConstructor<any>,
+  ): Iterable<OnRenderEach<any>> => {
+    return Iterator.from(systems.values())
+      .map(({ factoryData }) => factoryData.renderEach.get(EntityConstructor))
+      .filter(Maybe.IsSome)
+      .map((maybe) => maybe.value())
+  }
+
+  const iterRenderFunctions = (): Iterable<Callback> => {
+    return Iterator.from(systems.values()).flatMap(({ factoryData }) => factoryData.render)
+  }
+
+  const iterUpdateBatchFunctions = (
+    EntityConstructor: EntityConstructor<any>,
+  ): Iterable<OnUpdateBatch<any>> => {
+    return Iterator.from(systems.values())
+      .map(({ factoryData }) => factoryData.updateBatch.get(EntityConstructor))
+      .filter(Maybe.IsSome)
+      .map((maybe) => maybe.value())
+  }
+
+  const iterUpdateEachFunctions = (
+    EntityConstructor: EntityConstructor<any>,
+  ): Iterable<OnUpdateEach<any>> => {
+    return Iterator.from(systems.values())
+      .map(({ factoryData }) => factoryData.updateEach.get(EntityConstructor))
+      .filter(Maybe.IsSome)
+      .map((maybe) => maybe.value())
+  }
+
+  const iterUpdateFunctions = (): Iterable<Callback> => {
+    return Iterator.from(systems.values()).flatMap(({ factoryData }) => factoryData.updates)
+  }
+
+  const handleGameFrame = () => {
+    if (paused) {
+      gameLoopClock.stop()
+      isGameLoopClockStopped = true
+      return
+    }
+
+    if (isGameLoopClockStopped) {
+      gameLoopClock.start()
+      isGameLoopClockStopped = false
+    }
+
+    delta = gameLoopClock.getDelta()
+
+    frameCounter.lastTime += delta
+    frameCounter.totalTime += delta
+    frameCounter.lastFrames++
+    frameCounter.totalFrames++
+
+    if (frameCounter.lastTime >= 1) {
+      frameCounter.fps = frameCounter.lastFrames
+      frameCounter.lastFrames = 0
+      frameCounter.lastTime = 0
+    }
+
+    const collectedEntities = new HashMap<EntityConstructor, Entity[]>()
+
+    const fetchEntities = (EntityConstructor: EntityConstructor): Entity[] => {
+      if (!collectedEntities.has(EntityConstructor)) {
+        const entities = pipe(world.query().select(EntityConstructor).execute())
+          .mapIter((each) => each.entity)
+          .collectArray()
+          .value()
+
+        collectedEntities.set(EntityConstructor, entities)
+      }
+
+      return collectedEntities.get(EntityConstructor).unwrap()
+    }
+
+    // UPDATE SYSTEMS WITH ENTITY ARGUMENTS, FOR EXAMPLE: PLAYER MOVEMENT, PHYSICS, ETC.
+    for (const { Constructor: EntityConstructor } of Entity.iterEntityConstructors()) {
+      const entities = fetchEntities(EntityConstructor)
+      for (const updateBatch of iterUpdateBatchFunctions(EntityConstructor)) {
+        updateBatch(entities)
+      }
+
+      for (const updateEach of iterUpdateEachFunctions(EntityConstructor)) {
+        for (const entity of entities) {
+          updateEach(entity)
+        }
+      }
+    }
+
+    for (const update of iterUpdateFunctions()) {
+      update()
+    }
+
+    // UPDATE SYSTEMS WITHOUT ENTITY ARGUMENTS, FOR EXAMPLE: INPUT, CAMERA CONTROLS, ETC.
+    for (const update of iterUpdateFunctions()) {
+      update()
+    }
+
+    // Sync camera with player
+    camera.position.copy(clientPlayer.position)
+    camera.rotation.copy(clientPlayer.rotation)
+
+    // Reset mouse delta each frame
+    inputManager.resetMouseDelta()
+
+    // RENDER SYSTEMS WITH ENTITY ARGUMENTS, FOR EXAMPLE: RENDERABLE ENTITIES
+    for (const { Constructor: EntityConstructor } of Entity.iterEntityConstructors()) {
+      for (const renderBatch of iterRenderBatchFunctions(EntityConstructor)) {
+        const entities = fetchEntities(EntityConstructor)
+        renderBatch(entities)
+      }
+
+      for (const renderEach of iterRenderEachFunctions(EntityConstructor)) {
+        const entities = fetchEntities(EntityConstructor)
+        for (const entity of entities) {
+          renderEach(entity)
+        }
+      }
+    }
+
+    for (const render of iterRenderFunctions()) {
+      render()
+    }
+
+    // FINAL RENDER CALL TO RENDER THE SCENE
+    renderer.render(scene, camera)
+  }
+
+  const dispose = () => {
     // DISPOSE NON SYSTEM COMPONENTS
-    this.inputManager.dispose()
-    this.renderer.dispose()
-    this.scene.clear()
+    inputManager.dispose()
+    renderer.dispose()
+    scene.clear()
 
     // UNSUBSCRIBE EVENT LISTENERS
-    for (const unsubscribe of this.systemsUnsubscriptions) {
+    for (const unsubscribe of systemsUnsubscriptions) {
       unsubscribe()
     }
 
     // DISPOSE SYSTEMS
-    for (const dispose of this.iterDisposeFunctions()) {
+    for (const dispose of iterDisposeFunctions()) {
       dispose()
     }
 
-    if (this.lastTimeout) {
-      clearTimeout(this.lastTimeout)
+    if (lastTimeout) {
+      clearTimeout(lastTimeout)
     }
 
-    this.disposed = true
+    disposed = true
   }
 
-  execute() {
+  const execute = () => {
     const frame = () => {
-      if (this.disposed) {
+      if (disposed) {
         return
       }
 
-      this.handleGameFrame()
+      handleGameFrame()
 
       requestAnimationFrame(frame)
     }
@@ -166,40 +307,11 @@ export class GameLoop {
     requestAnimationFrame(frame)
   }
 
-  getClientPlayer(): Player {
-    return this.clientPlayer
-  }
+  const getClientPlayer = () => clientPlayer
 
-  getDelta(): number {
-    return this.delta
-  }
-
-  isFirstFrame(): boolean {
-    return this.frameCounter.totalFrames === 1
-  }
-
-  isPaused(): boolean {
-    return this.paused
-  }
-
-  /**
-   * Registers a new system in the game loop.
-   * @param factory The system factory function.
-   * @returns The created system instance.
-   * @example
-   * ```typescript
-   * const mySystem = gameLoop.registerSystem((ctx) => {
-   *   ctx.onUpdate(() => {
-   *     // Update logic here
-   *   })
-   *
-   *   return {
-   *     name: 'MySystem',
-   *   }
-   * })
-   * ```
-   */
-  registerSystem<T extends Record<string, unknown>>(factory: SystemFactory<string, T>): T {
+  const registerSystem = <T extends Record<string, unknown>>(
+    factory: SystemFactory<string, T>,
+  ): T => {
     const systemData: SystemFactoryContextData = {
       dispose: new Set<Callback>(),
       eventHandlers: new HashMap<EventConstructor<MinecraftEvent>, OnEvent<MinecraftEvent>>(),
@@ -213,9 +325,16 @@ export class GameLoop {
     }
 
     const factoryCtx: SystemFactoryContext = {
-      client: this.client,
-      eventBus: this.client.eventBus,
-      gameLoop: this,
+      blocksRegistry: ctx.blocksRegistry,
+      camera,
+      clientBlocksRegistry: ctx.clientBlocksRegistry,
+      eventBus: ctx.eventBus,
+      getClientPlayer: () => clientPlayer,
+      getDelta: () => delta,
+      gui: ctx.gui,
+      inputManager,
+      isFirstFrame: () => frameCounter.totalFrames === 1,
+      localStorageManager: ctx.localStorageManager,
       onDispose(disposeFn) {
         systemData.dispose.add(disposeFn)
       },
@@ -246,16 +365,19 @@ export class GameLoop {
       onUpdateEach(EntityConstructor, updateFn) {
         systemData.updateEach.set(EntityConstructor, updateFn as OnUpdateEach<Entity>)
       },
-      world: this.world,
+      renderer,
+      scene,
+      singlePlayerWorker: ctx.singlePlayerWorker,
+      world,
     }
 
     const system = factory(factoryCtx)
 
-    if (this.systems.has(system.name)) {
+    if (systems.has(system.name)) {
       throw new Error(`System with name "${system.name}" is already registered.`)
     }
 
-    this.systems.set(system.name, {
+    systems.set(system.name, {
       factoryData: systemData,
       system,
     })
@@ -265,154 +387,34 @@ export class GameLoop {
     return system as unknown as T
   }
 
-  private handleGameFrame() {
-    if (this.paused) {
-      this.gameLoopClock.stop()
-      this.isGameLoopClockStopped = true
-      return
-    }
+  ctx.eventBus.subscribe(PauseToggle, () => (paused = !paused))
 
-    if (this.isGameLoopClockStopped) {
-      this.gameLoopClock.start()
-      this.isGameLoopClockStopped = false
-    }
+  // REGISTER SYSTEMS HERE
+  registerSystem(chunkRenderingSystemFactory)
+  const raycastingSystem = registerSystem(raycastingSystemFactory)
+  const playerUpdateSystem = registerSystem(playerUpdateSystemFactory)
+  registerSystem(createClientPlayerControlSystemFactory({ playerUpdateSystem, raycastingSystem }))
 
-    this.delta = this.gameLoopClock.getDelta()
-
-    this.frameCounter.lastTime += this.delta
-    this.frameCounter.totalTime += this.delta
-    this.frameCounter.lastFrames++
-    this.frameCounter.totalFrames++
-
-    if (this.frameCounter.lastTime >= 1) {
-      this.frameCounter.fps = this.frameCounter.lastFrames
-      this.frameCounter.lastFrames = 0
-      this.frameCounter.lastTime = 0
-    }
-
-    const collectedEntities = new HashMap<EntityConstructor, Entity[]>()
-
-    const fetchEntities = (EntityConstructor: EntityConstructor): Entity[] => {
-      if (!collectedEntities.has(EntityConstructor)) {
-        const entities = pipe(this.world.query().select(EntityConstructor).execute())
-          .mapIter((each) => each.entity)
-          .collectArray()
-          .value()
-
-        collectedEntities.set(EntityConstructor, entities)
-      }
-
-      return collectedEntities.get(EntityConstructor).unwrap()
-    }
-
-    // UPDATE SYSTEMS WITH ENTITY ARGUMENTS, FOR EXAMPLE: PLAYER MOVEMENT, PHYSICS, ETC.
-    for (const { Constructor: EntityConstructor } of Entity.iterEntityConstructors()) {
-      const entities = fetchEntities(EntityConstructor)
-      for (const updateBatch of this.iterUpdateBatchFunctions(EntityConstructor)) {
-        updateBatch(entities)
-      }
-
-      for (const updateEach of this.iterUpdateEachFunctions(EntityConstructor)) {
-        for (const entity of entities) {
-          updateEach(entity)
-        }
-      }
-    }
-
-    for (const update of this.iterUpdateFunctions()) {
-      update()
-    }
-
-    // UPDATE SYSTEMS WITHOUT ENTITY ARGUMENTS, FOR EXAMPLE: INPUT, CAMERA CONTROLS, ETC.
-    for (const update of this.iterUpdateFunctions()) {
-      update()
-    }
-
-    // Sync camera with player
-    this.camera.position.copy(this.clientPlayer.position)
-    this.camera.rotation.copy(this.clientPlayer.rotation)
-
-    // Reset mouse delta each frame
-    this.inputManager.resetMouseDelta()
-
-    // RENDER SYSTEMS WITH ENTITY ARGUMENTS, FOR EXAMPLE: RENDERABLE ENTITIES
-    for (const { Constructor: EntityConstructor } of Entity.iterEntityConstructors()) {
-      for (const renderBatch of this.iterRenderBatchFunctions(EntityConstructor)) {
-        const entities = fetchEntities(EntityConstructor)
-        renderBatch(entities)
-      }
-
-      for (const renderEach of this.iterRenderEachFunctions(EntityConstructor)) {
-        const entities = fetchEntities(EntityConstructor)
-        for (const entity of entities) {
-          renderEach(entity)
-        }
-      }
-    }
-
-    for (const render of this.iterRenderFunctions()) {
-      render()
-    }
-
-    // FINAL RENDER CALL TO RENDER THE SCENE
-    this.renderer.render(this.scene, this.camera)
+  // INIT SYSTEMS
+  for (const init of iterInitFunctions()) {
+    init()
   }
 
-  private iterDisposeFunctions(): Iterable<Callback> {
-    return Iterator.from(this.systems.values()).flatMap(({ factoryData }) => factoryData.dispose)
+  // SETUP EVENT LISTENERS
+  for (const { EventConstructor, handler } of iterEventHandlers()) {
+    const unsubscribe = ctx.eventBus.subscribe(EventConstructor, handler)
+    systemsUnsubscriptions.push(unsubscribe)
   }
 
-  private iterEventHandlers(): Iterable<OnEvent<MinecraftEvent>> {
-    return Iterator.from(this.systems.values())
-      .flatMap(({ factoryData }) => factoryData.eventHandlers.values())
-      .map((handler) => handler)
-  }
-
-  private iterInitFunctions(): Iterable<Callback> {
-    return Iterator.from(this.systems.values()).flatMap(({ factoryData }) => factoryData.init)
-  }
-
-  private iterRenderBatchFunctions(
-    EntityConstructor: EntityConstructor<any>,
-  ): Iterable<OnRenderBatch<any>> {
-    return Iterator.from(this.systems.values())
-      .map(({ factoryData }) => factoryData.renderBatch.get(EntityConstructor))
-      .filter(Maybe.IsSome)
-      .map((maybe) => maybe.value())
-  }
-
-  private iterRenderEachFunctions(
-    EntityConstructor: EntityConstructor<any>,
-  ): Iterable<OnRenderEach<any>> {
-    return Iterator.from(this.systems.values())
-      .map(({ factoryData }) => factoryData.renderEach.get(EntityConstructor))
-      .filter(Maybe.IsSome)
-      .map((maybe) => maybe.value())
-  }
-
-  private iterRenderFunctions(): Iterable<Callback> {
-    return Iterator.from(this.systems.values()).flatMap(({ factoryData }) => factoryData.render)
-  }
-
-  private iterUpdateBatchFunctions(
-    EntityConstructor: EntityConstructor<any>,
-  ): Iterable<OnUpdateBatch<any>> {
-    return Iterator.from(this.systems.values())
-      .map(({ factoryData }) => factoryData.updateBatch.get(EntityConstructor))
-      .filter(Maybe.IsSome)
-      .map((maybe) => maybe.value())
-  }
-
-  private iterUpdateEachFunctions(
-    EntityConstructor: EntityConstructor<any>,
-  ): Iterable<OnUpdateEach<any>> {
-    return Iterator.from(this.systems.values())
-      .map(({ factoryData }) => factoryData.updateEach.get(EntityConstructor))
-      .filter(Maybe.IsSome)
-      .map((maybe) => maybe.value())
-  }
-
-  private iterUpdateFunctions(): Iterable<Callback> {
-    return Iterator.from(this.systems.values()).flatMap(({ factoryData }) => factoryData.updates)
+  return {
+    dispose,
+    execute,
+    getClientPlayer,
+    getFrameCounter: () => frameCounter,
+    setRendererSize: (width, height) => {
+      renderer.setSize(width, height)
+      camera.aspect = width / height
+      camera.updateProjectionMatrix()
+    },
   }
 }

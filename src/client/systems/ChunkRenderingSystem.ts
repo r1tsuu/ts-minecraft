@@ -25,7 +25,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   const geometry = new BoxGeometry()
   const matrix = new Matrix4()
 
-  const blockMeshes = pipe(ctx.client.clientBlocksRegistry.iterateBlocks())
+  const blockMeshes = pipe(ctx.clientBlocksRegistry.iterateBlocks())
     .mapIter(({ id, material }) => {
       // Share a single geometry instance across all block types for better memory efficiency
       geometry.computeBoundingBox()
@@ -58,7 +58,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     const meshesNeedUpdate = new Set<InstancedMesh>()
     const meshInstanceCounts = new HashMap<number, number>()
 
-    for (const chunk of ctx.gameLoop.isFirstFrame() ? chunks : chunksNeedingRender) {
+    for (const chunk of ctx.isFirstFrame() ? chunks : chunksNeedingRender) {
       for (const { blockID, x, y, z } of chunk.iterateBlocks()) {
         const blockKey = getBlockKey(x, y, z)
         const chunkBlockMeshesIndexes_ = chunkBlockMeshesIndexes.getOrSet(

@@ -22,9 +22,9 @@ export const createClientPlayerControlSystemFactory = ({
       if (maybeLookingAtBlock.isSome() && maybeLookingAtNormal.isSome()) {
         const lookingAtBlock = maybeLookingAtBlock.value()
         const lookingAtNormal = maybeLookingAtNormal.value()
-        const blockToPlace = ctx.client.blocksRegistry.getBlockIdByName('grass')
+        const blockToPlace = ctx.blocksRegistry.getBlockIdByName('grass')
 
-        ctx.gameLoop.world.addBlock(
+        ctx.world.addBlock(
           lookingAtBlock.x + lookingAtNormal.x,
           lookingAtBlock.y + lookingAtNormal.y,
           lookingAtBlock.z + lookingAtNormal.z,
@@ -37,15 +37,15 @@ export const createClientPlayerControlSystemFactory = ({
       const maybeLookingAtBlock = raycastingSystem.getLookingAtBlock()
       if (maybeLookingAtBlock.isSome()) {
         const lookingAtBlock = maybeLookingAtBlock.value()
-        ctx.gameLoop.world.removeBlock(lookingAtBlock.x, lookingAtBlock.y, lookingAtBlock.z)
+        ctx.world.removeBlock(lookingAtBlock.x, lookingAtBlock.y, lookingAtBlock.z)
       }
     }, THROTTLE_DELAY_MS)
 
     ctx.onUpdate(() => {
-      const inputManager = ctx.gameLoop.inputManager
+      const inputManager = ctx.inputManager
       const mouseMove = inputManager.getMouseDelta()
 
-      const player = ctx.gameLoop.getClientPlayer()
+      const player = ctx.getClientPlayer()
 
       player.rotation.y -= mouseMove.deltaX * Config.MOUSE_SENSITIVITY
       player.rotation.x -= mouseMove.deltaY * Config.MOUSE_SENSITIVITY
@@ -77,7 +77,7 @@ export const createClientPlayerControlSystemFactory = ({
     })
 
     ctx.onEvent(PauseToggle, () => {
-      const player = ctx.gameLoop.getClientPlayer()
+      const player = ctx.getClientPlayer()
 
       const state = playerUpdateSystem.getMovementState(player)
 

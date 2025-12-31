@@ -61,7 +61,7 @@ export const playerUpdateSystemFactory = createSystemFactory((ctx) => {
   }
 
   ctx.onUpdateBatch(Player, (players) => {
-    const delta = ctx.gameLoop.getDelta()
+    const delta = ctx.getDelta()
 
     for (const player of players) {
       // Apply gravity
@@ -98,7 +98,7 @@ export const playerUpdateSystemFactory = createSystemFactory((ctx) => {
         const attemptedPosition = player.position.clone()
         attemptedPosition.x += horizontalVelocity.x
 
-        if (!ctx.gameLoop.world.boxIntersectsWorldBlocks(Player.boundingBox(attemptedPosition))) {
+        if (!ctx.world.boxIntersectsWorldBlocks(Player.boundingBox(attemptedPosition))) {
           player.position.x = attemptedPosition.x
         }
       }
@@ -107,7 +107,7 @@ export const playerUpdateSystemFactory = createSystemFactory((ctx) => {
         const attemptedPosition = player.position.clone()
         attemptedPosition.z += horizontalVelocity.z
 
-        if (!ctx.gameLoop.world.boxIntersectsWorldBlocks(Player.boundingBox(attemptedPosition))) {
+        if (!ctx.world.boxIntersectsWorldBlocks(Player.boundingBox(attemptedPosition))) {
           player.position.z = attemptedPosition.z
         }
       }
@@ -116,7 +116,7 @@ export const playerUpdateSystemFactory = createSystemFactory((ctx) => {
         const attemptedPosition = player.position.clone()
         attemptedPosition.y += player.velocity.y * delta
 
-        if (ctx.gameLoop.world.boxIntersectsWorldBlocks(Player.boundingBox(attemptedPosition))) {
+        if (ctx.world.boxIntersectsWorldBlocks(Player.boundingBox(attemptedPosition))) {
           if (player.velocity.y > 0) {
             // Hitting ceiling
             player.velocity.y = 0
@@ -135,7 +135,7 @@ export const playerUpdateSystemFactory = createSystemFactory((ctx) => {
           const groundCheck = player.position.clone()
           groundCheck.y -= 0.05
 
-          if (ctx.gameLoop.world.boxIntersectsWorldBlocks(Player.boundingBox(groundCheck))) {
+          if (ctx.world.boxIntersectsWorldBlocks(Player.boundingBox(groundCheck))) {
             setCanJump(player, true)
           } else {
             setCanJump(player, false)

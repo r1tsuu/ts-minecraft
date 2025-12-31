@@ -1,12 +1,15 @@
 /* eslint-disable perfectionist/sort-modules */
 /* eslint-disable perfectionist/sort-interfaces */
+import type { Camera, Scene, WebGLRenderer } from 'three'
+
+import type { Player } from '../../shared/entities/Player.ts'
 import type { EventConstructor } from '../../shared/EventBus.ts'
 import type { MinecraftEvent } from '../../shared/MinecraftEvent.ts'
 import type { MinecraftEventBus } from '../../shared/MinecraftEventBus.ts'
 import type { Callback } from '../../shared/util.ts'
 import type { World } from '../../shared/World.ts'
-import type { GameLoop } from '../GameLoop.ts'
-import type { MinecraftClient } from '../MinecraftClient.ts'
+import type { InputManager } from '../InputManager.ts'
+import type { MinecraftClientContext } from '../MinecraftClient.ts'
 
 import { type Entity, type EntityConstructor } from '../../shared/entities/Entity.ts'
 
@@ -18,6 +21,18 @@ export interface SystemFactory<K extends string, Extra extends Record<string, un
   (ctx: SystemFactoryContext): System<K, Extra>
 }
 
+/**
+ * Creates a system factory for defining game systems.
+ * @example
+ * ```ts
+ * const mySystemFactory = createSystemFactory((ctx) => {
+ *  // System initialization logic here
+ * return {
+ *   name: 'MySystem',
+ *  // Additional system properties and methods here
+ * }
+ * })
+ */
 export const createSystemFactory = <Name extends string, Extra extends Record<string, unknown>>(
   /**
    * The factory function that creates the system instance
@@ -37,6 +52,9 @@ export const createSystemFactory = <Name extends string, Extra extends Record<st
   return factory
 }
 
+/**
+ * Context provided to the system factory function for creating systems.
+ */
 export interface SystemFactoryContext extends EngineContext {
   /**
    * Registers a callback to be called on specific lifecycle events of the system
@@ -145,19 +163,15 @@ export interface SystemFactoryContext extends EngineContext {
   onEvent<E extends MinecraftEvent>(Event: EventConstructor<E>, handler: (event: E) => void): void
 }
 
-export interface EngineContext {
-  /**
-   * The Minecraft client instance
-   */
-  readonly client: MinecraftClient
+/**
+ * Game Loop level context available to all systems.
+ *
+ */
+export interface EngineContext extends Omit<MinecraftClientContext, 'gameLoop'> {
   /**
    * The world instance the system operates on
    */
   readonly world: World
-  /**
-   * The main game loop instance
-   */
-  readonly gameLoop: GameLoop
   /**
    * The event bus for emitting and listening to events.
    * For listening to events, prefer using `ctx.onEvent` method in the SystemFactoryContext since it automatically
@@ -165,4 +179,32 @@ export interface EngineContext {
    * Otherwise you must manually unsubscribe from events to prevent memory leaks in onDispose lifecycle method.
    */
   readonly eventBus: MinecraftEventBus
+  /**
+   * The THREE.js renderer used for rendering the game world
+   */
+  readonly renderer: WebGLRenderer
+  /**
+   * The THREE.js scene used for rendering the game world
+   */
+  readonly scene: Scene
+  /**
+   * The THREE.js camera used for rendering the game world
+   */
+  readonly camera: Camera
+  /**
+   * Gets the client player entity
+   */
+  getClientPlayer(): Player
+  /**
+   * Gets the time delta (in seconds) since the last frame
+   */
+  getDelta(): number
+  /**
+   * Returns true if it's the first frame of the game loop
+   */
+  isFirstFrame(): boolean
+  /**
+   * The input manager for handling player inputs
+   */
+  readonly inputManager: InputManager
 }
