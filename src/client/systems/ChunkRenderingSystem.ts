@@ -5,7 +5,6 @@ import type { RawVector3 } from '../../types.ts'
 import { Config } from '../../shared/Config.ts'
 import { Chunk } from '../../shared/entities/Chunk.ts'
 import { HashMap } from '../../shared/HashMap.ts'
-import { Maybe } from '../../shared/Maybe.ts'
 import { pipe } from '../../shared/Pipe.ts'
 import { getBlockKey, getBlockKeyFromVector, getPositionFromBlockKey } from '../../shared/util.ts'
 import { createSystemFactory } from './createSystem.ts'
@@ -210,6 +209,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   // Renders a single block within a chunk
   const renderBlock = (
     meshesNeedUpdate: Set<InstancedMesh>,
+    meshInstanceCounts: HashMap<number, number>,
     chunk: Chunk,
     x: number,
     y: number,
@@ -232,7 +232,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
       .get(blockTypeID)
       .expect(`No mesh found for block ID ${blockTypeID}`)
 
-    const index = Maybe.from(freeList.pop()).unwrapOr(() => getNextBlockMeshIndex(blockTypeID))
+    const index = freeList.pop() ?? getNextBlockMeshIndex(blockTypeID)
 
     const blockWorldCoordinates = chunk.getBlockWorldCoordinates(x, y, z)
     matrix.setPosition(blockWorldCoordinates.x, blockWorldCoordinates.y, blockWorldCoordinates.z)
@@ -240,8 +240,8 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     blockMeshesIndexes.set(blockKey, index)
     meshesNeedUpdate.add(blockMesh)
 
-    const currentMax = blockMeshesCount.getOrDefault(blockTypeID, 0)
-    blockMeshesCount.set(blockTypeID, Math.max(currentMax, index + 1))
+    const currentMax = meshInstanceCounts.getOrDefault(blockTypeID, 0)
+    meshInstanceCounts.set(blockTypeID, Math.max(currentMax, index + 1))
   }
 
   ctx.onRenderBatch(Chunk, (chunks) => {
@@ -256,7 +256,16 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     for (const [chunk, blockKeys] of chunkBlocksNeedingRender) {
       for (const blockKey of blockKeys) {
         const pos = getPositionFromBlockKey(blockKey)
-        renderBlock(meshesNeedUpdate, chunk, pos.x, pos.y, pos.z, undefined, blockKey)
+        renderBlock(
+          meshesNeedUpdate,
+          meshInstanceCounts,
+          chunk,
+          pos.x,
+          pos.y,
+          pos.z,
+          undefined,
+          blockKey,
+        )
       }
 
       // After processing, clear the set for this chunk
@@ -275,7 +284,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
 
     for (const chunk of ctx.isFirstFrame() ? chunks : chunksNeedingRender) {
       for (const { blockID, x, y, z } of chunk.iterateBlocks()) {
-        renderBlock(meshesNeedUpdate, chunk, x, y, z, blockID)
+        renderBlock(meshesNeedUpdate, meshInstanceCounts, chunk, x, y, z, blockID)
       }
     }
 
