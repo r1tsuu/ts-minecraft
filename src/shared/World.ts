@@ -163,7 +163,7 @@ export class World {
     for (let x = minX; x <= maxX; x++) {
       for (let y = minY; y <= maxY; y++) {
         for (let z = minZ; z <= maxZ; z++) {
-          if (this.getBlock(x, y, z).isSome()) {
+          if (this.getBlockAt(x, y, z).isSome()) {
             // Block AABB: [x, x+1), [y, y+1), [z, z+1)
 
             if (
@@ -198,7 +198,7 @@ export class World {
     return this.entities.has(id)
   }
 
-  getBlock(x: number, y: number, z: number): Maybe<number> {
+  getBlockAt(x: number, y: number, z: number): Maybe<number> {
     return pipe(Chunk.mapToChunkCoordinates(x, z))
       .map((chunkCoordinates) =>
         this.getEntity(Chunk.getWorldID(chunkCoordinates), Chunk)
@@ -242,7 +242,7 @@ export class World {
     return new WorldQueryImpl(this.entities, this.entitiesByType)
   }
 
-  removeBlock(x: number, y: number, z: number): void {
+  removeBlockAt(x: number, y: number, z: number): void {
     pipe(Chunk.mapToChunkCoordinates(x, z)).map((chunk) =>
       this.getEntity(Chunk.getWorldID(chunk), Chunk)
         .map((chunk) => ({ chunk, local: Chunk.mapToLocalCoordinates(x, z) }))

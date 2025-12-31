@@ -73,7 +73,7 @@ export const raycastingSystemFactory = createSystemFactory((ctx) => {
           const worldY = Math.floor(clientPlayer.position.y + y)
           const worldZ = Math.floor(clientPlayer.position.z + z)
 
-          if (ctx.world.getBlock(worldX, worldY, worldZ).isNone()) continue
+          if (ctx.world.getBlockAt(worldX, worldY, worldZ).isNone()) continue
 
           const position = new Vector3(worldX, worldY, worldZ)
           matrix.setPosition(worldX, worldY, worldZ)

@@ -1,3 +1,5 @@
+import type { RawVector3 } from '../../types.ts'
+import type { ChunkRenderingSystem } from './ChunkRenderingSystem.ts'
 import type { PlayerUpdateSystem } from './PlayerUpdateSystem.ts'
 import type { RaycastingSystem } from './RaycastingSystem.ts'
 
@@ -9,9 +11,11 @@ import { createSystemFactory } from './createSystem.ts'
 const THROTTLE_DELAY_MS = 500
 
 export const createClientPlayerControlSystemFactory = ({
+  chunkRenderingSystem,
   playerUpdateSystem,
   raycastingSystem,
 }: {
+  chunkRenderingSystem: ChunkRenderingSystem
   playerUpdateSystem: PlayerUpdateSystem
   raycastingSystem: RaycastingSystem
 }) =>
@@ -24,12 +28,15 @@ export const createClientPlayerControlSystemFactory = ({
         const lookingAtNormal = maybeLookingAtNormal.value()
         const blockToPlace = ctx.blocksRegistry.getBlockIdByName('grass')
 
-        ctx.world.addBlock(
-          lookingAtBlock.x + lookingAtNormal.x,
-          lookingAtBlock.y + lookingAtNormal.y,
-          lookingAtBlock.z + lookingAtNormal.z,
-          blockToPlace,
-        )
+        const position: RawVector3 = {
+          x: lookingAtBlock.x + lookingAtNormal.x,
+          y: lookingAtBlock.y + lookingAtNormal.y,
+          z: lookingAtBlock.z + lookingAtNormal.z,
+        }
+
+        ctx.world.addBlock(position.x, position.y, position.z, blockToPlace)
+
+        chunkRenderingSystem.renderBlocksAt([position])
       }
     }, THROTTLE_DELAY_MS)
 
@@ -37,7 +44,8 @@ export const createClientPlayerControlSystemFactory = ({
       const maybeLookingAtBlock = raycastingSystem.getLookingAtBlock()
       if (maybeLookingAtBlock.isSome()) {
         const lookingAtBlock = maybeLookingAtBlock.value()
-        ctx.world.removeBlock(lookingAtBlock.x, lookingAtBlock.y, lookingAtBlock.z)
+        ctx.world.removeBlockAt(lookingAtBlock.x, lookingAtBlock.y, lookingAtBlock.z)
+        chunkRenderingSystem.unrenderBlocksAt([lookingAtBlock])
       }
     }, THROTTLE_DELAY_MS)
 

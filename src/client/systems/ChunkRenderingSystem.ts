@@ -63,6 +63,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   const chunkBlockMeshesIndexes: HashMap<Chunk, HashMap<string, number>> = new HashMap()
   const chunksNeedingRender: Set<Chunk> = new Set()
   const chunkBlocksNeedingRender = new HashMap<Chunk, Set<string>>()
+  const chunkBlocksNeedingUnrender = new HashMap<Chunk, Set<string>>()
 
   const matrix = new Matrix4()
 
@@ -132,8 +133,8 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
       pipe(Chunk.mapToChunkCoordinates(worldPos.x, worldPos.z))
         .map((chunkCoord) => ctx.world.getEntity(Chunk.getWorldID(chunkCoord), Chunk))
         .tapSome((chunk) => {
-          const existingSet = chunkBlocksNeedingRender.getOrSet(chunk, () => new Set())
-          existingSet.delete(
+          const existingSet = chunkBlocksNeedingUnrender.getOrSet(chunk, () => new Set())
+          existingSet.add(
             getBlockKeyFromVector({
               ...Chunk.mapToLocalCoordinates(worldPos.x, worldPos.z),
               y: worldPos.y,
@@ -153,6 +154,39 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
 
   const hideMatrix = new Matrix4().makeScale(0, 0, 0)
 
+  const unrenderBlock = (
+    meshesNeedUpdate: Set<InstancedMesh>,
+    chunk: Chunk,
+    x: number,
+    y: number,
+    z: number,
+    blockID?: number,
+    blockMeshesIndexes?: HashMap<string, number>,
+  ) => {
+    if (!blockID) {
+      const block = chunk.getBlock(x, y, z)
+      if (block.isNone()) {
+        return
+      }
+      blockID = block.value()
+    }
+
+    if (!blockMeshesIndexes) {
+      const maybeblockMeshesIndexes = chunkBlockMeshesIndexes.get(chunk)
+      if (maybeblockMeshesIndexes.isNone()) {
+        return
+      }
+      blockMeshesIndexes = maybeblockMeshesIndexes.value()
+
+      blockMeshesIndexes.get(getBlockKey(x, y, z)).tap((blockMeshIndex) => {
+        const mesh = blockMeshes.get(blockID).unwrap()
+        mesh.setMatrixAt(blockMeshIndex, hideMatrix)
+        blockMeshesFreeIndexes.get(blockID).tap((indexes) => indexes.push(blockMeshIndex))
+        meshesNeedUpdate.add(mesh)
+      })
+    }
+  }
+
   const unrenderChunks = (chunks: Chunk[]): void => {
     const meshesNeedUpdate = new Set<InstancedMesh>()
 
@@ -164,15 +198,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
       }
 
       for (const { blockID, x, y, z } of chunk.iterateBlocks()) {
-        blockMeshesIndexes
-          .unwrap()
-          .get(getBlockKey(x, y, z))
-          .tap((blockMeshIndex) => {
-            const mesh = blockMeshes.get(blockID).unwrap()
-            mesh.setMatrixAt(blockMeshIndex, hideMatrix)
-            blockMeshesFreeIndexes.get(blockID).tap((indexes) => indexes.push(blockMeshIndex))
-            meshesNeedUpdate.add(mesh)
-          })
+        unrenderBlock(meshesNeedUpdate, chunk, x, y, z, blockID, blockMeshesIndexes.value())
       }
 
       // Remove the chunk's block mesh indexes after unrendering
@@ -239,6 +265,16 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
 
       // After processing, clear the set for this chunk
       chunkBlocksNeedingRender.delete(chunk)
+    }
+
+    for (const [chunk, blockKeys] of chunkBlocksNeedingUnrender) {
+      for (const blockKey of blockKeys) {
+        const pos = getPositionFromBlockKey(blockKey)
+        unrenderBlock(meshesNeedUpdate, chunk, pos.x, pos.y, pos.z)
+      }
+
+      // After processing, clear the set for this chunk
+      chunkBlocksNeedingUnrender.delete(chunk)
     }
 
     for (const chunk of ctx.isFirstFrame() ? chunks : chunksNeedingRender) {
