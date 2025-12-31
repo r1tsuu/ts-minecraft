@@ -93,7 +93,6 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
   let disposed = false
   const gameLoopClock = new Clock()
   let isGameLoopClockStopped = false
-  const lastTimeout: null | number = null
   let paused = false
 
   const systems: HashMap<string, SystemInRegistry> = new HashMap()
@@ -118,64 +117,6 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     .unwrap()
 
   const inputManager = createInputManager(() => paused)
-
-  const iterDisposeFunctions = (): Iterable<Callback> => {
-    return Iterator.from(systems.values()).flatMap(({ factoryData }) => factoryData.dispose)
-  }
-
-  const iterEventHandlers = (): Iterable<OnEvent<MinecraftEvent>> => {
-    return Iterator.from(systems.values())
-      .flatMap(({ factoryData }) => factoryData.eventHandlers.values())
-      .map((handler) => handler)
-  }
-
-  const iterInitFunctions = (): Iterable<Callback> => {
-    return Iterator.from(systems.values()).flatMap(({ factoryData }) => factoryData.init)
-  }
-
-  const iterRenderBatchFunctions = (
-    EntityConstructor: EntityConstructor<any>,
-  ): Iterable<OnRenderBatch<any>> => {
-    return Iterator.from(systems.values())
-      .map(({ factoryData }) => factoryData.renderBatch.get(EntityConstructor))
-      .filter(Maybe.IsSome)
-      .map((maybe) => maybe.value())
-  }
-
-  const iterRenderEachFunctions = (
-    EntityConstructor: EntityConstructor<any>,
-  ): Iterable<OnRenderEach<any>> => {
-    return Iterator.from(systems.values())
-      .map(({ factoryData }) => factoryData.renderEach.get(EntityConstructor))
-      .filter(Maybe.IsSome)
-      .map((maybe) => maybe.value())
-  }
-
-  const iterRenderFunctions = (): Iterable<Callback> => {
-    return Iterator.from(systems.values()).flatMap(({ factoryData }) => factoryData.render)
-  }
-
-  const iterUpdateBatchFunctions = (
-    EntityConstructor: EntityConstructor<any>,
-  ): Iterable<OnUpdateBatch<any>> => {
-    return Iterator.from(systems.values())
-      .map(({ factoryData }) => factoryData.updateBatch.get(EntityConstructor))
-      .filter(Maybe.IsSome)
-      .map((maybe) => maybe.value())
-  }
-
-  const iterUpdateEachFunctions = (
-    EntityConstructor: EntityConstructor<any>,
-  ): Iterable<OnUpdateEach<any>> => {
-    return Iterator.from(systems.values())
-      .map(({ factoryData }) => factoryData.updateEach.get(EntityConstructor))
-      .filter(Maybe.IsSome)
-      .map((maybe) => maybe.value())
-  }
-
-  const iterUpdateFunctions = (): Iterable<Callback> => {
-    return Iterator.from(systems.values()).flatMap(({ factoryData }) => factoryData.updates)
-  }
 
   const handleGameFrame = () => {
     if (paused) {
@@ -220,23 +161,27 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     // UPDATE SYSTEMS WITH ENTITY ARGUMENTS, FOR EXAMPLE: PLAYER MOVEMENT, PHYSICS, ETC.
     for (const { Constructor: EntityConstructor } of Entity.iterEntityConstructors()) {
       const entities = fetchEntities(EntityConstructor)
-      for (const updateBatch of iterUpdateBatchFunctions(EntityConstructor)) {
+      for (const updateBatch of Iterator.from(systems.values())
+        .map(({ factoryData }) => factoryData.updateBatch.get(EntityConstructor))
+        .filter(Maybe.IsSome)
+        .map((maybe) => maybe.value())) {
         updateBatch(entities)
       }
 
-      for (const updateEach of iterUpdateEachFunctions(EntityConstructor)) {
+      for (const updateEach of Iterator.from(systems.values())
+        .map(({ factoryData }) => factoryData.updateEach.get(EntityConstructor))
+        .filter(Maybe.IsSome)
+        .map((maybe) => maybe.value())) {
         for (const entity of entities) {
           updateEach(entity)
         }
       }
     }
 
-    for (const update of iterUpdateFunctions()) {
-      update()
-    }
-
     // UPDATE SYSTEMS WITHOUT ENTITY ARGUMENTS, FOR EXAMPLE: INPUT, CAMERA CONTROLS, ETC.
-    for (const update of iterUpdateFunctions()) {
+    for (const update of Iterator.from(systems.values()).flatMap(
+      ({ factoryData }) => factoryData.updates,
+    )) {
       update()
     }
 
@@ -249,12 +194,18 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
 
     // RENDER SYSTEMS WITH ENTITY ARGUMENTS, FOR EXAMPLE: RENDERABLE ENTITIES
     for (const { Constructor: EntityConstructor } of Entity.iterEntityConstructors()) {
-      for (const renderBatch of iterRenderBatchFunctions(EntityConstructor)) {
+      for (const renderBatch of Iterator.from(systems.values())
+        .map(({ factoryData }) => factoryData.renderBatch.get(EntityConstructor))
+        .filter(Maybe.IsSome)
+        .map((maybe) => maybe.value())) {
         const entities = fetchEntities(EntityConstructor)
         renderBatch(entities)
       }
 
-      for (const renderEach of iterRenderEachFunctions(EntityConstructor)) {
+      for (const renderEach of Iterator.from(systems.values())
+        .map(({ factoryData }) => factoryData.renderEach.get(EntityConstructor))
+        .filter(Maybe.IsSome)
+        .map((maybe) => maybe.value())) {
         const entities = fetchEntities(EntityConstructor)
         for (const entity of entities) {
           renderEach(entity)
@@ -262,7 +213,9 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
       }
     }
 
-    for (const render of iterRenderFunctions()) {
+    for (const render of Iterator.from(systems.values()).flatMap(
+      ({ factoryData }) => factoryData.render,
+    )) {
       render()
     }
 
@@ -282,12 +235,10 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     }
 
     // DISPOSE SYSTEMS
-    for (const dispose of iterDisposeFunctions()) {
+    for (const dispose of Iterator.from(systems.values()).flatMap(
+      ({ factoryData }) => factoryData.dispose,
+    )) {
       dispose()
-    }
-
-    if (lastTimeout) {
-      clearTimeout(lastTimeout)
     }
 
     disposed = true
@@ -396,12 +347,16 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
   registerSystem(createClientPlayerControlSystemFactory({ playerUpdateSystem, raycastingSystem }))
 
   // INIT SYSTEMS
-  for (const init of iterInitFunctions()) {
+  for (const init of Iterator.from(systems.values()).flatMap(
+    ({ factoryData }) => factoryData.init,
+  )) {
     init()
   }
 
   // SETUP EVENT LISTENERS
-  for (const { EventConstructor, handler } of iterEventHandlers()) {
+  for (const { EventConstructor, handler } of Iterator.from(systems.values())
+    .flatMap(({ factoryData }) => factoryData.eventHandlers.values())
+    .map((handler) => handler)) {
     const unsubscribe = ctx.eventBus.subscribe(EventConstructor, handler)
     systemsUnsubscriptions.push(unsubscribe)
   }
