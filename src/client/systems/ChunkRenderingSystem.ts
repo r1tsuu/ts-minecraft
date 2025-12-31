@@ -15,6 +15,8 @@ const MAX_BLOCK_COUNT_FOR_MESH =
   Config.CHUNK_SIZE *
   Config.WORLD_HEIGHT
 
+export type ChunkRenderingSystem = ReturnType<typeof chunkRenderingSystemFactory>
+
 export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   const blockMeshesCount = new HashMap<number, number>()
   const blockMeshesFreeIndexes = new HashMap<number, number[]>()
@@ -53,12 +55,10 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     return currentCount
   }
 
-  /**
-   * Marks a chunk to be rendered on the next render cycle.
-   * Use it in other systems when a chunk's data has changed
-   */
-  const markChunkForRender = (chunk: Chunk): void => {
-    chunksNeedingRender.add(chunk)
+  const queueChunksForRender = (...chunks: Chunk[]): void => {
+    for (const chunk of chunks) {
+      chunksNeedingRender.add(chunk)
+    }
   }
 
   ctx.onRenderBatch(Chunk, (chunks) => {
@@ -109,7 +109,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   })
 
   return {
-    markChunkForRender,
     name: 'ChunkRenderingSystem',
+    queueChunksForRender,
   }
 })

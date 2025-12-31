@@ -3,7 +3,7 @@ import { AmbientLight, Color, DirectionalLight, Fog } from 'three'
 import { createSystemFactory } from './createSystem.ts'
 
 // TODO: Expand light system to handle dynamic lights, day-night cycle, etc, for now its dumb
-export const lightSystemFactory = createSystemFactory((ctx) => {
+export const lightingSystemFactory = createSystemFactory((ctx) => {
   const backgroundColor = 0x87ceeb
 
   ctx.scene.fog = new Fog(backgroundColor, 1, 96)
@@ -20,6 +20,6 @@ export const lightSystemFactory = createSystemFactory((ctx) => {
   ctx.scene.add(reflectionLight)
 
   return {
-    name: 'LightSystem',
+    name: 'LightingSystem',
   }
 })

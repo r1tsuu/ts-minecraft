@@ -128,6 +128,19 @@ class Pipeline<T> {
     return new Pipeline(generator.call(this))
   }
 
+  mapSome<U>(fn: (value: T extends Maybe<infer R> ? R : never) => U): Pipeline<Maybe<U>> {
+    if (isMaybe(this._value)) {
+      if (this._value.isSome()) {
+        // @ts-expect-error
+        return new Pipeline(Some(fn(this._value.value())))
+      } else {
+        return new Pipeline(None())
+      }
+    } else {
+      throw new Error('mapSome can only be called on Chain wrapping a Maybe')
+    }
+  }
+
   /**
    * Apply a side effect without changing the value
    */

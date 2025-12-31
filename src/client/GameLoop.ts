@@ -27,7 +27,7 @@ import {
   type SystemFactory,
   type SystemFactoryContext,
 } from './systems/createSystem.ts'
-import { lightSystemFactory } from './systems/light.ts'
+import { lightingSystemFactory } from './systems/LightingSystem.ts'
 import { playerUpdateSystemFactory } from './systems/PlayerUpdateSystem.ts'
 import { raycastingSystemFactory } from './systems/RaycastingSystem.ts'
 
@@ -252,6 +252,8 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     disposed = true
   }
 
+  const vsync = false
+
   const execute = () => {
     const frame = () => {
       if (disposed) {
@@ -260,10 +262,12 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
 
       handleGameFrame()
 
-      requestAnimationFrame(frame)
+      if (vsync) requestAnimationFrame(frame)
+      else setTimeout(frame, 0)
     }
 
-    requestAnimationFrame(frame)
+    if (vsync) requestAnimationFrame(frame)
+    else setTimeout(frame, 0)
   }
 
   const getClientPlayer = () => clientPlayer
@@ -347,7 +351,7 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
   }
 
   // REGISTER SYSTEMS HERE
-  registerSystem(lightSystemFactory)
+  registerSystem(lightingSystemFactory)
   registerSystem(chunkRenderingSystemFactory)
   const raycastingSystem = registerSystem(raycastingSystemFactory)
   const playerUpdateSystem = registerSystem(playerUpdateSystemFactory)

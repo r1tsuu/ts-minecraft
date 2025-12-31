@@ -184,6 +184,20 @@ export class World {
     return false
   }
 
+  /**
+   * Check if an entity exists in the world by its ID
+   * @param id - The ID of the entity to check
+   * @returns True if the entity exists, false otherwise
+   * @example
+   * ```ts
+   * const exists = world.hasEntity('entity-id-123')
+   * console.log(exists) // true or false
+   * ```
+   */
+  entityExists(id: string): boolean {
+    return this.entities.has(id)
+  }
+
   getBlock(x: number, y: number, z: number): Maybe<number> {
     return pipe(Chunk.mapToChunkCoordinates(x, z))
       .map((chunkCoordinates) =>
@@ -197,7 +211,6 @@ export class World {
       )
       .value()
   }
-
   /**
    * Get an entity by its ID
    */

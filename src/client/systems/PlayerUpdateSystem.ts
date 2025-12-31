@@ -1,8 +1,10 @@
 import * as THREE from 'three'
 
 import { Config } from '../../shared/Config.ts'
+import { Chunk } from '../../shared/entities/Chunk.ts'
 import { Player } from '../../shared/entities/Player.ts'
 import { HashMap } from '../../shared/HashMap.ts'
+import { pipe } from '../../shared/Pipe.ts'
 import { UP_VECTOR } from '../../shared/util.ts'
 import { createSystemFactory } from './createSystem.ts'
 
@@ -10,23 +12,35 @@ export type PlayerUpdateSystem = ReturnType<typeof playerUpdateSystemFactory>
 
 class PlayerMovementState {
   canJump: boolean = false
+  hasChunkChanged: boolean = true
+  hasPositionChanged: boolean = true
   movingBackward: boolean = false
   movingForward: boolean = false
   movingLeft: boolean = false
   movingRight: boolean = false
+
+  constructor(public chunk: Chunk) {}
 }
 
 export const playerUpdateSystemFactory = createSystemFactory((ctx) => {
   const playerMovementStates = new HashMap<string, PlayerMovementState>()
 
   const getMovementState = (player: Player): PlayerMovementState =>
-    playerMovementStates.getOrSet(player.uuid, () => new PlayerMovementState())
+    playerMovementStates.getOrSet(
+      player.uuid,
+      () => new PlayerMovementState(calculatePlayerChunk(player)),
+    )
 
   const canJump = (player: Player) => getMovementState(player).canJump
 
   const setCanJump = (player: Player, canJump: boolean): void => {
     getMovementState(player).canJump = canJump
   }
+
+  const calculatePlayerChunk = (player: Player): Chunk =>
+    pipe(Chunk.mapToChunkCoordinates(player.position.x, player.position.z))
+      .map((coords) => ctx.world.getEntity(Chunk.getWorldID(coords), Chunk).unwrap()) // assume chunk exists, otherwise its a bug
+      .value()
 
   const isMovingBackward = (player: Player): boolean => getMovementState(player).movingBackward
 
@@ -51,6 +65,8 @@ export const playerUpdateSystemFactory = createSystemFactory((ctx) => {
   const setMovingRight = (player: Player, moving: boolean): void => {
     getMovementState(player).movingRight = moving
   }
+
+  const getPlayerChunk = (player: Player): Chunk => getMovementState(player).chunk
 
   const tryJump = (player: Player): boolean => {
     if (!canJump(player)) return false
@@ -77,6 +93,13 @@ export const playerUpdateSystemFactory = createSystemFactory((ctx) => {
       if (direction.lengthSq() > 0) {
         direction.normalize()
       }
+
+      const initalPosition = player.position.clone()
+
+      const movementState = getMovementState(player)
+      const newChunk = calculatePlayerChunk(player)
+      movementState.hasChunkChanged = movementState.chunk !== newChunk
+      movementState.chunk = newChunk
 
       const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(
         new THREE.Quaternion().setFromEuler(player.rotation),
@@ -142,11 +165,14 @@ export const playerUpdateSystemFactory = createSystemFactory((ctx) => {
           }
         }
       }
+
+      movementState.hasPositionChanged = !player.position.equals(initalPosition)
     }
   })
 
   return {
     getMovementState,
+    getPlayerChunk,
     name: 'PlayerUpdateSystem',
     setMovingBackward,
     setMovingForward,
