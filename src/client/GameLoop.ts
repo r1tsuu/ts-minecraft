@@ -27,6 +27,7 @@ import {
   type SystemFactory,
   type SystemFactoryContext,
 } from './systems/createSystem.ts'
+import { lightSystemFactory } from './systems/light.ts'
 import { playerUpdateSystemFactory } from './systems/PlayerUpdateSystem.ts'
 import { raycastingSystemFactory } from './systems/RaycastingSystem.ts'
 
@@ -289,6 +290,7 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
       eventBus: ctx.eventBus,
       getClientPlayer: () => clientPlayer,
       getDelta: () => delta,
+      getSinglePlayerWorker: ctx.getSinglePlayerWorker,
       gui: ctx.gui,
       inputManager,
       isFirstFrame: () => frameCounter.totalFrames === 1,
@@ -325,7 +327,6 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
       },
       renderer,
       scene,
-      singlePlayerWorker: ctx.singlePlayerWorker,
       world,
     }
 
@@ -346,6 +347,7 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
   }
 
   // REGISTER SYSTEMS HERE
+  registerSystem(lightSystemFactory)
   registerSystem(chunkRenderingSystemFactory)
   const raycastingSystem = registerSystem(raycastingSystemFactory)
   const playerUpdateSystem = registerSystem(playerUpdateSystemFactory)

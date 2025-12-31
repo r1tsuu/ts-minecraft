@@ -20,10 +20,10 @@ export interface MinecraftClientContext {
   readonly blocksRegistry: BlocksRegistry
   readonly clientBlocksRegistry: ClientBlocksRegistry
   readonly eventBus: MinecraftEventBus
-  readonly gameLoop: Maybe<GameLoop>
+  getGameLoop(): Maybe<GameLoop>
+  getSinglePlayerWorker(): Maybe<Worker>
   readonly gui: GUI
   readonly localStorageManager: LocalStorageManager
-  readonly singlePlayerWorker: Maybe<Worker>
 }
 
 export const createMinecraftClient = (): MinecraftClientContext => {
@@ -44,10 +44,10 @@ export const createMinecraftClient = (): MinecraftClientContext => {
     blocksRegistry,
     clientBlocksRegistry,
     eventBus,
-    gameLoop,
+    getGameLoop: () => gameLoop,
+    getSinglePlayerWorker: () => singlePlayerWorker,
     gui,
     localStorageManager,
-    singlePlayerWorker,
   }
 
   eventBus.subscribe('*', (event) => {

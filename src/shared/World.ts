@@ -94,7 +94,6 @@ class WorldQueryImpl<T extends Entity[] = [], Initial extends boolean = true> im
 }
 
 export class World {
-  private dirtyEntities = new Set<string>()
   private entities: HashMap<string, Entity> = new HashMap()
   private entitiesByType: HashMap<EntityConstructor, Set<string>> = new HashMap()
 
@@ -120,25 +119,6 @@ export class World {
         .map((chunk) => ({ chunk, local: Chunk.mapToLocalCoordinates(x, z) }))
         .tap(({ chunk, local }) => chunk.setBlock(local.x, y, local.z, blockID)),
     )
-  }
-
-  /**
-   * Add an entity to the world and mark it as dirty.
-   * @param resolveEntity - A function that resolves to the entity to add.
-   * @returns The added entity.
-   * @example
-   * ```ts
-   * const player = world.addDirtyEntity(() => new Player(uuid, name))
-   * ```
-   *
-   * Useful for new entity creation where you want to both add and mark as dirty in one step.
-   * For example when generating a new player or chunk.
-   */
-  addDirtyEntity<T extends Entity>(resolveEntity: () => T): T {
-    const entity = resolveEntity()
-    this.addEntity(entity)
-    this.markEntityAsDirty(entity.getWorldID())
-    return entity
   }
 
   /**
@@ -244,16 +224,9 @@ export class World {
 
     return None()
   }
-  markEntityAsDirty(id: string): void {
-    this.dirtyEntities.add(id)
-  }
 
   query(): WorldQuery {
     return new WorldQueryImpl(this.entities, this.entitiesByType)
-  }
-
-  queryDirty(): WorldQuery {
-    return this.query().whereID((id) => this.dirtyEntities.has(id))
   }
 
   removeBlock(x: number, y: number, z: number): void {
@@ -299,9 +272,5 @@ export class World {
     return {
       entities,
     }
-  }
-
-  unmarkEntityAsDirty(id: string): void {
-    this.dirtyEntities.delete(id)
   }
 }

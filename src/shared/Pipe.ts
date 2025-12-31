@@ -88,6 +88,7 @@ class Pipeline<T> {
     }
 
     const result = new HashMap<K, V>()
+    console.log('Building map from iterable...', this._value)
     for (const item of this._value as Iterable<any>) {
       const [key, value] = fn(item)
       result.set(key, value)

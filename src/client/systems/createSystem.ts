@@ -57,7 +57,8 @@ export const createSystemFactory = <Name extends string, Extra extends Record<st
  */
 export interface SystemFactoryContext extends EngineContext {
   /**
-   * Registers a callback to be called on specific lifecycle events of the system
+   * Registers a callback to be called after every system is initialized
+   * Here you are sure that all systems are initialized and can safely reference each other
    * @example
    * ```ts
    * ctx.onInit(() => {
@@ -167,7 +168,7 @@ export interface SystemFactoryContext extends EngineContext {
  * Game Loop level context available to all systems.
  *
  */
-export interface EngineContext extends Omit<MinecraftClientContext, 'gameLoop'> {
+export interface EngineContext extends Omit<MinecraftClientContext, 'getGameLoop'> {
   /**
    * The world instance the system operates on
    */

@@ -9,12 +9,11 @@ import { getBlockKey } from '../../shared/util.ts'
 import { createSystemFactory } from './createSystem.ts'
 
 const MAX_BLOCK_COUNT_FOR_MESH =
-  (Config.RENDER_DISTANCE *
-    Config.RENDER_DISTANCE *
-    Config.CHUNK_SIZE *
-    Config.CHUNK_SIZE *
-    Config.WORLD_HEIGHT) /
-  2
+  Config.RENDER_DISTANCE *
+  Config.RENDER_DISTANCE *
+  Config.CHUNK_SIZE *
+  Config.CHUNK_SIZE *
+  Config.WORLD_HEIGHT
 
 export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   const blockMeshesCount = new HashMap<number, number>()
@@ -22,23 +21,31 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   const chunkBlockMeshesIndexes: HashMap<Chunk, HashMap<string, number>> = new HashMap()
   const chunksNeedingRender: Set<Chunk> = new Set()
 
-  const geometry = new BoxGeometry()
   const matrix = new Matrix4()
+
+  const geometry = new BoxGeometry()
+  geometry.computeBoundingBox()
+  geometry.computeBoundingSphere()
 
   const blockMeshes = pipe(ctx.clientBlocksRegistry.iterateBlocks())
     .mapIter(({ id, material }) => {
-      // Share a single geometry instance across all block types for better memory efficiency
-      geometry.computeBoundingBox()
-      geometry.computeBoundingSphere()
       blockMeshesCount.set(id, 0)
       blockMeshesFreeIndexes.set(id, [])
+      const mesh = new InstancedMesh(geometry, material, MAX_BLOCK_COUNT_FOR_MESH)
+      mesh.count = 0
+      ctx.scene.add(mesh)
+
+      console.log(`Created InstancedMesh for block ID ${id}`)
+
       return {
         id,
-        mesh: new InstancedMesh(geometry, material, MAX_BLOCK_COUNT_FOR_MESH),
+        mesh,
       }
     })
-    .iterToMap((e) => [e.id, e.mesh])
+    .iterToMap((x) => [x.id, x.mesh])
     .value()
+
+  console.log('Created block meshes for chunk rendering:', blockMeshes)
 
   const getNextBlockMeshIndex = (blockID: number): number => {
     const currentCount = blockMeshesCount.get(blockID).unwrap()
@@ -61,21 +68,16 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     for (const chunk of ctx.isFirstFrame() ? chunks : chunksNeedingRender) {
       for (const { blockID, x, y, z } of chunk.iterateBlocks()) {
         const blockKey = getBlockKey(x, y, z)
-        const chunkBlockMeshesIndexes_ = chunkBlockMeshesIndexes.getOrSet(
-          chunk,
-          () => new HashMap(),
-        )
+        const blockMeshesIndexes = chunkBlockMeshesIndexes.getOrSet(chunk, () => new HashMap())
 
-        if (!chunkBlockMeshesIndexes_.has(blockKey)) {
+        if (blockMeshesIndexes.has(blockKey)) {
           continue
         }
 
         const freeList = blockMeshesFreeIndexes.get(blockID).unwrap()
         const blockMesh = blockMeshes.get(blockID).expect(`No mesh found for block ID ${blockID}`)
 
-        const index = Maybe.When(freeList.length > 0, () => freeList.pop()!).unwrapOr(() =>
-          getNextBlockMeshIndex(blockID),
-        )
+        const index = Maybe.from(freeList.pop()).unwrapOr(() => getNextBlockMeshIndex(blockID))
 
         const blockWorldCoordinates = chunk.getBlockWorldCoordinates(x, y, z)
         matrix.setPosition(
@@ -84,7 +86,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
           blockWorldCoordinates.z,
         )
         blockMesh.setMatrixAt(index, matrix)
-        chunkBlockMeshesIndexes_.set(blockKey, index)
+        blockMeshesIndexes.set(blockKey, index)
         meshesNeedUpdate.add(blockMesh)
 
         const currentMax = meshInstanceCounts.getOrDefault(blockID, 0)
@@ -93,6 +95,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     }
 
     for (const mesh of meshesNeedUpdate) {
+      console.log(`Updating instance matrix for mesh`, mesh)
       mesh.instanceMatrix.needsUpdate = true
     }
 
