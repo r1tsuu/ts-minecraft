@@ -35,7 +35,6 @@ export const createClientPlayerControlSystemFactory = ({
         }
 
         ctx.world.addBlock(position.x, position.y, position.z, blockToPlace)
-
         chunkRenderingSystem.renderBlocksAt([position])
       }
     }, THROTTLE_DELAY_MS)

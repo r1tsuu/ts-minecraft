@@ -187,11 +187,27 @@ class Pipeline<T> {
 
 /**
  * Factory function to create a new Pipeline
+ * Supports method chaining for functional transformations, including with iterables, arrays, and Maybe types.
  * @example
  * const result = pipe(5)
  *   .map(x => x * 2)
  *   .filter(x => x > 5)
  *   .value(); // result is 10
+ *
+ * const result2 = pipe([1, 2, 3, 4])
+ *   .mapIter(x => x * 3)
+ *   .filterIter(x => x % 2 === 0)
+ *   .collectArray()
+ *   .value(); // result2 is [6, 12]
+ *
+ * const maybeResult = pipe(Some(10))
+ *   .mapSome(x => x + 5)
+ *   .tapSome(x => console.log('Value is:', x))
+ *   .value(); // maybeResult is Some(15)
+ *
+ * const defaultResult = pipe<number | null>(null)
+ *   .default(42)
+ *   .value(); // defaultResult is 42
  */
 export function pipe<T>(value: T): Pipeline<T> {
   return new Pipeline(value)

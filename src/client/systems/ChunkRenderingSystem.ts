@@ -105,26 +105,24 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   }
 
   const renderBlocks = (chunk: Chunk, positions: RawVector3[]): void => {
-    const existingSet = chunkBlocksNeedingRender.getOrSet(chunk, () => new Set())
-
-    for (const blockKey of positions.map(getBlockKeyFromVector)) {
-      existingSet.add(blockKey)
-    }
+    pipe(chunkBlocksNeedingRender.getOrSet(chunk, () => new Set())).tap((set) =>
+      positions.map(getBlockKeyFromVector).forEach((blockKey) => set.add(blockKey)),
+    )
   }
 
   const renderBlocksAt = (positions: RawVector3[]): void => {
     for (const worldPos of positions) {
       pipe(Chunk.mapToChunkCoordinates(worldPos.x, worldPos.z))
         .map((chunkCoord) => ctx.world.getEntity(Chunk.getWorldID(chunkCoord), Chunk))
-        .tapSome((chunk) => {
-          const existingSet = chunkBlocksNeedingRender.getOrSet(chunk, () => new Set())
-          existingSet.add(
+        .mapSome((chunk) => chunkBlocksNeedingRender.getOrSet(chunk, () => new Set()))
+        .tapSome((set) =>
+          set.add(
             getBlockKeyFromVector({
               ...Chunk.mapToLocalCoordinates(worldPos.x, worldPos.z),
               y: worldPos.y,
             }),
-          )
-        })
+          ),
+        )
     }
   }
 
@@ -132,24 +130,22 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     for (const worldPos of positions) {
       pipe(Chunk.mapToChunkCoordinates(worldPos.x, worldPos.z))
         .map((chunkCoord) => ctx.world.getEntity(Chunk.getWorldID(chunkCoord), Chunk))
-        .tapSome((chunk) => {
-          const existingSet = chunkBlocksNeedingUnrender.getOrSet(chunk, () => new Set())
-          existingSet.add(
+        .mapSome((chunk) => chunkBlocksNeedingUnrender.getOrSet(chunk, () => new Set()))
+        .tapSome((set) =>
+          set.add(
             getBlockKeyFromVector({
               ...Chunk.mapToLocalCoordinates(worldPos.x, worldPos.z),
               y: worldPos.y,
             }),
-          )
-        })
+          ),
+        )
     }
   }
 
   const unrenderBlocks = (chunk: Chunk, positions: RawVector3[]): void => {
-    const existingSet = chunkBlocksNeedingRender.getOrSet(chunk, () => new Set())
-
-    for (const blockKey of positions.map(getBlockKeyFromVector)) {
-      existingSet.delete(blockKey)
-    }
+    pipe(chunkBlocksNeedingRender.getOrSet(chunk, () => new Set())).tap((set) =>
+      set.delete(getBlockKeyFromVector(positions[0])),
+    )
   }
 
   const hideMatrix = new Matrix4().makeScale(0, 0, 0)

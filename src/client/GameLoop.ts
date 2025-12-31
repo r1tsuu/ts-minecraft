@@ -375,7 +375,13 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
   const chunkRenderingSystem = registerSystem(chunkRenderingSystemFactory)
   const raycastingSystem = registerSystem(raycastingSystemFactory)
   const playerUpdateSystem = registerSystem(playerUpdateSystemFactory)
-  registerSystem(createClientPlayerControlSystemFactory({ playerUpdateSystem, raycastingSystem }))
+  registerSystem(
+    createClientPlayerControlSystemFactory({
+      chunkRenderingSystem,
+      playerUpdateSystem,
+      raycastingSystem,
+    }),
+  )
   registerSystem(chunkLoadingSystemFactory({ chunkRenderingSystem, playerUpdateSystem }))
   // ---------------------------------
   // REGISTER SYSTEMS ENDS HERE

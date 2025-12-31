@@ -1,12 +1,7 @@
 import type { Chunk, ChunkCoordinates } from '../shared/entities/Chunk.ts'
 import type { Player } from '../shared/entities/Player.ts'
 import type { Maybe } from '../shared/Maybe.ts'
-import type { ChunkIndex, UUID } from '../types.ts'
-
-export interface WorldMetadata {
-  lastLoadedAt: Date | null
-  loadedChunks: ChunkIndex[]
-}
+import type { UUID } from '../types.ts'
 
 export interface WorldStorageAdapter {
   deleteChunk(coordinates: ChunkCoordinates): Promise<void>
