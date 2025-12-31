@@ -47,8 +47,6 @@ const filePath = path.join(folderPath, `${eventName}.ts`)
 fs.writeFileSync(filePath, classCode, 'utf-8')
 console.log(`Event class ${eventName} created at ${filePath}`)
 
-const minecraftEventBusPath = path.resolve(import.meta.dirname, './src/shared/MinecraftEventBus.ts')
-
 // Update the index.ts file in the event scope folder
 const indexPath = path.join(folderPath, 'index.ts')
 let indexContent = ''

@@ -21,6 +21,19 @@ export const getBlockKey = (x: number, y: number, z: number): string => {
   return `${x},${y},${z}`
 }
 
+export const getBlockKeyFromVector = (pos: RawVector3): string => {
+  return getBlockKey(pos.x, pos.y, pos.z)
+}
+
+export const getPositionFromBlockKey = (key: string): RawVector3 => {
+  const [xStr, yStr, zStr] = key.split(',')
+  return {
+    x: parseInt(xStr, 10),
+    y: parseInt(yStr, 10),
+    z: parseInt(zStr, 10),
+  }
+}
+
 export const getBlockIndex = (x: number, y: number, z: number): number => {
   return x + Config.CHUNK_SIZE * (z + Config.CHUNK_SIZE * y)
 }

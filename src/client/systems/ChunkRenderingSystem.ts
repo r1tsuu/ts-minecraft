@@ -1,11 +1,13 @@
 import { BoxGeometry, InstancedMesh, Matrix4 } from 'three'
 
+import type { RawVector3 } from '../../types.ts'
+
 import { Config } from '../../shared/Config.ts'
 import { Chunk } from '../../shared/entities/Chunk.ts'
 import { HashMap } from '../../shared/HashMap.ts'
 import { Maybe } from '../../shared/Maybe.ts'
 import { pipe } from '../../shared/Pipe.ts'
-import { getBlockKey } from '../../shared/util.ts'
+import { getBlockKey, getBlockKeyFromVector, getPositionFromBlockKey } from '../../shared/util.ts'
 import { createSystemFactory } from './createSystem.ts'
 
 const MAX_BLOCK_COUNT_FOR_MESH =
@@ -16,15 +18,51 @@ const MAX_BLOCK_COUNT_FOR_MESH =
   Config.WORLD_HEIGHT
 
 export interface ChunkRenderingSystem {
-  queueChunksForRender(chunks: Chunk[]): void
-  queueChunksForUnrender(chunks: Chunk[]): void
+  /**
+   * Renders the specified blocks within a chunk.
+   * @param chunk The chunk containing the blocks to render.
+   * @param localPositions The local positions of the blocks within the chunk to render.
+   */
+  renderBlocks(chunk: Chunk, localPositions: RawVector3[]): void
+
+  /**
+   * Renders blocks at the specified world positions.
+   * @param worldPositions The world positions of the blocks to render.
+   */
+  renderBlocksAt(worldPositions: RawVector3[]): void
+
+  /**
+   * Renders entire chunks.
+   * @param chunks The chunks to render.
+   */
+  renderChunks(chunks: Chunk[]): void
+
+  /**
+   * Unrenders the specified blocks within a chunk.
+   * @param chunk The chunk containing the blocks to unrender.
+   * @param localPositions The local positions of the blocks within the chunk to unrender.
+   */
+  unrenderBlocks(chunk: Chunk, localPositions: RawVector3[]): void
+
+  /**
+   * Unrenders blocks at the specified world positions.
+   * @param worldPositions The world positions of the blocks to unrender.
+   */
+  unrenderBlocksAt(worldPositions: RawVector3[]): void
+
+  /**
+   * Unrenders entire chunks.
+   * @param chunks The chunks to unrender.
+   */
+  unrenderChunks(chunks: Chunk[]): void
 }
 
 export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   const blockMeshesCount = new HashMap<number, number>()
   const blockMeshesFreeIndexes = new HashMap<number, number[]>()
-  const blockMeshesIndexes: HashMap<string, number> = new HashMap()
+  const chunkBlockMeshesIndexes: HashMap<Chunk, HashMap<string, number>> = new HashMap()
   const chunksNeedingRender: Set<Chunk> = new Set()
+  const chunkBlocksNeedingRender = new HashMap<Chunk, Set<string>>()
 
   const matrix = new Matrix4()
 
@@ -39,6 +77,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
       const mesh = new InstancedMesh(geometry, material, MAX_BLOCK_COUNT_FOR_MESH)
       mesh.count = 0
       ctx.scene.add(mesh)
+      mesh.frustumCulled = false // TODO: Produces artifacts.
 
       console.log(`Created InstancedMesh for block ID ${id}`)
 
@@ -58,27 +97,86 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     return currentCount
   }
 
-  const queueChunksForRender = (chunks: Chunk[]): void => {
+  const renderChunks = (chunks: Chunk[]): void => {
     for (const chunk of chunks) {
       chunksNeedingRender.add(chunk)
     }
   }
 
+  const renderBlocks = (chunk: Chunk, positions: RawVector3[]): void => {
+    const existingSet = chunkBlocksNeedingRender.getOrSet(chunk, () => new Set())
+
+    for (const blockKey of positions.map(getBlockKeyFromVector)) {
+      existingSet.add(blockKey)
+    }
+  }
+
+  const renderBlocksAt = (positions: RawVector3[]): void => {
+    for (const worldPos of positions) {
+      pipe(Chunk.mapToChunkCoordinates(worldPos.x, worldPos.z))
+        .map((chunkCoord) => ctx.world.getEntity(Chunk.getWorldID(chunkCoord), Chunk))
+        .tapSome((chunk) => {
+          const existingSet = chunkBlocksNeedingRender.getOrSet(chunk, () => new Set())
+          existingSet.add(
+            getBlockKeyFromVector({
+              ...Chunk.mapToLocalCoordinates(worldPos.x, worldPos.z),
+              y: worldPos.y,
+            }),
+          )
+        })
+    }
+  }
+
+  const unrenderBlocksAt = (positions: RawVector3[]): void => {
+    for (const worldPos of positions) {
+      pipe(Chunk.mapToChunkCoordinates(worldPos.x, worldPos.z))
+        .map((chunkCoord) => ctx.world.getEntity(Chunk.getWorldID(chunkCoord), Chunk))
+        .tapSome((chunk) => {
+          const existingSet = chunkBlocksNeedingRender.getOrSet(chunk, () => new Set())
+          existingSet.delete(
+            getBlockKeyFromVector({
+              ...Chunk.mapToLocalCoordinates(worldPos.x, worldPos.z),
+              y: worldPos.y,
+            }),
+          )
+        })
+    }
+  }
+
+  const unrenderBlocks = (chunk: Chunk, positions: RawVector3[]): void => {
+    const existingSet = chunkBlocksNeedingRender.getOrSet(chunk, () => new Set())
+
+    for (const blockKey of positions.map(getBlockKeyFromVector)) {
+      existingSet.delete(blockKey)
+    }
+  }
+
   const hideMatrix = new Matrix4().makeScale(0, 0, 0)
 
-  const queueChunksForUnrender = (chunks: Chunk[]): void => {
+  const unrenderChunks = (chunks: Chunk[]): void => {
     const meshesNeedUpdate = new Set<InstancedMesh>()
 
     for (const chunk of chunks) {
-      for (const { blockID, x, y, z } of chunk.iterateBlocks()) {
-        blockMeshesIndexes.get(getBlockKey(x, y, z)).tap((blockMeshIndex) => {
-          const mesh = blockMeshes.get(blockID).unwrap()
-          mesh.setMatrixAt(blockMeshIndex, hideMatrix)
-          blockMeshesFreeIndexes.get(blockID).tap((indexes) => indexes.push(blockMeshIndex))
-          meshesNeedUpdate.add(mesh)
-        })
+      const blockMeshesIndexes = chunkBlockMeshesIndexes.get(chunk)
+
+      if (blockMeshesIndexes.isNone()) {
+        continue
       }
 
+      for (const { blockID, x, y, z } of chunk.iterateBlocks()) {
+        blockMeshesIndexes
+          .unwrap()
+          .get(getBlockKey(x, y, z))
+          .tap((blockMeshIndex) => {
+            const mesh = blockMeshes.get(blockID).unwrap()
+            mesh.setMatrixAt(blockMeshIndex, hideMatrix)
+            blockMeshesFreeIndexes.get(blockID).tap((indexes) => indexes.push(blockMeshIndex))
+            meshesNeedUpdate.add(mesh)
+          })
+      }
+
+      // Remove the chunk's block mesh indexes after unrendering
+      chunkBlockMeshesIndexes.delete(chunk)
       chunksNeedingRender.delete(chunk)
     }
 
@@ -87,35 +185,65 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     }
   }
 
+  // Renders a single block within a chunk
+  const renderBlock = (
+    meshesNeedUpdate: Set<InstancedMesh>,
+    chunk: Chunk,
+    x: number,
+    y: number,
+    z: number,
+    incomingBlockTypeID?: number,
+    incomingBlockKey?: string,
+  ) => {
+    const blockKey = incomingBlockKey ?? getBlockKey(x, y, z)
+
+    const blockMeshesIndexes = chunkBlockMeshesIndexes.getOrSet(chunk, () => new HashMap())
+
+    if (blockMeshesIndexes.has(blockKey)) {
+      return
+    }
+
+    const blockTypeID = incomingBlockTypeID ?? chunk.getBlock(x, y, z).unwrap()
+
+    const freeList = blockMeshesFreeIndexes.get(blockTypeID).unwrap()
+    const blockMesh = blockMeshes
+      .get(blockTypeID)
+      .expect(`No mesh found for block ID ${blockTypeID}`)
+
+    const index = Maybe.from(freeList.pop()).unwrapOr(() => getNextBlockMeshIndex(blockTypeID))
+
+    const blockWorldCoordinates = chunk.getBlockWorldCoordinates(x, y, z)
+    matrix.setPosition(blockWorldCoordinates.x, blockWorldCoordinates.y, blockWorldCoordinates.z)
+    blockMesh.setMatrixAt(index, matrix)
+    blockMeshesIndexes.set(blockKey, index)
+    meshesNeedUpdate.add(blockMesh)
+
+    const currentMax = blockMeshesCount.getOrDefault(blockTypeID, 0)
+    blockMeshesCount.set(blockTypeID, Math.max(currentMax, index + 1))
+  }
+
   ctx.onRenderBatch(Chunk, (chunks) => {
     const meshesNeedUpdate = new Set<InstancedMesh>()
     const meshInstanceCounts = new HashMap<number, number>()
 
+    // Initialize counts with current mesh counts
+    for (const [blockID, mesh] of blockMeshes) {
+      meshInstanceCounts.set(blockID, mesh.count)
+    }
+
+    for (const [chunk, blockKeys] of chunkBlocksNeedingRender) {
+      for (const blockKey of blockKeys) {
+        const pos = getPositionFromBlockKey(blockKey)
+        renderBlock(meshesNeedUpdate, chunk, pos.x, pos.y, pos.z, undefined, blockKey)
+      }
+
+      // After processing, clear the set for this chunk
+      chunkBlocksNeedingRender.delete(chunk)
+    }
+
     for (const chunk of ctx.isFirstFrame() ? chunks : chunksNeedingRender) {
       for (const { blockID, x, y, z } of chunk.iterateBlocks()) {
-        const blockKey = getBlockKey(x, y, z)
-
-        if (blockMeshesIndexes.has(blockKey)) {
-          continue
-        }
-
-        const freeList = blockMeshesFreeIndexes.get(blockID).unwrap()
-        const blockMesh = blockMeshes.get(blockID).expect(`No mesh found for block ID ${blockID}`)
-
-        const index = Maybe.from(freeList.pop()).unwrapOr(() => getNextBlockMeshIndex(blockID))
-
-        const blockWorldCoordinates = chunk.getBlockWorldCoordinates(x, y, z)
-        matrix.setPosition(
-          blockWorldCoordinates.x,
-          blockWorldCoordinates.y,
-          blockWorldCoordinates.z,
-        )
-        blockMesh.setMatrixAt(index, matrix)
-        blockMeshesIndexes.set(blockKey, index)
-        meshesNeedUpdate.add(blockMesh)
-
-        const currentMax = meshInstanceCounts.getOrDefault(blockID, 0)
-        meshInstanceCounts.set(blockID, Math.max(currentMax, index + 1))
+        renderBlock(meshesNeedUpdate, chunk, x, y, z, blockID)
       }
     }
 
@@ -125,17 +253,21 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     }
 
     // Update instance counts for better frustum culling
-    for (const [blockTypeID] of meshInstanceCounts) {
+    for (const [blockTypeID, count] of meshInstanceCounts) {
       const mesh = blockMeshes.get(blockTypeID).unwrap()
-      mesh.count = meshInstanceCounts.getOrDefault(blockTypeID, 0)
+      mesh.count = count
     }
 
     chunksNeedingRender.clear()
   })
 
   const api: ChunkRenderingSystem = {
-    queueChunksForRender,
-    queueChunksForUnrender,
+    renderBlocks,
+    renderBlocksAt,
+    renderChunks,
+    unrenderBlocks,
+    unrenderBlocksAt,
+    unrenderChunks,
   }
 
   return {

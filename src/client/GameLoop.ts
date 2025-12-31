@@ -20,6 +20,7 @@ import { Maybe } from '../shared/Maybe.ts'
 import { pipe } from '../shared/Pipe.ts'
 import { World } from '../shared/World.ts'
 import { createInputManager } from './InputManager.ts'
+import { chunkLoadingSystemFactory } from './systems/ChunkLoadingSystem.ts'
 import { chunkRenderingSystemFactory } from './systems/ChunkRenderingSystem.ts'
 import { createClientPlayerControlSystemFactory } from './systems/ClientPlayerControlSystem.ts'
 import {
@@ -31,7 +32,7 @@ import { lightingSystemFactory } from './systems/LightingSystem.ts'
 import { playerUpdateSystemFactory } from './systems/PlayerUpdateSystem.ts'
 import { raycastingSystemFactory } from './systems/RaycastingSystem.ts'
 
-export type FrameCounter = {
+export interface FrameCounter {
   fps: number
   lastFrames: number
   lastTime: number
@@ -46,19 +47,6 @@ export interface GameLoop {
   getFrameCounter(): Readonly<FrameCounter>
   setRendererSize(width: number, height: number): void
 }
-
-export type OnEvent<E extends MinecraftEvent> = {
-  EventConstructor: EventConstructor<E>
-  handler: (event: E) => void
-}
-
-export type OnRenderBatch<T extends Entity> = (entities: T[]) => void
-
-export type OnRenderEach<T extends Entity> = (entity: T) => void
-
-export type OnUpdateBatch<T extends Entity> = (entities: T[]) => void
-
-export type OnUpdateEach<T extends Entity> = (entity: T) => void
 
 export interface SystemFactoryContextData {
   dispose: Set<Callback>
@@ -76,6 +64,19 @@ export interface SystemInRegistry {
   factoryData: SystemFactoryContextData
   system: System<string>
 }
+
+type OnEvent<E extends MinecraftEvent> = {
+  EventConstructor: EventConstructor<E>
+  handler: (event: E) => void
+}
+
+type OnRenderBatch<T extends Entity> = (entities: T[]) => void
+
+type OnRenderEach<T extends Entity> = (entity: T) => void
+
+type OnUpdateBatch<T extends Entity> = (entities: T[]) => void
+
+type OnUpdateEach<T extends Entity> = (entity: T) => void
 
 export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameLoop => {
   const camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
@@ -119,6 +120,9 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
 
   const inputManager = createInputManager(() => paused)
 
+  // ---------------------------------
+  // GAME LOOP FRAME HANDLER STARTS HERE
+  // ---------------------------------
   const handleGameFrame = () => {
     if (paused) {
       gameLoopClock.stop()
@@ -133,6 +137,9 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
 
     delta = gameLoopClock.getDelta()
 
+    // ---------------------------------
+    // FRAME COUNTER UPDATE STARTS HERE
+    // ---------------------------------
     frameCounter.lastTime += delta
     frameCounter.totalTime += delta
     frameCounter.lastFrames++
@@ -143,6 +150,9 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
       frameCounter.lastFrames = 0
       frameCounter.lastTime = 0
     }
+    // ---------------------------------
+    // FRAME COUNTER UPDATE ENDS HERE
+    // ---------------------------------
 
     const collectedEntities = new HashMap<EntityConstructor, Entity[]>()
 
@@ -159,7 +169,9 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
       return collectedEntities.get(EntityConstructor).unwrap()
     }
 
+    // ---------------------------------
     // UPDATE SYSTEMS WITH ENTITY ARGUMENTS, FOR EXAMPLE: PLAYER MOVEMENT, PHYSICS, ETC.
+    // ---------------------------------
     for (const { Constructor: EntityConstructor } of Entity.iterEntityConstructors()) {
       const entities = fetchEntities(EntityConstructor)
       for (const updateBatch of Iterator.from(systems.values())
@@ -179,7 +191,9 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
       }
     }
 
+    // ---------------------------------
     // UPDATE SYSTEMS WITHOUT ENTITY ARGUMENTS, FOR EXAMPLE: INPUT, CAMERA CONTROLS, ETC.
+    // ---------------------------------
     for (const update of Iterator.from(systems.values()).flatMap(
       ({ factoryData }) => factoryData.updates,
     )) {
@@ -193,7 +207,9 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     // Reset mouse delta each frame
     inputManager.resetMouseDelta()
 
+    // ---------------------------------
     // RENDER SYSTEMS WITH ENTITY ARGUMENTS, FOR EXAMPLE: RENDERABLE ENTITIES
+    // ---------------------------------
     for (const { Constructor: EntityConstructor } of Entity.iterEntityConstructors()) {
       for (const renderBatch of Iterator.from(systems.values())
         .map(({ factoryData }) => factoryData.renderBatch.get(EntityConstructor))
@@ -223,6 +239,9 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     // FINAL RENDER CALL TO RENDER THE SCENE
     renderer.render(scene, camera)
   }
+  // ---------------------------------
+  // GAME LOOP FRAME HANDLER ENDS HERE
+  // ---------------------------------
 
   const subscriptions: Callback[] = []
   subscriptions.push(ctx.eventBus.subscribe(PauseToggle, () => (paused = !paused)))
@@ -252,7 +271,7 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     disposed = true
   }
 
-  const vsync = false
+  const vsync = true
 
   const execute = () => {
     const frame = () => {
@@ -302,9 +321,9 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
       onDispose(disposeFn) {
         systemData.dispose.add(disposeFn)
       },
-      onEvent(Event, handler) {
-        systemData.eventHandlers.set(Event, {
-          EventConstructor: Event,
+      onEvent(EventConstructor, handler) {
+        systemData.eventHandlers.set(EventConstructor, {
+          EventConstructor,
           handler: handler as (event: MinecraftEvent) => void,
         })
       },
@@ -350,27 +369,37 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     return system as unknown as T
   }
 
-  // REGISTER SYSTEMS HERE
+  // ---------------------------------
+  // REGISTER SYSTEMS STARTS HERE
   registerSystem(lightingSystemFactory)
-  registerSystem(chunkRenderingSystemFactory)
+  const chunkRenderingSystem = registerSystem(chunkRenderingSystemFactory)
   const raycastingSystem = registerSystem(raycastingSystemFactory)
   const playerUpdateSystem = registerSystem(playerUpdateSystemFactory)
   registerSystem(createClientPlayerControlSystemFactory({ playerUpdateSystem, raycastingSystem }))
+  registerSystem(chunkLoadingSystemFactory({ chunkRenderingSystem, playerUpdateSystem }))
+  // ---------------------------------
+  // REGISTER SYSTEMS ENDS HERE
 
-  // INIT SYSTEMS
+  // ---------------------------------
+  // INITIALIZE SYSTEMS STARTS HERE
   for (const init of Iterator.from(systems.values()).flatMap(
     ({ factoryData }) => factoryData.init,
   )) {
     init()
   }
+  // ---------------------------------
+  // INITIALIZE SYSTEMS ENDS HERE
 
-  // SETUP EVENT LISTENERS
+  // ---------------------------------
+  // SUBSCRIBE SYSTEM EVENT LISTENERS STARTS HERE
   for (const { EventConstructor, handler } of Iterator.from(systems.values())
     .flatMap(({ factoryData }) => factoryData.eventHandlers.values())
     .map((handler) => handler)) {
     const unsubscribe = ctx.eventBus.subscribe(EventConstructor, handler)
     systemsUnsubscriptions.push(unsubscribe)
   }
+  // ---------------------------------
+  // SUBSCRIBE SYSTEM EVENT LISTENERS ENDS HERE
 
   return {
     dispose,

@@ -107,6 +107,9 @@ export const playerUpdateSystemFactory = createSystemFactory((ctx) => {
       const movementState = getMovementState(player)
       const newChunk = calculatePlayerChunk(player)
       movementState.hasChunkChanged = movementState.chunk !== newChunk
+      if (movementState.hasChunkChanged) {
+        console.log('Player chunk changed to:', newChunk.x, newChunk.z)
+      }
       movementState.chunk = newChunk
 
       const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(

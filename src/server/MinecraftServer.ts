@@ -31,7 +31,7 @@ export const createMinecraftServer = async ({
   const terrainGenerator = createTerrainGenerator(blocksRegistry)
 
   const players = await storage.readPlayers()
-  const spawnChunks = Chunk.coordsInRadius(0, 0, Config.SPAWN_CHUNK_RADIUS)
+  const spawnChunks = Chunk.coordsInRadius(0, 0, Config.RENDER_DISTANCE)
 
   const world = new World()
 

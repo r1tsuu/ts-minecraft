@@ -6,7 +6,6 @@ import { Chunk } from '../../shared/entities/Chunk.ts'
 import { RequestChunksLoad } from '../../shared/events/client/RequestChunksLoad.ts'
 import { RequestChunksUnload } from '../../shared/events/client/RequestChunksUnload.ts'
 import { ResponseChunksLoad } from '../../shared/events/server/ResponseChunksLoad.ts'
-import { Maybe } from '../../shared/Maybe.ts'
 import { pipe } from '../../shared/Pipe.ts'
 import { createSystemFactory } from './createSystem.ts'
 
@@ -20,7 +19,8 @@ export const chunkLoadingSystemFactory = ({
   createSystemFactory((ctx) => {
     ctx.onEvent(ResponseChunksLoad, (event) => {
       ctx.world.addEntities(event.chunks)
-      chunkRenderingSystem.queueChunksForRender(event.chunks)
+      chunkRenderingSystem.renderChunks(event.chunks)
+      console.log('Loaded chunks:', event.chunks)
     })
 
     // On each update, check if the player's chunk has changed and request new chunks if needed
@@ -33,13 +33,13 @@ export const chunkLoadingSystemFactory = ({
         return
       }
 
-      const chunksToShouldBeLoaded = Chunk.coordsInRadius(
+      const chunksInRenderDistance = Chunk.coordsInRadius(
         movementState.chunk.x,
         movementState.chunk.z,
         Config.RENDER_DISTANCE,
       )
 
-      const chunksToLoad = chunksToShouldBeLoaded.filter(
+      const chunksToLoad = chunksInRenderDistance.filter(
         (coords) => !ctx.world.entityExists(Chunk.getWorldID(coords)),
       )
 
@@ -49,10 +49,13 @@ export const chunkLoadingSystemFactory = ({
 
       const chunksToUnload = currentChunks.filter(
         (chunk) =>
-          !chunksToShouldBeLoaded.some((coord) => coord.x === chunk.x && coord.z === chunk.z),
+          chunksInRenderDistance.findIndex(
+            (coords) => coords.x === chunk.x && coords.z === chunk.z,
+          ) === -1,
       )
 
       if (chunksToUnload.length > 0) {
+        console.log('Unloading chunks:', chunksToUnload)
         ctx.eventBus.publish(
           new RequestChunksUnload(
             chunksToUnload.map((chunk) => ({
@@ -63,21 +66,8 @@ export const chunkLoadingSystemFactory = ({
         )
 
         ctx.world.removeEntities(chunksToUnload.map(Chunk.getWorldID))
-        chunkRenderingSystem.queueChunksForUnrender(chunksToUnload)
+        chunkRenderingSystem.unrenderChunks(chunksToUnload)
       }
-
-      pipe(ctx.getClientPlayer())
-        .map((player) => playerUpdateSystem.getMovementState(player))
-        .filter((movementState) => movementState.hasChunkChanged)
-        .map(Maybe.from)
-        .mapSome(({ chunk }) =>
-          Chunk.coordsInRadius(chunk.x, chunk.z, Config.RENDER_DISTANCE).filter(
-            (coords) => !ctx.world.entityExists(Chunk.getWorldID(coords)),
-          ),
-        )
-        .tapSome(
-          (coords) => coords.length > 0 && ctx.eventBus.publish(new RequestChunksLoad(coords)),
-        )
     })
 
     return {
