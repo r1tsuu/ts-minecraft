@@ -35,7 +35,7 @@ export const createClientPlayerControlSystemFactory = ({
         }
 
         ctx.world.addBlock(position.x, position.y, position.z, blockToPlace)
-        chunkRenderingSystem.renderBlocksAt([position])
+        chunkRenderingSystem.renderBlockAt(position)
       }
     }, THROTTLE_DELAY_MS)
 
@@ -43,10 +43,8 @@ export const createClientPlayerControlSystemFactory = ({
       const maybeLookingAtBlock = raycastingSystem.getLookingAtBlock()
       if (maybeLookingAtBlock.isSome()) {
         const lookingAtBlock = maybeLookingAtBlock.value()
-
-        chunkRenderingSystem.unrenderBlocksAt([lookingAtBlock], () =>
-          ctx.world.removeBlockAt(lookingAtBlock.x, lookingAtBlock.y, lookingAtBlock.z),
-        )
+        chunkRenderingSystem.unrenderBlockAt(lookingAtBlock)
+        ctx.world.removeBlockAt(lookingAtBlock.x, lookingAtBlock.y, lookingAtBlock.z)
       }
     }, THROTTLE_DELAY_MS)
 

@@ -6,12 +6,7 @@ import { Config } from '../../shared/Config.ts'
 import { Chunk } from '../../shared/entities/Chunk.ts'
 import { HashMap } from '../../shared/HashMap.ts'
 import { pipe } from '../../shared/Pipe.ts'
-import {
-  type Callback,
-  getBlockKey,
-  getBlockKeyFromVector,
-  getPositionFromBlockKey,
-} from '../../shared/util.ts'
+import { getBlockKey, getBlockKeyFromVector, getPositionFromBlockKey } from '../../shared/util.ts'
 import { createSystemFactory } from './createSystem.ts'
 
 const MAX_BLOCK_COUNT_FOR_MESH =
@@ -22,22 +17,13 @@ const MAX_BLOCK_COUNT_FOR_MESH =
   Config.WORLD_HEIGHT
 
 export interface ChunkRenderingSystem {
-  /**
-   * Renders blocks at the specified world positions.
-   * @param worldPositions The world positions of the blocks to render.
-   */
-  renderBlocksAt(worldPositions: RawVector3[]): void
+  renderBlockAt(worldPosition: RawVector3): void
   /**
    * Renders entire chunks.
    * @param chunks The chunks to render.
    */
   renderChunks(chunks: Chunk[]): void
-  /**
-   * Unrenders blocks at the specified world positions.
-   * @param worldPositions The world positions of the blocks to unrender.
-   * @param callback Optional callback to be called after unrendering.
-   */
-  unrenderBlocksAt(worldPositions: RawVector3[], callback?: Callback): void
+  unrenderBlockAt(worldPosition: RawVector3): void
   /**
    * Unrenders entire chunks.
    * @param chunks The chunks to unrender.
@@ -52,8 +38,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   const chunksNeedingRender = new Set<Chunk>()
   const chunkBlocksNeedingRender = new HashMap<Chunk, Set<string>>()
 
-  const chunkBlocksNeedingUnrender = new HashMap<Chunk, Set<string>>()
-  const chunkBlocksUnrenderCallbacks = new HashMap<Chunk, Callback[]>()
+  const chunkBlocksNeedingUnrender = new HashMap<Chunk, Set<{ blockID: number; key: string }>>()
 
   const intermediateMatrix = new Matrix4()
   const hideMatrix = new Matrix4().makeScale(0, 0, 0)
@@ -95,40 +80,37 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     }
   }
 
-  const renderBlocksAt = (positions: RawVector3[]): void => {
-    for (const worldPos of positions) {
-      pipe(Chunk.mapToChunkCoordinates(worldPos.x, worldPos.z))
-        .map((chunkCoord) => ctx.world.getEntity(Chunk.getWorldID(chunkCoord), Chunk))
-        .mapSome((chunk) => chunkBlocksNeedingRender.getOrSet(chunk, () => new Set()))
-        .tapSome((set) =>
-          set.add(
-            getBlockKeyFromVector({
-              ...Chunk.mapToLocalCoordinates(worldPos.x, worldPos.z),
-              y: worldPos.y,
-            }),
-          ),
-        )
-    }
+  const renderBlockAt = (worldPos: RawVector3): void => {
+    pipe(Chunk.mapToChunkCoordinates(worldPos.x, worldPos.z))
+      .map((chunkCoord) => ctx.world.getEntity(Chunk.getWorldID(chunkCoord), Chunk))
+      .mapSome((chunk) => chunkBlocksNeedingRender.getOrSet(chunk, () => new Set()))
+      .tapSome((set) =>
+        set.add(
+          getBlockKeyFromVector({
+            ...Chunk.mapToLocalCoordinates(worldPos.x, worldPos.z),
+            y: worldPos.y,
+          }),
+        ),
+      )
   }
 
-  const unrenderBlocksAt = (positions: RawVector3[], callback?: Callback): void => {
-    for (const worldPos of positions) {
-      pipe(Chunk.mapToChunkCoordinates(worldPos.x, worldPos.z))
-        .map((chunkCoord) => ctx.world.getEntity(Chunk.getWorldID(chunkCoord), Chunk))
-        .tapSome(
-          (chunk) =>
-            callback && chunkBlocksUnrenderCallbacks.getOrSet(chunk, () => []).push(callback),
-        )
-        .mapSome((chunk) => chunkBlocksNeedingUnrender.getOrSet(chunk, () => new Set()))
-        .tapSome((set) =>
-          set.add(
-            getBlockKeyFromVector({
-              ...Chunk.mapToLocalCoordinates(worldPos.x, worldPos.z),
-              y: worldPos.y,
-            }),
-          ),
-        )
-    }
+  const unrenderBlockAt = (worldPos: RawVector3): void => {
+    pipe(Chunk.mapToChunkCoordinates(worldPos.x, worldPos.z))
+      .map((chunkCoord) => ctx.world.getEntity(Chunk.getWorldID(chunkCoord), Chunk))
+      .mapSome((chunk) => ({
+        chunk,
+        set: chunkBlocksNeedingUnrender.getOrSet(chunk, () => new Set()),
+      }))
+      .tapSome(({ chunk, set }) => {
+        const localCoords = Chunk.mapToLocalCoordinates(worldPos.x, worldPos.z)
+        set.add({
+          blockID: chunk.getBlock(localCoords.x, worldPos.y, localCoords.z).unwrapOrDefault(0),
+          key: getBlockKeyFromVector({
+            ...localCoords,
+            y: worldPos.y,
+          }),
+        })
+      })
   }
 
   const unrenderBlock = (
@@ -137,17 +119,9 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     x: number,
     y: number,
     z: number,
-    blockID?: number,
+    blockID: number,
     blockMeshesIndexes?: HashMap<string, number>,
   ) => {
-    if (!blockID) {
-      const block = chunk.getBlock(x, y, z)
-      if (block.isNone()) {
-        return
-      }
-      blockID = block.value()
-    }
-
     if (!blockMeshesIndexes) {
       const maybeblockMeshesIndexes = chunkBlockMeshesIndexes.get(chunk)
       if (maybeblockMeshesIndexes.isNone()) {
@@ -186,7 +160,6 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
       chunksNeedingRender.delete(chunk)
       chunkBlocksNeedingRender.delete(chunk)
       chunkBlocksNeedingUnrender.delete(chunk)
-      chunkBlocksUnrenderCallbacks.delete(chunk)
     }
 
     for (const mesh of meshesNeedUpdate) {
@@ -265,19 +238,13 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     }
 
     for (const [chunk, blockKeys] of chunkBlocksNeedingUnrender) {
-      for (const blockKey of blockKeys) {
-        const pos = getPositionFromBlockKey(blockKey)
-        console.log('Unrendering block with key:', blockKey)
-        unrenderBlock(meshesNeedUpdate, chunk, pos.x, pos.y, pos.z, undefined, undefined)
-
-        for (const callback of chunkBlocksUnrenderCallbacks.getOrDefault(chunk, [])) {
-          callback()
-        }
+      for (const { blockID, key } of blockKeys) {
+        const pos = getPositionFromBlockKey(key)
+        unrenderBlock(meshesNeedUpdate, chunk, pos.x, pos.y, pos.z, blockID, undefined)
       }
 
       // After processing, clear the set for this chunk and its callbacks
       chunkBlocksNeedingUnrender.delete(chunk)
-      chunkBlocksUnrenderCallbacks.delete(chunk)
     }
 
     for (const chunk of ctx.isFirstFrame() ? chunks : chunksNeedingRender) {
@@ -301,9 +268,9 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   })
 
   const api: ChunkRenderingSystem = {
-    renderBlocksAt,
+    renderBlockAt,
     renderChunks,
-    unrenderBlocksAt,
+    unrenderBlockAt,
     unrenderChunks,
   }
 
