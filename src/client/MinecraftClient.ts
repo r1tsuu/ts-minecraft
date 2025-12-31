@@ -12,17 +12,17 @@ import { ResponsePlayerJoin } from '../shared/events/server/ResponsePlayerJoin.t
 import { ServerStarted } from '../shared/events/single-player-worker/ServerStarted.ts'
 import { WorkerReady } from '../shared/events/single-player-worker/WorkerReady.ts'
 import { type Maybe, None, Some } from '../shared/Maybe.ts'
-import { eventBus, Handler, Listener } from '../shared/MinecraftEventBus.ts'
+import { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import SinglePlayerWorker from '../singleplayer/SinglePlayerWorker.ts?worker'
 import { ClientBlocksRegistry } from './ClientBlocksRegistry.ts'
 import { GameLoop } from './GameLoop.ts'
 import { GUI } from './gui/GUI.ts'
 import { LocalStorageManager } from './LocalStorageManager.ts'
 
-@Listener()
 export class MinecraftClient {
   blocksRegistry = new BlocksRegistry()
   clientBlocksRegistry = new ClientBlocksRegistry(this.blocksRegistry)
+  eventBus = new MinecraftEventBus('Client')
   gameLoop: Maybe<GameLoop> = None()
   gui: GUI
   localStorageManager = new LocalStorageManager()
@@ -30,6 +30,10 @@ export class MinecraftClient {
 
   constructor() {
     this.gui = new GUI(this)
+
+    this.eventBus.subscribe('*', this.forwardEventsToServer.bind(this))
+    this.eventBus.subscribe(JoinWorld, this.onJoinWorld.bind(this))
+    this.eventBus.subscribe(ExitWorld, this.onExitWorld.bind(this))
   }
 
   dispose(): void {
@@ -40,8 +44,7 @@ export class MinecraftClient {
     this.singlePlayerWorker = None()
   }
 
-  @Handler('*')
-  protected forwardEventsToServer(event: MinecraftEvent): void {
+  private forwardEventsToServer(event: MinecraftEvent): void {
     if (this.singlePlayerWorker.isNone()) {
       return
     }
@@ -51,8 +54,7 @@ export class MinecraftClient {
     }
   }
 
-  @Handler(ExitWorld)
-  protected onExitWorld(): void {
+  private onExitWorld(): void {
     this.gameLoop.tap((game) => game.dispose())
     this.gameLoop = None()
     this.singlePlayerWorker.tap((worker) => worker.terminate())
@@ -60,8 +62,7 @@ export class MinecraftClient {
     console.log('Exited world.')
   }
 
-  @Handler(JoinWorld)
-  protected async onJoinWorld(event: JoinWorld): Promise<void> {
+  private async onJoinWorld(event: JoinWorld): Promise<void> {
     if (this.gameLoop.isSome()) {
       console.warn(`Received ${event.getType()} but already in a world.`)
       return
@@ -70,15 +71,16 @@ export class MinecraftClient {
     await asyncPipe(new SinglePlayerWorker())
       .tap(
         (worker) =>
-          (worker.onmessage = (msg) => eventBus.publish(deserializeEvent(eventBus, msg.data))),
+          (worker.onmessage = (msg) =>
+            this.eventBus.publish(deserializeEvent(this.eventBus, msg.data))),
       )
       .tap((worker) => (this.singlePlayerWorker = Some(worker)))
-      .tap(() => eventBus.waitFor(WorkerReady))
+      .tap(() => this.eventBus.waitFor(WorkerReady))
       .tap(() => console.log('Single-player worker is ready.'))
-      .tap(() => eventBus.request(new StartLocalServer(event.worldUUID), ServerStarted))
+      .tap(() => this.eventBus.request(new StartLocalServer(event.worldUUID), ServerStarted))
       .tap(() => console.log(`Local server started for world ${event.worldUUID}.`))
       .map(() =>
-        eventBus.request(
+        this.eventBus.request(
           new RequestPlayerJoin(this.localStorageManager.getPlayerUUID()),
           ResponsePlayerJoin,
         ),
@@ -87,7 +89,7 @@ export class MinecraftClient {
       .tap((gameLoop) => gameLoop.execute())
       .tap((gameLoop) => (this.gameLoop = Some(gameLoop)))
       .tap(() => console.log(`Joined world ${event.worldUUID}`))
-      .tap(() => eventBus.reply(event, new JoinedWorld()))
+      .tap(() => this.eventBus.reply(event, new JoinedWorld()))
       .execute()
   }
 }

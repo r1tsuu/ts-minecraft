@@ -2,6 +2,7 @@
 /* eslint-disable perfectionist/sort-interfaces */
 import type { EventConstructor } from '../../shared/EventBus.ts'
 import type { MinecraftEvent } from '../../shared/MinecraftEvent.ts'
+import type { MinecraftEventBus } from '../../shared/MinecraftEventBus.ts'
 import type { Callback } from '../../shared/util.ts'
 import type { World } from '../../shared/World.ts'
 import type { GameLoop } from '../GameLoop.ts'
@@ -157,4 +158,11 @@ export interface EngineContext {
    * The main game loop instance
    */
   readonly gameLoop: GameLoop
+  /**
+   * The event bus for emitting and listening to events.
+   * For listening to events, prefer using `ctx.onEvent` method in the SystemFactoryContext since it automatically
+   * handles unsubscription when the system is disposed.
+   * Otherwise you must manually unsubscribe from events to prevent memory leaks in onDispose lifecycle method.
+   */
+  readonly eventBus: MinecraftEventBus
 }

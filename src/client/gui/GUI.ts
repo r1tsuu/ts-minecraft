@@ -7,12 +7,8 @@ import { ExitWorld } from '../../shared/events/client/ExitWorld.ts'
 import { JoinedWorld } from '../../shared/events/client/JoinedWorld.ts'
 import { JoinWorld } from '../../shared/events/client/JoinWorld.ts'
 import { PauseToggle } from '../../shared/events/client/PauseToggle.ts'
-import { eventBus, Handler, Listener } from '../../shared/MinecraftEventBus.ts'
-import { RunTask, Schedulable } from '../../shared/Scheduler.ts'
 import { synchronize } from './synchronize.ts'
 
-@Listener()
-@Schedulable()
 export class GUI {
   state: GUIState
   private actions: GUIActions
@@ -51,6 +47,12 @@ export class GUI {
       document.removeEventListener('pointerlockchange', this.onPointerLockChange)
     })
 
+    client.eventBus.subscribe(JoinedWorld, this.onJoinedWorld.bind(this))
+    const interval = setInterval(this.updateGameUI.bind(this), 200)
+    this.dispositions.push(() => {
+      clearInterval(interval)
+    })
+
     synchronize(this.state, this.actions, this.conditions)
   }
 
@@ -69,64 +71,10 @@ export class GUI {
     synchronize(this.state, this.actions, this.conditions, affectedQuerySelectors)
   }
 
-  @Handler(JoinedWorld)
-  protected onJoinedWorld(): void {
-    this.setState({
-      activePage: 'game',
-      loadingWorldName: ' ',
-    })
-
-    this.getCanvas()
-      .requestPointerLock()
-      .catch((e) => {
-        console.warn('Pointer lock request failed', e)
-      })
-
-    this.onResizeSyncRenderer()
-    window.addEventListener('resize', this.onResizeSyncRenderer)
-  }
-
-  @RunTask(200)
-  protected updateGameUI(): void {
-    if (!this.client.gameLoop.isSome() || this.state.isPaused) return
-
-    if (!this.state.initializedGameUI) {
-      this.setState({ initializedGameUI: true })
-    }
-
-    const gameLoop = this.client.gameLoop.value()
-
-    const player = gameLoop.getClientPlayer()
-    this.setState(
-      {
-        fps: gameLoop.frameCounter.fps.toFixed(0),
-        positionX: player.position.x.toFixed(),
-        positionY: player.position.y.toFixed(),
-        positionZ: player.position.z.toFixed(),
-        rotationPitch: THREE.MathUtils.radToDeg(player.rotation.x).toFixed(),
-        rotationYaw: THREE.MathUtils.radToDeg(player.rotation.y).toFixed(),
-      },
-
-      ['#fps', '#position', '#rotation'],
-    )
-
-    let performance: 'average' | 'bad' | 'good'
-
-    if (gameLoop.frameCounter.fps < 30) {
-      performance = 'bad'
-    } else if (gameLoop.frameCounter.fps < 60) {
-      performance = 'average'
-    } else {
-      performance = 'good'
-    }
-
-    document.getElementById('fps_value')!.setAttribute('data-performance', performance)
-  }
-
   private createActions(): GUIActions {
     return {
       backToMenu: () => {
-        eventBus.publish(new ExitWorld())
+        this.client.eventBus.publish(new ExitWorld())
         this.setState({
           activePage: 'start',
           fps: 'Loading...',
@@ -181,7 +129,7 @@ export class GUI {
           loadingWorldName: world.name,
         })
 
-        eventBus.publish(new JoinWorld(world.uuid))
+        this.client.eventBus.publish(new JoinWorld(world.uuid))
       },
       resumeGame: async () => {
         await this.resumeGame()
@@ -220,6 +168,22 @@ export class GUI {
     throw new Error('Invalid index attribute')
   }
 
+  private onJoinedWorld(): void {
+    this.setState({
+      activePage: 'game',
+      loadingWorldName: ' ',
+    })
+
+    this.getCanvas()
+      .requestPointerLock()
+      .catch((e) => {
+        console.warn('Pointer lock request failed', e)
+      })
+
+    this.onResizeSyncRenderer()
+    window.addEventListener('resize', this.onResizeSyncRenderer)
+  }
+
   private onPointerLockChange = (): void => {
     const gameLoop = this.client.gameLoop
 
@@ -240,7 +204,7 @@ export class GUI {
         pauseText: 'Click to Resume',
       })
 
-      eventBus.publish(new PauseToggle())
+      this.client.eventBus.publish(new PauseToggle())
       return
     }
   }
@@ -262,9 +226,45 @@ export class GUI {
         isPaused: false,
         pauseText: 'Press Escape to Pause',
       })
-      eventBus.publish(new PauseToggle())
+      this.client.eventBus.publish(new PauseToggle())
     } catch (e) {
       console.warn('Pointer lock request failed', e)
     }
+  }
+
+  private updateGameUI(): void {
+    if (!this.client.gameLoop.isSome() || this.state.isPaused) return
+
+    if (!this.state.initializedGameUI) {
+      this.setState({ initializedGameUI: true })
+    }
+
+    const gameLoop = this.client.gameLoop.value()
+
+    const player = gameLoop.getClientPlayer()
+    this.setState(
+      {
+        fps: gameLoop.frameCounter.fps.toFixed(0),
+        positionX: player.position.x.toFixed(),
+        positionY: player.position.y.toFixed(),
+        positionZ: player.position.z.toFixed(),
+        rotationPitch: THREE.MathUtils.radToDeg(player.rotation.x).toFixed(),
+        rotationYaw: THREE.MathUtils.radToDeg(player.rotation.y).toFixed(),
+      },
+
+      ['#fps', '#position', '#rotation'],
+    )
+
+    let performance: 'average' | 'bad' | 'good'
+
+    if (gameLoop.frameCounter.fps < 30) {
+      performance = 'bad'
+    } else if (gameLoop.frameCounter.fps < 60) {
+      performance = 'average'
+    } else {
+      performance = 'good'
+    }
+
+    document.getElementById('fps_value')!.setAttribute('data-performance', performance)
   }
 }

@@ -1,61 +1,81 @@
 import { Euler, Vector3 } from 'three'
 
+import type { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
+import type { WorldStorageAdapter } from './types.ts'
+
 import { asyncPipe } from '../shared/AsyncPipe.ts'
+import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { Config } from '../shared/Config.ts'
-import { Chunk } from '../shared/entities/Chunk.ts'
+import { Chunk, type ChunkCoordinates } from '../shared/entities/Chunk.ts'
 import { Player } from '../shared/entities/Player.ts'
 import { RequestChunksLoad } from '../shared/events/client/RequestChunksLoad.ts'
 import { RequestPlayerJoin } from '../shared/events/client/RequestPlayerJoin.ts'
 import { ResponseChunksLoad } from '../shared/events/server/ResponseChunksLoad.ts'
 import { ResponsePlayerJoin } from '../shared/events/server/ResponsePlayerJoin.ts'
-import { eventBus, Listener, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { pipe } from '../shared/Pipe.ts'
 import { range } from '../shared/util.ts'
 import { World } from '../shared/World.ts'
-import { TerrainGenerator } from './TerrainGenerator.ts'
+import { createTerrainGenerator } from './TerrainGenerator.ts'
 
-@Listener()
-export class MinecraftServer {
-  constructor(
-    readonly world: World,
-    readonly terrainGenerator: TerrainGenerator,
-  ) {}
+export type MinecraftServer = Awaited<ReturnType<typeof createMinecraftServer>>
 
-  dispose(): void {}
+export const createMinecraftServer = async ({
+  eventBus,
+  storage,
+}: {
+  eventBus: MinecraftEventBus
+  storage: WorldStorageAdapter
+}) => {
+  const blocksRegistry = new BlocksRegistry()
+  const terrainGenerator = createTerrainGenerator(blocksRegistry)
 
-  @MinecraftEventBus.Handler(RequestChunksLoad)
-  protected async onRequestChunksLoad(event: RequestChunksLoad): Promise<void> {
-    await asyncPipe(event.chunks)
+  const players = await storage.readPlayers()
+  const spawnChunks = Chunk.coordsInRadius(0, 0, Config.SPAWN_CHUNK_RADIUS)
+
+  const world = new World()
+
+  const readChunks = (coords: ChunkCoordinates[]) =>
+    asyncPipe(coords)
+      .mapArray(async (coord) => ({ ...coord, chunk: await storage.readChunk(coord) }))
+      .execute()
+
+  const chunks = await asyncPipe(readChunks(spawnChunks))
+    .mapArray((readChunk) =>
+      readChunk.chunk.unwrapOr(() => world.addEntity(terrainGenerator.generateChunkAt(readChunk))),
+    )
+    .execute()
+
+  world.addEntities(players, chunks)
+
+  eventBus.subscribe(RequestChunksLoad, (event) =>
+    asyncPipe(event.chunks)
       .mapArray((coord) =>
-        this.world
+        world
           .getEntity(Chunk.getWorldID(coord), Chunk)
-          .unwrapOr(() =>
-            this.world.addDirtyEntity(() => this.terrainGenerator.generateChunkAt(coord)),
-          ),
+          .unwrapOr(() => world.addEntity(terrainGenerator.generateChunkAt(coord))),
       )
       .map((chunks) => new ResponseChunksLoad(chunks))
       .tap((response) => eventBus.reply(event, response))
-      .execute()
-  }
+      .execute(),
+  )
 
-  @MinecraftEventBus.Handler(RequestPlayerJoin)
-  protected async onRequestPlayerJoin(event: RequestPlayerJoin) {
+  eventBus.subscribe(RequestPlayerJoin, (event) => {
     pipe(event.playerUUID)
       .map((uuid) =>
-        this.world
+        world
           .getEntity(uuid, Player)
           .unwrapOr(() =>
-            this.world.addDirtyEntity(
-              () => new Player(uuid, this.getPlayerSpawnPosition(), Euler.zero(), new Vector3()),
+            world.addEntity(
+              new Player(uuid, getPlayerSpawnPosition(), Euler.zero(), new Vector3()),
             ),
           ),
       )
-      .map(() => new ResponsePlayerJoin(this.world))
+      .map(() => new ResponsePlayerJoin(world))
       .tap((response) => eventBus.reply(event, response))
-  }
+  })
 
-  private getPlayerSpawnPosition(): Vector3 {
-    const centralChunk = this.world.getEntity(Chunk.getWorldID({ x: 0, z: 0 }), Chunk).unwrap()
+  const getPlayerSpawnPosition = (): Vector3 => {
+    const centralChunk = world.getEntity(Chunk.getWorldID({ x: 0, z: 0 }), Chunk).unwrap()
 
     return pipe(range(Config.WORLD_HEIGHT))
       .filterIter((y) => centralChunk.getBlock(0, y, 0).isSome())
@@ -63,5 +83,11 @@ export class MinecraftServer {
       .value()
       .map((y) => new Vector3(0, y + 2, 0))
       .unwrap()
+  }
+
+  console.log('Minecraft server created.')
+
+  return {
+    world,
   }
 }

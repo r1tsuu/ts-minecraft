@@ -6,7 +6,7 @@ import { Maybe, Some } from './Maybe.ts'
  * Event Bus system for publishing and subscribing to events.
  * Supports event metadata and pre-publish hooks.
  */
-import { type ClassConstructor, preserveClassOriginalClassConstructor } from './util.ts'
+import { type ClassConstructor } from './util.ts'
 
 const EVENT_HANDLERS_KEY = Symbol('EVENT_HANDLERS')
 const WILDCARD = '*'
@@ -22,7 +22,7 @@ const getEventConstructor = <T extends Event<any>>(event: T): EventConstructor<T
 
 export type WildcardKey = typeof WILDCARD
 
-type EventHandler<E extends Event<any>> = (event: E) => Promise<void> | void
+type EventHandler<E extends Event<any>> = (event: E) => void
 
 interface EventHandlerMetadata {
   Constructor: EventConstructor<any>
@@ -46,71 +46,6 @@ export class EventBus<E extends Event<EventMetadata>> {
   private beforeEmitHooks: ((event: E) => void)[] = []
   private eventTypesRegistry = new Map<string, EventConstructor<any>>()
   private registry = new Map<string | WildcardKey, { listeners: ((event: any) => void)[] }>()
-
-  /**
-   * Decorator to mark a method as an event handler for a specific event type or for all event types (wildcard).
-   * ```typescript
-   * class MyEventHandler {
-   *   @EventBus.Handler(MyEvent)
-   *   handleMyEvent(event: MyEvent) {
-   *     // Handle MyEvent
-   *   }
-   * }
-   * ```
-   */
-  static Handler<T extends EventConstructor<any>>(Constructor: T | WildcardKey) {
-    return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-      // Store metadata about this event handler
-      if (!target.constructor[EVENT_HANDLERS_KEY]) {
-        target.constructor[EVENT_HANDLERS_KEY] = []
-      }
-
-      target.constructor[EVENT_HANDLERS_KEY].push({
-        methodName: propertyKey,
-        type: typeof Constructor === 'string' ? Constructor : Constructor.type,
-      })
-
-      // Return the original method (binding happens at initialization)
-      return descriptor
-    }
-  }
-
-  /**
-   * Class decorator to register all event handlers in the class with the provided EventBus.
-   * @param resolveEventBus A function that returns the EventBus instance to register handlers with.
-   * @example
-   * ```ts
-   * @MinecraftEventBus.Listener(() => myEventBus)
-   * class MyEventListener {
-   *   @MinecraftEventBus.Handler(JoinWorld)
-   *   onJoinWorld(event: JoinWorld) {
-   *     console.log('Player joined world with UUID:', event.worldUUID)
-   *   }
-   * }
-   * ```
-   */
-  static Listener(
-    resolveEventBus: () => Pick<EventBus<Event<any>>, 'registerHandlers' | 'unregisterHandlers'>,
-  ): ClassDecorator {
-    // @ts-expect-error
-    return function <T extends new (...args: any[]) => any>(Target: T): T {
-      preserveClassOriginalClassConstructor(Target)
-      return class extends Target {
-        constructor(...args: any[]) {
-          super(...args)
-
-          const eventBus = resolveEventBus()
-          eventBus.registerHandlers(this)
-          const originalDispose = this.dispose?.bind(this)
-
-          this.dispose = () => {
-            originalDispose?.()
-            eventBus.unregisterHandlers(this)
-          }
-        }
-      }
-    }
-  }
 
   /**
    * Adds a hook that is called before an event is published.

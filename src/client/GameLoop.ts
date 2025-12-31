@@ -10,9 +10,7 @@ import { Player } from '../shared/entities/Player.ts'
 import { PauseToggle } from '../shared/events/client/PauseToggle.ts'
 import { HashMap } from '../shared/HashMap.ts'
 import { Maybe } from '../shared/Maybe.ts'
-import { eventBus, Listener, MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import { pipe } from '../shared/Pipe.ts'
-import { Schedulable } from '../shared/Scheduler.ts'
 import { World } from '../shared/World.ts'
 import { InputManager } from './InputManager.ts'
 import { chunkRenderingSystemFactory } from './systems/ChunkRenderingSystem.ts'
@@ -55,8 +53,6 @@ export interface SystemInRegistry {
   system: System<string>
 }
 
-@Listener()
-@Schedulable()
 export class GameLoop {
   readonly camera = new THREE.PerspectiveCamera(
     75,
@@ -90,7 +86,7 @@ export class GameLoop {
   private systemsUnsubscriptions: Callback[] = []
 
   constructor(
-    private readonly client: MinecraftClient,
+    private client: MinecraftClient,
     readonly world: World,
   ) {
     // SETUP RENDERER HERE
@@ -104,6 +100,8 @@ export class GameLoop {
     this.renderer.toneMappingExposure = 1.0
     this.renderer.shadowMap.enabled = false // Disable shadows for performance
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)) // Cap pixel ratio
+
+    client.eventBus.subscribe(PauseToggle, () => (this.paused = !this.paused))
 
     // FETCH CLIENT PLAYER ENTITY
     this.clientPlayer = pipe(this.client.localStorageManager.getPlayerUUID())
@@ -126,7 +124,7 @@ export class GameLoop {
 
     // SETUP EVENT LISTENERS
     for (const { EventConstructor, handler } of this.iterEventHandlers()) {
-      const unsubscribe = eventBus.subscribe(EventConstructor, handler)
+      const unsubscribe = client.eventBus.subscribe(EventConstructor, handler)
       this.systemsUnsubscriptions.push(unsubscribe)
     }
   }
@@ -216,6 +214,7 @@ export class GameLoop {
 
     const factoryCtx: SystemFactoryContext = {
       client: this.client,
+      eventBus: this.client.eventBus,
       gameLoop: this,
       onDispose(disposeFn) {
         systemData.dispose.add(disposeFn)
@@ -264,11 +263,6 @@ export class GameLoop {
     console.log(`Registered system: ${system.name}`)
 
     return system as unknown as T
-  }
-
-  @MinecraftEventBus.Handler(PauseToggle)
-  protected onPauseToggle(): void {
-    this.paused = !this.paused
   }
 
   private handleGameFrame() {

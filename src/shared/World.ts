@@ -160,7 +160,7 @@ export class World {
     }
   }
 
-  addEntity(entity: Entity): void {
+  addEntity<T extends Entity>(entity: T): T {
     const id = entity.getWorldID()
     this.entities.set(id, entity)
     const entityConstructor = getEntityConstructor(entity)
@@ -168,6 +168,7 @@ export class World {
       this.entitiesByType.set(entityConstructor, new Set())
     }
     this.entitiesByType.get(entityConstructor).unwrap().add(id)
+    return entity
   }
 
   boxIntersectsWorldBlocks(box: Box3): boolean {
