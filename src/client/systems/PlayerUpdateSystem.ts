@@ -147,7 +147,7 @@ export const playerUpdateSystemFactory = createSystemFactory((ctx) => {
 
   return {
     getMovementState,
-    name: 'ClientPlayerControlSystem',
+    name: 'PlayerUpdateSystem',
     setMovingBackward,
     setMovingForward,
     setMovingLeft,

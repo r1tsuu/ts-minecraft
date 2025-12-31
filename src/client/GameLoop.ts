@@ -223,6 +223,9 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     renderer.render(scene, camera)
   }
 
+  const subscriptions: Callback[] = []
+  subscriptions.push(ctx.eventBus.subscribe(PauseToggle, () => (paused = !paused)))
+
   const dispose = () => {
     // DISPOSE NON SYSTEM COMPONENTS
     inputManager.dispose()
@@ -239,6 +242,10 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
       ({ factoryData }) => factoryData.dispose,
     )) {
       dispose()
+    }
+
+    for (const unsubscribe of subscriptions) {
+      unsubscribe()
     }
 
     disposed = true
@@ -337,8 +344,6 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
 
     return system as unknown as T
   }
-
-  ctx.eventBus.subscribe(PauseToggle, () => (paused = !paused))
 
   // REGISTER SYSTEMS HERE
   registerSystem(chunkRenderingSystemFactory)

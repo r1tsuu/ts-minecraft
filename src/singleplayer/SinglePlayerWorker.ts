@@ -15,7 +15,6 @@ let server: Maybe<MinecraftServer> = None()
 const eventBus = new MinecraftEventBus('Server')
 
 eventBus.subscribe('*', (event: MinecraftEvent) => {
-  console.log(`SinglePlayerServerImpl forwarding event of type ${event.getType()} to client.`)
   if (
     event.getType().startsWith('Server.Response') ||
     event instanceof SinglePlayerWorkerEvent.WorkerReady ||

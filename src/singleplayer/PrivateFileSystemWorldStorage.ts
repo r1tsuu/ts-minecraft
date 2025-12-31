@@ -71,7 +71,6 @@ export const createPrivateFileSystemWorldStorage = async (
         .map(readBuffer)
         .map((buffer) => new Chunk(chunkCoordinates.x, chunkCoordinates.z, buffer))
         .map(Some)
-        .tapError((error) => console.warn('Error reading chunk file:', error))
         .catch(() => None<Chunk>())
         .execute()
     },

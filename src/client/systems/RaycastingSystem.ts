@@ -52,15 +52,15 @@ export const raycastingSystemFactory = createSystemFactory((ctx) => {
   }
 
   ctx.onUpdate(() => {
-    ctx.gameLoop.scene.remove(mesh)
+    ctx.scene.remove(mesh)
 
-    raycaster.setFromCamera(new Vector2(0, 0), ctx.gameLoop.camera)
+    raycaster.setFromCamera(new Vector2(0, 0), ctx.camera)
 
     let index = 0
     const matrix = new Matrix4()
     blockPositionMap.clear()
 
-    const clientPlayer = ctx.gameLoop.getClientPlayer()
+    const clientPlayer = ctx.getClientPlayer()
 
     for (let x = -FAR; x <= FAR; x++) {
       for (let y = -FAR; y <= FAR; y++) {
@@ -69,7 +69,7 @@ export const raycastingSystemFactory = createSystemFactory((ctx) => {
           const worldY = Math.floor(clientPlayer.position.y + y)
           const worldZ = Math.floor(clientPlayer.position.z + z)
 
-          if (ctx.gameLoop.world.getBlock(worldX, worldY, worldZ).isNone()) continue
+          if (ctx.world.getBlock(worldX, worldY, worldZ).isNone()) continue
 
           const position = new Vector3(worldX, worldY, worldZ)
           matrix.setPosition(worldX, worldY, worldZ)
@@ -102,7 +102,7 @@ export const raycastingSystemFactory = createSystemFactory((ctx) => {
       if (maybePosition.isSome()) {
         const position = maybePosition.value()
         mesh.position.set(position.x, position.y, position.z)
-        ctx.gameLoop.scene.add(mesh)
+        ctx.scene.add(mesh)
 
         maybeLookingAtBlock = Some(position.clone())
 

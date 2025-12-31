@@ -1,4 +1,3 @@
-import { MinecraftClient } from './client/MinecraftClient.ts'
+import { createMinecraftClient } from './client/MinecraftClient.ts'
 
-// @ts-expect-error
-window.minecraft = new MinecraftClient()
+createMinecraftClient()

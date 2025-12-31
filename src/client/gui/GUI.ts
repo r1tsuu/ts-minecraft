@@ -263,6 +263,8 @@ export const createGUI = ({
     clearInterval(interval)
   })
 
+  synchronize(state, actions, conditions)
+
   return {
     dispose: (): void => {
       for (const dispose of dispositions) {
