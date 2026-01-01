@@ -89,7 +89,7 @@ export const createTerrainGenerator = (seed: string): TerrainGenerator => {
 
           if (!isCave) {
             // Check for gravel pockets in stone
-            const gravelChance = seedrandom(`${seed}:gravel:${worldX}:${y}:${worldZ}`)()
+            const gravelChance = splitter(`gravel:${worldX}:${y}:${worldZ}`).random()
             const isGravelPocket =
               gravelChance < TERRAIN_CONFIG.gravelChance && y < height - 4 && y > 5
 
@@ -126,9 +126,7 @@ export const createTerrainGenerator = (seed: string): TerrainGenerator => {
           const { x: worldX, z: worldZ } = Chunk.mapToWorldCoordinates(chunkCoords, { x, z })
 
           for (let y = oreConfig.minY; y <= oreConfig.maxY; y++) {
-            const oreChance = seedrandom(
-              `${seed}:ore:${oreConfig.block}:${worldX}:${y}:${worldZ}`,
-            )()
+            const oreChance = splitter(`ore:${oreConfig.block}:${worldX}:${y}:${worldZ}`).random()
             if (oreChance < oreConfig.chance) {
               // Generate ore vein
               const veinCenterX = x
@@ -139,9 +137,9 @@ export const createTerrainGenerator = (seed: string): TerrainGenerator => {
               for (let dx = -1; dx <= 1; dx++) {
                 for (let dy = -1; dy <= 1; dy++) {
                   for (let dz = -1; dz <= 1; dz++) {
-                    const veinRandom = seedrandom(
-                      `${seed}:vein:${oreConfig.block}:${worldX + dx}:${y + dy}:${worldZ + dz}`,
-                    )()
+                    const veinRandom = splitter(
+                      `vein:${oreConfig.block}:${worldX + dx}:${y + dy}:${worldZ + dz}`,
+                    ).random()
                     // Use distance to create irregular vein shapes
                     if (veinRandom < 0.6) {
                       const veinX = veinCenterX + dx
@@ -178,7 +176,7 @@ export const createTerrainGenerator = (seed: string): TerrainGenerator => {
         const { x: worldX, z: worldZ } = Chunk.mapToWorldCoordinates(chunkCoords, { x, z })
 
         // Use world coordinates for consistent tree placement across chunks
-        const treeChance = seedrandom(`${seed}:tree:${worldX}:${worldZ}`)()
+        const treeChance = splitter(`tree:${worldX}:${worldZ}`).random()
         if (treeChance < TERRAIN_CONFIG.treeChance) {
           // 0.5% chance of tree
           // Find ground level
@@ -192,8 +190,8 @@ export const createTerrainGenerator = (seed: string): TerrainGenerator => {
           }
 
           if (groundY > 0 && groundY < Config.WORLD_HEIGHT - 10) {
-            const treeRandom = seedrandom(`${seed}:tree_height:${worldX}:${worldZ}`)
-            const treeHeight = 5 + Math.floor(treeRandom() * 2) // 5-6 blocks tall
+            const treeRandom = splitter(`tree_height:${worldX}:${worldZ}`).random()
+            const treeHeight = 5 + Math.floor(treeRandom * 2) // 5-6 blocks tall
 
             // Place trunk
             for (let y = groundY + 1; y <= groundY + treeHeight; y++) {
