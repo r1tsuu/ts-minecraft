@@ -247,13 +247,11 @@ export const createGUI = ({
         loadingWorldName: ' ',
       })
 
-      getCanvas()
-        .requestPointerLock()
-        .catch((e) => {
-          console.warn('Pointer lock request failed', e)
-        })
-
       onResizeSyncRenderer()
+
+      setState({ isPaused: true, pauseText: 'Click to Resume' })
+      eventBus.publish(new PauseToggle())
+
       window.addEventListener('resize', onResizeSyncRenderer)
     }),
   )
