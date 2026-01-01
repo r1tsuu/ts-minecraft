@@ -74,6 +74,7 @@ export const createMinecraftClient = async (): Promise<MinecraftClientContext> =
       .tap(() => console.log('Single-player worker is ready.'))
       .map(() => localStorageManager.getWorld(event.worldUUID).seed)
       .tap((seed) => console.log(`Starting local server with seed ${seed}...`))
+      .tap(() => gui.requestLock())
       .map((seed) => eventBus.request(new StartLocalServer(seed, event.worldUUID), ServerStarted))
       .tap(() => console.log(`Local server started for world ${event.worldUUID}.`))
       .map(() =>

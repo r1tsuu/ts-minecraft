@@ -33,7 +33,11 @@ const getCanvas = (): HTMLCanvasElement => {
   return document.getElementById('game_canvas') as HTMLCanvasElement
 }
 
-export type GUI = ReturnType<typeof createGUI>
+export interface GUI {
+  dispose(): void
+  getCanvas(): HTMLCanvasElement
+  requestLock(): void
+}
 
 export const createGUI = ({
   eventBus,
@@ -43,7 +47,7 @@ export const createGUI = ({
   eventBus: MinecraftEventBus
   getGameLoop: () => Maybe<GameLoop>
   localStorageManager: LocalStorageManager
-}) => {
+}): GUI => {
   const state: GUIState = {
     activePage: 'start',
     fps: 'Loading...',
@@ -249,8 +253,8 @@ export const createGUI = ({
 
       onResizeSyncRenderer()
 
-      setState({ isPaused: true, pauseText: 'Click to Resume' })
-      eventBus.publish(new PauseToggle())
+      // setState({ isPaused: true, pauseText: 'Click to Resume' })
+      // eventBus.publish(new PauseToggle())
 
       window.addEventListener('resize', onResizeSyncRenderer)
     }),
@@ -270,5 +274,8 @@ export const createGUI = ({
       }
     },
     getCanvas,
+    requestLock: async () => {
+      getCanvas().requestPointerLock()
+    },
   }
 }
