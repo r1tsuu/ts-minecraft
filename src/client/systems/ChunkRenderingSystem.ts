@@ -1,20 +1,21 @@
-import { BoxGeometry, InstancedMesh, Matrix4 } from 'three'
+import {
+  BufferGeometry,
+  DoubleSide,
+  Float32BufferAttribute,
+  Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+  Uint16BufferAttribute,
+} from 'three'
 
-import type { RawVector3 } from '../../types.ts'
+import type { RawVector2, RawVector3 } from '../../types.ts'
 
 import { Config } from '../../shared/Config.ts'
 import { Chunk } from '../../shared/entities/Chunk.ts'
 import { HashMap } from '../../shared/HashMap.ts'
 import { pipe } from '../../shared/Pipe.ts'
-import { getBlockKey, getBlockKeyFromVector, getPositionFromBlockKey } from '../../shared/util.ts'
+import { getBlockKeyFromVector } from '../../shared/util.ts'
 import { createSystemFactory } from './createSystem.ts'
-
-const MAX_BLOCK_COUNT_FOR_MESH =
-  Config.RENDER_DISTANCE *
-  Config.RENDER_DISTANCE *
-  Config.CHUNK_SIZE *
-  Config.CHUNK_SIZE *
-  Config.WORLD_HEIGHT
 
 export interface ChunkRenderingSystem {
   renderBlockAt(worldPosition: RawVector3): void
@@ -31,47 +32,245 @@ export interface ChunkRenderingSystem {
   unrenderChunks(chunks: Chunk[]): void
 }
 
+interface ChunkMeshData {
+  mesh: Mesh
+  needsRebuild: boolean
+}
+
+// Face vertices for a cube (each face has 4 vertices)
+const CUBE_FACES = {
+  back: {
+    normal: [0, 0, -1],
+    vertices: [
+      [1, 0, 0],
+      [1, 1, 0],
+      [0, 1, 0],
+      [0, 0, 0],
+    ],
+  },
+  bottom: {
+    normal: [0, -1, 0],
+    vertices: [
+      [0, 0, 1],
+      [1, 0, 1],
+      [1, 0, 0],
+      [0, 0, 0],
+    ],
+  },
+  front: {
+    normal: [0, 0, 1],
+    vertices: [
+      [0, 0, 1],
+      [0, 1, 1],
+      [1, 1, 1],
+      [1, 0, 1],
+    ],
+  },
+  left: {
+    normal: [-1, 0, 0],
+    vertices: [
+      [0, 0, 0],
+      [0, 1, 0],
+      [0, 1, 1],
+      [0, 0, 1],
+    ],
+  },
+  right: {
+    normal: [1, 0, 0],
+    vertices: [
+      [1, 0, 1],
+      [1, 1, 1],
+      [1, 1, 0],
+      [1, 0, 0],
+    ],
+  },
+  // Each face: [normal, vertices]
+  top: {
+    normal: [0, 1, 0],
+    vertices: [
+      [0, 1, 0],
+      [1, 1, 0],
+      [1, 1, 1],
+      [0, 1, 1],
+    ],
+  },
+}
+
+const mapUVFromAtlas = (
+  tile: RawVector2, // top-left corner of tile in atlas
+  tilesPerRow: number,
+  vertexIndex: number,
+): RawVector2 => {
+  const tileUV = 1 / tilesPerRow
+  // Cube face vertices order: [0,1,2,3]
+  // We'll map vertex 0 = (0,0), 1 = (0,1), 2 = (1,1), 3 = (1,0)
+  const offsets = [
+    { x: 0, y: 0 }, // bottom-left
+    { x: 0, y: 1 }, // top-left
+    { x: 1, y: 1 }, // top-right
+    { x: 1, y: 0 }, // bottom-right
+  ]
+  const offset = offsets[vertexIndex]
+  return {
+    x: tile.x + offset.x * tileUV,
+    y: tile.y + offset.y * tileUV,
+  }
+}
+
+// Face indices (two triangles per face)
+const FACE_INDICES = [0, 1, 2, 0, 2, 3]
+
 export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
-  const blockMeshesCount = new HashMap<number, number>()
-  const blockMeshesFreeIndexes = new HashMap<number, number[]>()
-  const chunkBlockMeshesIndexes = new HashMap<Chunk, HashMap<string, number>>()
+  const chunkMeshes = new HashMap<Chunk, ChunkMeshData>()
   const chunksNeedingRender = new Set<Chunk>()
-  const chunkBlocksNeedingRender = new HashMap<Chunk, Set<string>>()
+  const chunkBlocksNeedingUpdate = new HashMap<Chunk, Set<string>>()
 
-  const chunkBlocksNeedingUnrender = new HashMap<Chunk, Set<{ blockID: number; key: string }>>()
+  // Check if a block is solid (exists and is not air)
+  const isBlockSolid = (chunk: Chunk, x: number, y: number, z: number): boolean => {
+    const block = chunk.getBlock(x, y, z)
+    return block.isSome() && block.value() !== 0
+  }
 
-  const intermediateMatrix = new Matrix4()
-  const hideMatrix = new Matrix4().makeScale(0, 0, 0)
+  // Check if a neighbor block exists and is solid
+  // Check if a neighbor block exists and is solid
+  const hasNeighbor = (chunk: Chunk, x: number, y: number, z: number): boolean => {
+    // Check height bounds
+    if (y < 0 || y >= Config.WORLD_HEIGHT) {
+      return false
+    }
 
-  const geometry = new BoxGeometry()
-  geometry.computeBoundingBox()
-  geometry.computeBoundingSphere()
+    // If within current chunk bounds, check directly
+    if (x >= 0 && x < Config.CHUNK_SIZE && z >= 0 && z < Config.CHUNK_SIZE) {
+      return isBlockSolid(chunk, x, y, z)
+    }
 
-  const blockMeshes = pipe(ctx.clientBlocksRegistry.iterateBlocks())
-    .mapIter(({ id, material }) => {
-      blockMeshesCount.set(id, 0)
-      blockMeshesFreeIndexes.set(id, [])
-      const mesh = new InstancedMesh(geometry, material, MAX_BLOCK_COUNT_FOR_MESH)
-      mesh.count = 0
-      ctx.scene.add(mesh)
-      mesh.frustumCulled = false // TODO: Produces artifacts.
+    // Calculate world position for neighbor check
+    const chunkWorldPos = chunk.getWorldCoordinates()
+    const worldX = chunkWorldPos.x + x
+    const worldZ = chunkWorldPos.z + z
 
-      console.log(`Created InstancedMesh for block ID ${id}`)
+    // Get neighboring chunk coordinates
+    const neighborChunkCoord = Chunk.mapToChunkCoordinates(worldX, worldZ)
 
-      return {
-        id,
-        mesh,
+    // Get neighboring chunk
+    const neighborChunk = ctx.world.getEntity(Chunk.getWorldID(neighborChunkCoord), Chunk)
+
+    if (neighborChunk.isNone()) return false
+
+    // Convert to local coordinates in neighboring chunk
+    const localCoords = Chunk.mapToLocalCoordinates(worldX, worldZ)
+    return isBlockSolid(neighborChunk.value(), localCoords.x, y, localCoords.z)
+  }
+
+  // Build mesh geometry for a chunk
+  const buildChunkMesh = (chunk: Chunk): BufferGeometry => {
+    const now = performance.now()
+    const positions: number[] = []
+    const normals: number[] = []
+    const uvs: number[] = []
+    const indices: number[] = []
+
+    let vertexCount = 0
+
+    // Get chunk world position for offsetting vertices
+    const chunkWorldPos = chunk.getWorldCoordinates()
+
+    // Iterate through all blocks in the chunk
+    for (const { blockID, x, y, z } of chunk.iterateBlocks()) {
+      if (blockID === 0) continue // Skip air blocks
+
+      // Get block material for color
+      // const blockTexture = ctx..getBlock(blockID).unwrap()
+
+      // Check each face and only add if not occluded
+      const faces = [
+        { check: () => !hasNeighbor(chunk, x, y + 1, z), face: CUBE_FACES.top, type: 'top' },
+        { check: () => !hasNeighbor(chunk, x, y - 1, z), face: CUBE_FACES.bottom, type: 'bottom' },
+        { check: () => !hasNeighbor(chunk, x, y, z + 1), face: CUBE_FACES.front, type: 'front' },
+        { check: () => !hasNeighbor(chunk, x, y, z - 1), face: CUBE_FACES.back, type: 'back' },
+        { check: () => !hasNeighbor(chunk, x + 1, y, z), face: CUBE_FACES.right, type: 'right' },
+        { check: () => !hasNeighbor(chunk, x - 1, y, z), face: CUBE_FACES.left, type: 'left' },
+      ] as const
+
+      for (const { check, face, type } of faces) {
+        if (!check()) continue // Face is occluded
+
+        const startVertex = vertexCount
+        const tile = ctx.texturesRegistry.getUVForBlockSide(blockID, type)
+
+        let i = 0
+        // Add vertices for this face
+        for (const [vx, vy, vz] of face.vertices) {
+          positions.push(chunkWorldPos.x + x + vx, y + vy, chunkWorldPos.z + z + vz)
+          normals.push(...face.normal)
+          const mappedTile = mapUVFromAtlas(tile, ctx.texturesRegistry.tilesPerRow, i++)
+          uvs.push(mappedTile.x, mappedTile.y)
+        }
+
+        // Add indices for this face
+        for (const idx of FACE_INDICES) {
+          indices.push(startVertex + idx)
+        }
+
+        vertexCount += 4
       }
-    })
-    .iterToMap((x) => [x.id, x.mesh])
-    .value()
+    }
 
-  console.log('Created block meshes for chunk rendering:', blockMeshes)
+    const geometry = new BufferGeometry()
 
-  const getNextBlockMeshIndex = (blockID: number): number => {
-    const currentCount = blockMeshesCount.get(blockID).unwrap()
-    blockMeshesCount.set(blockID, currentCount + 1)
-    return currentCount
+    if (positions.length > 0) {
+      geometry.setAttribute('position', new Float32BufferAttribute(positions, 3))
+      geometry.setAttribute('normal', new Float32BufferAttribute(normals, 3))
+      geometry.setAttribute('uv', new Float32BufferAttribute(uvs, 2))
+      // geometry.setAttribute('color', new Float32BufferAttribute(colors, 3))
+      geometry.setIndex(new Uint16BufferAttribute(indices, 1))
+
+      geometry.computeBoundingBox()
+      geometry.computeBoundingSphere()
+    }
+
+    console.log(
+      `Built mesh for chunk at`,
+      chunk.getWorldCoordinates(),
+      `in ${(performance.now() - now).toFixed(2)} ms`,
+    )
+
+    return geometry
+  }
+
+  // Create or update a chunk mesh
+  const updateChunkMesh = (chunk: Chunk): void => {
+    const existingData = chunkMeshes.get(chunk)
+
+    const geometry = buildChunkMesh(chunk)
+
+    if (existingData.isSome()) {
+      // Update existing mesh
+      const data = existingData.value()
+      data.mesh.geometry.dispose()
+      data.mesh.geometry = geometry
+      data.needsRebuild = false
+      console.log(`Updated mesh for chunk at`, chunk.getWorldCoordinates())
+    } else {
+      // Create new mesh
+      const mesh = new Mesh(
+        geometry,
+        new MeshBasicMaterial({
+          map: ctx.texturesRegistry.atlas,
+          side: DoubleSide,
+          // vertexColors: true,
+        }),
+      )
+      // mesh.frustumCulled = false
+      ctx.scene.add(mesh)
+
+      chunkMeshes.set(chunk, {
+        mesh,
+        needsRebuild: false,
+      })
+
+      console.log(`Created mesh for chunk at`, chunk.getWorldCoordinates())
+    }
   }
 
   const renderChunks = (chunks: Chunk[]): void => {
@@ -83,7 +282,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   const renderBlockAt = (worldPos: RawVector3): void => {
     pipe(Chunk.mapToChunkCoordinates(worldPos.x, worldPos.z))
       .map((chunkCoord) => ctx.world.getEntity(Chunk.getWorldID(chunkCoord), Chunk))
-      .mapSome((chunk) => chunkBlocksNeedingRender.getOrSet(chunk, () => new Set()))
+      .mapSome((chunk) => chunkBlocksNeedingUpdate.getOrSet(chunk, () => new Set()))
       .tapSome((set) =>
         set.add(
           getBlockKeyFromVector({
@@ -95,173 +294,40 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   }
 
   const unrenderBlockAt = (worldPos: RawVector3): void => {
-    pipe(Chunk.mapToChunkCoordinates(worldPos.x, worldPos.z))
-      .map((chunkCoord) => ctx.world.getEntity(Chunk.getWorldID(chunkCoord), Chunk))
-      .mapSome((chunk) => ({
-        chunk,
-        set: chunkBlocksNeedingUnrender.getOrSet(chunk, () => new Set()),
-      }))
-      .tapSome(({ chunk, set }) => {
-        const localCoords = Chunk.mapToLocalCoordinates(worldPos.x, worldPos.z)
-        set.add({
-          blockID: chunk.getBlock(localCoords.x, worldPos.y, localCoords.z).unwrapOrDefault(0),
-          key: getBlockKeyFromVector({
-            ...localCoords,
-            y: worldPos.y,
-          }),
-        })
-      })
-  }
-
-  const unrenderBlock = (
-    meshesNeedUpdate: Set<InstancedMesh>,
-    chunk: Chunk,
-    x: number,
-    y: number,
-    z: number,
-    blockID: number,
-    blockMeshesIndexes?: HashMap<string, number>,
-  ) => {
-    if (!blockMeshesIndexes) {
-      const maybeblockMeshesIndexes = chunkBlockMeshesIndexes.get(chunk)
-      if (maybeblockMeshesIndexes.isNone()) {
-        return
-      }
-      blockMeshesIndexes = maybeblockMeshesIndexes.value()
-    }
-
-    const blockKey = getBlockKey(x, y, z)
-
-    blockMeshesIndexes.get(blockKey).tap((blockMeshIndex) => {
-      const mesh = blockMeshes.get(blockID).unwrap()
-      mesh.setMatrixAt(blockMeshIndex, hideMatrix)
-      blockMeshesFreeIndexes.get(blockID).tap((indexes) => indexes.push(blockMeshIndex))
-      meshesNeedUpdate.add(mesh)
-      blockMeshesIndexes.delete(blockKey)
-    })
+    // For chunk meshing, unrendering a block means rebuilding the chunk mesh
+    renderBlockAt(worldPos)
   }
 
   const unrenderChunks = (chunks: Chunk[]): void => {
-    const meshesNeedUpdate = new Set<InstancedMesh>()
-
     for (const chunk of chunks) {
-      const blockMeshesIndexes = chunkBlockMeshesIndexes.get(chunk)
+      const meshData = chunkMeshes.get(chunk)
 
-      if (blockMeshesIndexes.isNone()) {
-        continue
+      if (meshData.isSome()) {
+        const data = meshData.value()
+        ctx.scene.remove(data.mesh)
+        data.mesh.geometry.dispose()
+        chunkMeshes.delete(chunk)
       }
 
-      for (const { blockID, x, y, z } of chunk.iterateBlocks()) {
-        unrenderBlock(meshesNeedUpdate, chunk, x, y, z, blockID, blockMeshesIndexes.value())
-      }
-
-      // Free up all associated data
-      chunkBlockMeshesIndexes.delete(chunk)
       chunksNeedingRender.delete(chunk)
-      chunkBlocksNeedingRender.delete(chunk)
-      chunkBlocksNeedingUnrender.delete(chunk)
+      chunkBlocksNeedingUpdate.delete(chunk)
     }
 
-    for (const mesh of meshesNeedUpdate) {
-      mesh.instanceMatrix.needsUpdate = true
-    }
-  }
-
-  // Renders a single block within a chunk
-  const renderBlock = (
-    meshesNeedUpdate: Set<InstancedMesh>,
-    meshInstanceCounts: HashMap<number, number>,
-    chunk: Chunk,
-    x: number,
-    y: number,
-    z: number,
-    incomingBlockTypeID?: number,
-    incomingBlockKey?: string,
-  ) => {
-    const blockKey = incomingBlockKey ?? getBlockKey(x, y, z)
-
-    const blockMeshesIndexes = chunkBlockMeshesIndexes.getOrSet(chunk, () => new HashMap())
-
-    if (blockMeshesIndexes.has(blockKey)) {
-      return
-    }
-
-    const blockTypeID = incomingBlockTypeID ?? chunk.getBlock(x, y, z).unwrap()
-
-    const freeList = blockMeshesFreeIndexes.get(blockTypeID).unwrap()
-    const blockMesh = blockMeshes
-      .get(blockTypeID)
-      .expect(`No mesh found for block ID ${blockTypeID}`)
-
-    const index = freeList.pop() ?? getNextBlockMeshIndex(blockTypeID)
-
-    const blockWorldCoordinates = chunk.getBlockWorldCoordinates(x, y, z)
-    intermediateMatrix.setPosition(
-      blockWorldCoordinates.x,
-      blockWorldCoordinates.y,
-      blockWorldCoordinates.z,
-    )
-    blockMesh.setMatrixAt(index, intermediateMatrix)
-    blockMeshesIndexes.set(blockKey, index)
-    meshesNeedUpdate.add(blockMesh)
-
-    const currentMax = meshInstanceCounts.getOrDefault(blockTypeID, 0)
-    meshInstanceCounts.set(blockTypeID, Math.max(currentMax, index + 1))
+    console.log(`Unrendered ${chunks.length} chunks`)
   }
 
   ctx.onRenderBatch(Chunk, (chunks) => {
-    const meshesNeedUpdate = new Set<InstancedMesh>()
-    const meshInstanceCounts = new HashMap<number, number>()
-
-    // Initialize counts with current mesh counts
-    for (const [blockID, mesh] of blockMeshes) {
-      meshInstanceCounts.set(blockID, mesh.count)
+    // Handle individual block updates
+    for (const [chunk] of chunkBlocksNeedingUpdate) {
+      chunksNeedingRender.add(chunk)
+      chunkBlocksNeedingUpdate.delete(chunk)
     }
 
-    for (const [chunk, blockKeys] of chunkBlocksNeedingRender) {
-      for (const blockKey of blockKeys) {
-        const pos = getPositionFromBlockKey(blockKey)
-        renderBlock(
-          meshesNeedUpdate,
-          meshInstanceCounts,
-          chunk,
-          pos.x,
-          pos.y,
-          pos.z,
-          undefined,
-          blockKey,
-        )
-      }
+    // Rebuild chunks that need rendering
+    const chunksToRender = ctx.isFirstFrame() ? chunks : Array.from(chunksNeedingRender)
 
-      // After processing, clear the set for this chunk
-      chunkBlocksNeedingRender.delete(chunk)
-    }
-
-    for (const [chunk, blockKeys] of chunkBlocksNeedingUnrender) {
-      for (const { blockID, key } of blockKeys) {
-        const pos = getPositionFromBlockKey(key)
-        unrenderBlock(meshesNeedUpdate, chunk, pos.x, pos.y, pos.z, blockID, undefined)
-      }
-
-      // After processing, clear the set for this chunk and its callbacks
-      chunkBlocksNeedingUnrender.delete(chunk)
-    }
-
-    for (const chunk of ctx.isFirstFrame() ? chunks : chunksNeedingRender) {
-      for (const { blockID, x, y, z } of chunk.iterateBlocks()) {
-        renderBlock(meshesNeedUpdate, meshInstanceCounts, chunk, x, y, z, blockID)
-      }
-    }
-
-    for (const mesh of meshesNeedUpdate) {
-      console.log(`Updating instance matrix for mesh`, mesh)
-      mesh.instanceMatrix.needsUpdate = true
-    }
-
-    // Update instance counts for better frustum culling
-    for (const [blockTypeID, count] of meshInstanceCounts) {
-      const mesh = blockMeshes.get(blockTypeID).unwrap()
-      mesh.count = count
+    for (const chunk of chunksToRender) {
+      updateChunkMesh(chunk)
     }
 
     chunksNeedingRender.clear()

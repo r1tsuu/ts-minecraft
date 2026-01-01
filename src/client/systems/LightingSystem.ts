@@ -9,10 +9,10 @@ export const lightingSystemFactory = createSystemFactory((ctx) => {
   ctx.scene.fog = new Fog(backgroundColor, 1, 96)
   ctx.scene.background = new Color(backgroundColor)
 
-  const sunLight = new DirectionalLight(0xffffff, 3)
+  const sunLight = new DirectionalLight(0xffffff, 0.5)
   sunLight.position.set(500, 500, 500)
   ctx.scene.add(sunLight)
-  const sunLight2 = new DirectionalLight(0xffffff, 3)
+  const sunLight2 = new DirectionalLight(0xffffff, 0.5)
   sunLight2.position.set(-500, 500, -500)
   ctx.scene.add(sunLight2)
 

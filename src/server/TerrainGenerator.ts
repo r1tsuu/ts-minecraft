@@ -1,37 +1,55 @@
+import seedrandom from 'seedrandom'
 import { SimplexNoise } from 'three/examples/jsm/Addons.js'
+import { match } from 'ts-pattern'
 
-import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
+import { type BlockID, Blocks } from '../shared/BlocksRegistry.ts'
 import { Config } from '../shared/Config.ts'
 import { Chunk, type ChunkCoordinates } from '../shared/entities/Chunk.ts'
+import { pipe } from '../shared/Pipe.ts'
 import { range } from '../shared/util.ts'
 
 export type TerrainGenerator = ReturnType<typeof createTerrainGenerator>
 
-export const createTerrainGenerator = (blocksRegistry: BlocksRegistry) => {
-  const noise = new SimplexNoise()
+const createRandomSplitter = (seed: string) => (salt: string) => ({
+  random: seedrandom(`${seed}:${salt}`),
+})
 
-  const generateChunkAt = (coords: ChunkCoordinates): Chunk => {
-    const chunk = new Chunk(coords.x, coords.z)
+export const createTerrainGenerator = (seed: string) => {
+  const splitter = createRandomSplitter(seed)
+
+  const heightNoise = new SimplexNoise(splitter('terrain_height'))
+
+  const detailNoise = new SimplexNoise(splitter('terrain_detail'))
+
+  const generateChunkAt = (chunkCoords: ChunkCoordinates): Chunk => {
+    const chunk = new Chunk(chunkCoords.x, chunkCoords.z)
 
     for (const x of range(Config.CHUNK_SIZE)) {
       for (const z of range(Config.CHUNK_SIZE)) {
-        const worldX = coords.x * Config.CHUNK_SIZE + x
-        const worldZ = coords.z * Config.CHUNK_SIZE + z
+        const { x: worldX, z: worldZ } = Chunk.mapToWorldCoordinates(chunkCoords, { x, z })
 
-        const baseY = 10
-        const heightVariation = 5
-        const amplitude = heightVariation / 2
-        const frequency = 0.005
+        const baseY = 5
 
-        const yOffset = Math.floor(
-          (noise.noise(worldX * frequency, worldZ * frequency) + 1) * amplitude,
-        )
-
-        const height = baseY + yOffset
+        const height =
+          baseY +
+          Math.floor(
+            (heightNoise.noise(worldX * 0.005, worldZ * 0.005) + 1) * 3 +
+              detailNoise.noise(worldX * 0.02, worldZ * 0.02) * 2,
+          )
 
         for (let y = 0; y <= height; y++) {
-          const block = y === height ? 'grass' : 'dirt'
-          chunk.setBlock(x, y, z, blocksRegistry.getBlockIdByName(block))
+          pipe(
+            match<number, BlockID>(y)
+              .when(
+                (y) => y === 0,
+                () => Blocks.Bedrock.id,
+              )
+              .when(
+                (y) => y === height,
+                () => Blocks.Grass.id,
+              )
+              .otherwise(() => Blocks.Dirt.id),
+          ).tap((blockID) => chunk.setBlock(x, y, z, blockID))
         }
       }
     }

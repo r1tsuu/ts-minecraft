@@ -4,6 +4,7 @@ import type { RawVector3 } from '../types.ts'
 
 import { Config } from './Config.ts'
 import { type ChunkCoordinates } from './entities/Chunk.ts'
+import { HashMap } from './HashMap.ts'
 
 export const minutes = (m: number): number => {
   return m * 60 * 1000
@@ -515,3 +516,15 @@ export const throttle = <F extends (...args: any[]) => void>(fn: F, delayMs: num
 }
 
 export type Callback = () => void
+
+export const deepMapToObj = <T>(obj: HashMap<any, T>): any => {
+  const result: any = {}
+  for (const [key, value] of obj.entries()) {
+    if (value instanceof HashMap) {
+      result[key] = deepMapToObj(value)
+    } else {
+      result[key] = value
+    }
+  }
+  return result
+}

@@ -23,7 +23,6 @@ class AsyncPipeline<T> {
     return new AsyncPipeline(
       promiseFn.then(async (iterable) => {
         if (!isIterable(iterable)) {
-          console.log(iterable)
           throw new Error('collect can only be called on ChainAsync wrapping an AsyncIterable')
         }
 
@@ -250,7 +249,6 @@ class AsyncPipeline<T> {
     const promiseFn = this.promise instanceof Promise ? this.promise : Promise.resolve(this.promise)
     return new AsyncPipeline(
       promiseFn.then(async (value) => {
-        console.log(value)
         if (!isIterable(value)) {
           throw new Error('tapIter can only be called on ChainAsync wrapping an iterable')
         }
