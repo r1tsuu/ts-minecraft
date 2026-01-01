@@ -29,7 +29,12 @@ export const raycastingSystemFactory = createSystemFactory((ctx) => {
   const blockPositionMap = new HashMap<number, Vector3>()
   const mesh: Mesh = new Mesh(
     new BoxGeometry(1.01, 1.01, 1.01),
-    new MeshStandardMaterial({ opacity: 0.5, transparent: true }),
+    new MeshStandardMaterial({
+      alphaTest: 0.5,
+      depthWrite: false,
+      opacity: 0.5,
+      transparent: true,
+    }),
   )
 
   const raycaster: Raycaster = new Raycaster()

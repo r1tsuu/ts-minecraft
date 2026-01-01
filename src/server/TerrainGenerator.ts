@@ -6,7 +6,10 @@ import { Config } from '../shared/Config.ts'
 import { Chunk, type ChunkCoordinates } from '../shared/entities/Chunk.ts'
 import { range } from '../shared/util.ts'
 
-export type TerrainGenerator = ReturnType<typeof createTerrainGenerator>
+export interface TerrainGenerator {
+  generateChunkAt(chunkCoords: ChunkCoordinates): Chunk
+}
+
 // Terrain generation configuration
 const TERRAIN_CONFIG = {
   baseY: 32,
@@ -38,7 +41,7 @@ const createRandomSplitter = (seed: string) => (salt: string) => ({
   random: seedrandom(`${seed}:${salt}`),
 })
 
-export const createTerrainGenerator = (seed: string) => {
+export const createTerrainGenerator = (seed: string): TerrainGenerator => {
   const splitter = createRandomSplitter(seed)
 
   const heightNoise = new SimplexNoise(splitter('terrain_height'))
