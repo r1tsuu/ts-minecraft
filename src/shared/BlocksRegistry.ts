@@ -11,6 +11,14 @@ export const Blocks = {
     id: 2,
     name: 'grass',
   },
+  OakLeaves: {
+    id: 6,
+    name: 'oak_leaves',
+  },
+  OakLog: {
+    id: 5,
+    name: 'oak_log',
+  },
   Stone: {
     id: 3,
     name: 'stone',

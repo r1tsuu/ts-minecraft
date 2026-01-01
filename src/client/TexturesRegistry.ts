@@ -9,6 +9,9 @@ import { deepMapToObj } from '../shared/util.ts'
 import dirtTextureImg from '../static/dirt.png?no-inline'
 import grassBlockSideTextureImg from '../static/grass_block_side.png?no-inline'
 import grassBlockTopTextureImg from '../static/grass_block_top.png?no-inline'
+import oakLeavesTextureImg from '../static/oak_leaves.png?no-inline'
+import oakLogTopTextureImg from '../static/oak_log_top.png?no-inline'
+import oakLogTextureImg from '../static/oak_log.png?no-inline'
 
 type BlockClientData = {
   [key in Side]: string
@@ -42,6 +45,22 @@ const blocksTextureMap: Record<BlockID, Omit<BlockClientData, 'name'>> = {
     left: grassBlockSideTextureImg,
     right: grassBlockSideTextureImg,
     top: grassBlockTopTextureImg,
+  },
+  [Blocks.OakLeaves.id]: {
+    back: oakLeavesTextureImg,
+    bottom: oakLeavesTextureImg,
+    front: oakLeavesTextureImg,
+    left: oakLeavesTextureImg,
+    right: oakLeavesTextureImg,
+    top: oakLeavesTextureImg,
+  },
+  [Blocks.OakLog.id]: {
+    back: oakLogTextureImg,
+    bottom: oakLogTopTextureImg,
+    front: oakLogTextureImg,
+    left: oakLogTextureImg,
+    right: oakLogTextureImg,
+    top: oakLogTopTextureImg,
   },
   [Blocks.Stone.id]: {
     back: dirtTextureImg,
