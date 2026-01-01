@@ -112,6 +112,36 @@ const input = tv({
   },
 })
 
+const hotbarSlot = tv({
+  base: `
+    w-16 h-16
+    bg-game-ui
+    border-2
+    flex items-center justify-center
+    transition-all duration-150
+    backdrop-blur-sm
+    relative
+    shadow-[inset_0_-2px_4px_rgba(0,0,0,0.4),inset_0_2px_4px_rgba(255,255,255,0.1)]
+  `,
+  defaultVariants: {
+    selected: false,
+  },
+  variants: {
+    selected: {
+      false: `
+        border-primary-dark
+        bg-game-ui
+      `,
+      true: `
+        border-accent
+        bg-[#2a2a2a]
+        shadow-[0_0_12px_var(--color-accent-glow),inset_0_-2px_6px_rgba(0,0,0,0.5),inset_0_2px_4px_var(--color-accent-glow)]
+        scale-110
+        border-[3px]
+      `,
+    },
+  },
+})
 const card = tv({
   base: `
     bg-overlay-bg
@@ -328,6 +358,23 @@ const Main = () => {
         {/** <!-- Horizontal line --> */}
         <div class="absolute h-0.5 w-full top-1/2 -translate-y-1/2 bg-crosshair shadow-[0_0_4px_rgba(0,0,0,0.8)]"></div>
       </div>
+      <div
+        class="fixed bottom-5 left-1/2 -translate-x-1/2 z-20"
+        data-condition={conditionKey('showGameUI')}
+      >
+        <div
+          class="flex gap-1 bg-game-ui/80 p-1 border-2 border-primary-dark backdrop-blur-sm"
+          id="hotbar"
+        >
+          <div class="flex gap-1" id="hotbar_slots"></div>
+        </div>
+      </div>
+      <template id="hotbar_item_template">
+        <div class={hotbarSlot()} selected-class={hotbarSlot({ selected: true })}>
+          <img alt="block" class="w-12 h-12 pixelated absolute" data-dynamic-attrs="src" />
+          <span class="absolute bottom-0.5 right-0.5 text-xs text-accent text-shadow-[1px_1px_2px_rgba(0,0,0,0.9)] leading-none" />
+        </div>
+      </template>
     </div>
   )
 }

@@ -5,6 +5,7 @@ import type { MinecraftEventBus } from '../../shared/MinecraftEventBus.ts'
 import type { Callback } from '../../shared/util.ts'
 import type { GameLoop } from '../GameLoop.ts'
 import type { LocalStorageManager } from '../LocalStorageManager.ts'
+import type { TexturesRegistry } from '../TexturesRegistry.ts'
 import type { GUIActions, GUIConditions, GUIState as GUIState } from './state.ts'
 
 import { ExitWorld } from '../../shared/events/client/ExitWorld.ts'
@@ -43,10 +44,12 @@ export const createGUI = ({
   eventBus,
   getGameLoop,
   localStorageManager,
+  texturesRegistry,
 }: {
   eventBus: MinecraftEventBus
   getGameLoop: () => Maybe<GameLoop>
   localStorageManager: LocalStorageManager
+  texturesRegistry: TexturesRegistry
 }): GUI => {
   const state: GUIState = {
     activePage: 'start',
@@ -172,6 +175,17 @@ export const createGUI = ({
     synchronize(state, actions, conditions, affectedQuerySelectors)
   }
 
+  type HotbarSlot = {
+    isSelected: boolean
+    quantity: number
+    texture: string
+  }
+
+  let previousHotbarSlots: HotbarSlot[] = []
+
+  const hotbarSlotsContainer = document.getElementById('hotbar_slots')!
+  const hotbarSlotTemplate = document.getElementById('hotbar_item_template') as HTMLTemplateElement
+
   const updateGameUI = (): void => {
     const maybeGameLoop = getGameLoop()
     if (!maybeGameLoop.isSome() || state.isPaused) return
@@ -186,6 +200,17 @@ export const createGUI = ({
 
     const frameCounter = gameLoop.getFrameCounter()
 
+    Iterator.from(player.getInventory().listItems()).take(9)
+
+    const hotbarSlots: HotbarSlot[] = Iterator.from(player.getInventory().listItems())
+      .take(9)
+      .map((stack, i) => ({
+        isSelected: player.getActiveSlotIndex() === i,
+        quantity: stack.map((s) => s.quantity).unwrapOrDefault(0),
+        texture: stack.map((s) => texturesRegistry.getItemTexture(s.itemID)).unwrapOrDefault(''),
+      }))
+      .toArray()
+
     setState(
       {
         fps: frameCounter.fps.toFixed(0),
@@ -195,8 +220,7 @@ export const createGUI = ({
         rotationPitch: MathUtils.radToDeg(player.rotation.x).toFixed(),
         rotationYaw: MathUtils.radToDeg(player.rotation.y).toFixed(),
       },
-
-      ['#fps', '#position', '#rotation'],
+      ['#fps', '#position', '#rotation', '#hotbar'],
     )
 
     let performance: 'average' | 'bad' | 'good'
@@ -210,6 +234,36 @@ export const createGUI = ({
     }
 
     document.getElementById('fps_value')!.setAttribute('data-performance', performance)
+
+    if (JSON.stringify(previousHotbarSlots) !== JSON.stringify(hotbarSlots)) {
+      previousHotbarSlots = hotbarSlots
+
+      hotbarSlotsContainer.innerHTML = ''
+
+      for (const slot of hotbarSlots) {
+        const clone = hotbarSlotTemplate.content.cloneNode(true) as HTMLElement
+        const img = clone.querySelector('img')!
+
+        if (slot.texture) {
+          img.src = slot.texture
+        } else {
+          img.remove()
+        }
+
+        // clone.querySelector('div')!.setAttribute('data-selected', slot.isSelected.toString())
+        if (slot.isSelected) {
+          const div = clone.querySelector('div')!
+          div.setAttribute('class', div.getAttribute('selected-class') ?? '')
+          div.setAttribute('data-selected', 'true')
+        }
+
+        if (slot.quantity > 0) {
+          clone.querySelector('span')!.textContent = slot.quantity.toString()
+        }
+
+        hotbarSlotsContainer.appendChild(clone)
+      }
+    }
   }
 
   const onPointerLockChange = (): void => {

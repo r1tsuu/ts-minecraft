@@ -36,6 +36,7 @@ export const createMinecraftClient = async (): Promise<MinecraftClientContext> =
     eventBus,
     getGameLoop: () => maybeGameLoop,
     localStorageManager,
+    texturesRegistry,
   })
 
   const ctx: MinecraftClientContext = {

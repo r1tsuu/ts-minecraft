@@ -1,49 +1,53 @@
+let id = 1
+
 export const Blocks = {
   Bedrock: {
-    id: 4,
+    id: id++,
     name: 'bedrock',
   },
   CoalOre: {
-    id: 10,
+    id: id++,
     name: 'coal_ore',
   },
   DiamondOre: {
-    id: 12,
+    id: id++,
     name: 'diamond_ore',
   },
   Dirt: {
-    id: 1,
+    id: id++,
     name: 'dirt',
   },
   Grass: {
-    id: 2,
+    id: id++,
     name: 'grass',
   },
   Gravel: {
-    id: 9,
+    id: id++,
     name: 'gravel',
   },
   IronOre: {
-    id: 11,
+    id: id++,
     name: 'iron_ore',
   },
   OakLeaves: {
-    id: 6,
+    id: id++,
     name: 'oak_leaves',
   },
   OakLog: {
-    id: 5,
+    id: id++,
     name: 'oak_log',
   },
   Sand: {
-    id: 8,
+    id: id++,
     name: 'sand',
   },
   Stone: {
-    id: 3,
+    id: id++,
     name: 'stone',
   },
 } as const
+
+export const blockIDS: number[] = Object.values(Blocks).map((block) => block.id)
 
 export type BlockID = (typeof Blocks)[keyof typeof Blocks]['id'] | ({} & number)
 export type BlockName = (typeof Blocks)[keyof typeof Blocks]['name']

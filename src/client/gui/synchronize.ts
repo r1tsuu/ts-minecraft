@@ -28,10 +28,21 @@ const bindStateToDOM = (
           subContainer.appendChild(clone)
         }
       }
-    } else
+    } else {
       container.querySelectorAll(`[data-variable="${keyPrefix}${key}"]`).forEach((el) => {
         el.textContent = String(value)
       })
+      container.querySelectorAll('[data-dynamic-attrs]').forEach((el) => {
+        const dynamicAttrs = el.getAttribute('data-dynamic-attrs')
+        if (!dynamicAttrs) return
+        const list = dynamicAttrs.split(',').map((s) => s.trim())
+        for (const attributeName of list) {
+          if (attributeName === keyPrefix + key) {
+            el.setAttribute(`${attributeName}`, String(value))
+          }
+        }
+      })
+    }
   }
 }
 
@@ -101,4 +112,15 @@ export const synchronize = (
       }
     })
   }
+
+  // for (const container of containers) {
+  //   container.querySelectorAll('[data-dynamic-attrs]').forEach((el) => {
+  //     const dynamicAttrs = el.getAttribute('data-dynamic-attrs')
+  //     if (!dynamicAttrs) return
+  //     const list = dynamicAttrs.split(',').map((s) => s.trim())
+  //     for (const attributeName of list) {
+  //       const variable = el.getAttribute(`data-${attributeName}`)
+  //     }
+  //   })
+  // }
 }

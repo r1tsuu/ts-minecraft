@@ -13,10 +13,24 @@ import {
   RequestBlocksUpdate,
 } from '../../shared/events/client/RequestBlocksUpdate.ts'
 import { RequestPlayerUpdate } from '../../shared/events/client/RequestPlayerUpdate.ts'
+import { itemIDToBlockID } from '../../shared/ItemRegistry.ts'
 import { throttle } from '../../shared/util.ts'
 import { createSystemFactory } from './createSystem.ts'
 
 const THROTTLE_DELAY_MS = 500
+
+const digitToSlotIndexMap = {
+  Digit0: 9,
+  Digit1: 0,
+  Digit2: 1,
+  Digit3: 2,
+  Digit4: 3,
+  Digit5: 4,
+  Digit6: 5,
+  Digit7: 6,
+  Digit8: 7,
+  Digit9: 8,
+} as const
 
 export const createClientPlayerControlSystemFactory = ({
   chunkRenderingSystem,
@@ -43,10 +57,19 @@ export const createClientPlayerControlSystemFactory = ({
           z: lookingAtBlock.z + lookingAtNormal.z,
         }
 
-        const blockToPlace = Blocks.Grass.id
-        ctx.world.addBlock(position.x, position.y, position.z, blockToPlace)
+        const player = ctx.getClientPlayer()
+        const maybeHoldingItemStack = player.getInventory().getItemAt(player.getActiveSlotIndex())
+        if (maybeHoldingItemStack.isNone()) return
+        const itemStack = maybeHoldingItemStack.value()
+        if (itemStack.quantity <= 0) return
+        if (!player.getInventory().decrementAmountAt(player.getActiveSlotIndex(), 1)) return
+
+        const blockToPlace = itemIDToBlockID(itemStack.itemID)
+        if (blockToPlace.isNone()) return
+
+        ctx.world.addBlock(position.x, position.y, position.z, blockToPlace.value())
         chunkRenderingSystem.renderBlockAt(position)
-        queuedActionsToSend.push({ blockID: blockToPlace, position, type: 'SET' })
+        queuedActionsToSend.push({ blockID: blockToPlace.value(), position, type: 'SET' })
       }
     }, THROTTLE_DELAY_MS)
 
@@ -95,6 +118,15 @@ export const createClientPlayerControlSystemFactory = ({
 
       if (inputManager.isPressedRightMouse()) {
         handleBlockPlace()
+      }
+
+      for (const key of Object.keys(digitToSlotIndexMap)) {
+        if (inputManager.isKeyPressed(key as keyof typeof digitToSlotIndexMap)) {
+          const slotIndex = digitToSlotIndexMap[key as keyof typeof digitToSlotIndexMap]
+          if (player.getActiveSlotIndex() !== slotIndex) {
+            player.setActiveSlotIndex(slotIndex)
+          }
+        }
       }
     })
 

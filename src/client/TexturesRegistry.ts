@@ -2,23 +2,24 @@ import { NearestFilter, Texture, TextureLoader } from 'three'
 
 import type { RawVector2 } from '../types.ts'
 
-import { type BlockID, Blocks } from '../shared/BlocksRegistry.ts'
+import { type BlockID, blockIDS, Blocks } from '../shared/BlocksRegistry.ts'
 import { HashMap } from '../shared/HashMap.ts'
+import { itemIDToBlockID } from '../shared/ItemRegistry.ts'
 import { Maybe } from '../shared/Maybe.ts'
-import { deepMapToObj } from '../shared/util.ts'
-import bedrockTextureImg from '../static/bedrock.png?no-inline'
-import coalOreTextureImg from '../static/coal_ore.png?no-inline'
-import diamondOreTextureImg from '../static/diamond_ore.png?no-inline'
-import dirtTextureImg from '../static/dirt.png?no-inline'
-import grassBlockSideTextureImg from '../static/grass_block_side.png?no-inline'
-import grassBlockTopTextureImg from '../static/grass_block_top.png?no-inline'
-import gravelTextureImg from '../static/gravel.png?no-inline'
-import ironOreTextureImg from '../static/iron_ore.png?no-inline'
-import oakLeavesTextureImg from '../static/oak_leaves.png' // Using glass as placeholder for leaves
-import oakLogTopTextureImg from '../static/oak_log_top.png?no-inline'
-import oakLogTextureImg from '../static/oak_log.png?no-inline'
-import sandTextureImg from '../static/sand.png?no-inline'
-import stoneTextureImg from '../static/stone.png?no-inline'
+import { pipe } from '../shared/Pipe.ts'
+import bedrockTextureImg from '../static/textures/blocks/bedrock.png?no-inline'
+import coalOreTextureImg from '../static/textures/blocks/coal_ore.png?no-inline'
+import diamondOreTextureImg from '../static/textures/blocks/diamond_ore.png?no-inline'
+import dirtTextureImg from '../static/textures/blocks/dirt.png?no-inline'
+import grassBlockSideTextureImg from '../static/textures/blocks/grass_block_side.png?no-inline'
+import grassBlockTopTextureImg from '../static/textures/blocks/grass_block_top.png?no-inline'
+import gravelTextureImg from '../static/textures/blocks/gravel.png?no-inline'
+import ironOreTextureImg from '../static/textures/blocks/iron_ore.png?no-inline'
+import oakLeavesTextureImg from '../static/textures/blocks/oak_leaves.png?no-inline'
+import oakLogTopTextureImg from '../static/textures/blocks/oak_log_top.png?no-inline'
+import oakLogTextureImg from '../static/textures/blocks/oak_log.png?no-inline'
+import sandTextureImg from '../static/textures/blocks/sand.png?no-inline'
+import stoneTextureImg from '../static/textures/blocks/stone.png?no-inline'
 
 type BlockClientData = {
   [key in Side]: string
@@ -121,6 +122,7 @@ const blocksTextureMap: Record<BlockID, Omit<BlockClientData, 'name'>> = {
 
 export interface TexturesRegistry {
   readonly atlas: Texture<HTMLCanvasElement>
+  getItemTexture(itemID: number): string
   getUVForBlockSide(blockID: number, side: Side): RawVector2
   readonly tilesPerRow: number
 }
@@ -197,14 +199,12 @@ export const createTexturesRegistry = async (): Promise<TexturesRegistry> => {
     }
   }
 
-  console.log(deepMapToObj(uvMap))
   const atlasTexture = new Texture(canvas)
   atlasTexture.needsUpdate = true
   atlasTexture.magFilter = NearestFilter
   atlasTexture.minFilter = NearestFilter
   atlasTexture.flipY = false // Don't flip the texture
 
-  console.log(`Created texture atlas with size ${atlasSize}x${atlasSize}`)
   const getUVForBlockSide = (blockID: number, side: Side): RawVector2 => {
     const blockMap = uvMap.get(blockID)
     if (blockMap.isNone()) {
@@ -221,8 +221,57 @@ export const createTexturesRegistry = async (): Promise<TexturesRegistry> => {
     return uv.value()
   }
 
+  const createItemTextureForBlock = (blockID: number): string => {
+    const size = 64
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx2d = Maybe.from(canvas.getContext('2d', { alpha: true })).expect(
+      '2D context is not supported',
+    )
+
+    ctx2d.imageSmoothingEnabled = false
+
+    const uvFront = getUVForBlockSide(blockID, 'front')
+    const tilePixelSize = atlasSize / tilesPerRow
+
+    // Simple centered block texture
+    const blockSize = size * 0.85
+    const offset = (size - blockSize) / 2
+
+    // Draw main front face
+    ctx2d.drawImage(
+      atlasTexture.image,
+      uvFront.x * atlasSize,
+      uvFront.y * atlasSize,
+      tilePixelSize,
+      tilePixelSize,
+      offset,
+      offset,
+      blockSize,
+      blockSize,
+    )
+
+    return canvas.toDataURL()
+  }
+
+  const itemTexturesMap = pipe(
+    blockIDS.map((id) => ({ id, texture: createItemTextureForBlock(id) })),
+  )
+    .iterToMap<number, string>(({ id, texture }) => [id, texture])
+    .value()
+
+  const getItemTexture = (itemID: number): string => {
+    return pipe(itemIDToBlockID(itemID).expect(`No block ID for item ID ${itemID}`))
+      .map((blockID) =>
+        itemTexturesMap.get(blockID).expect(`No item texture for block ID ${blockID}`),
+      )
+      .value()
+  }
+
   return {
     atlas: atlasTexture,
+    getItemTexture,
     getUVForBlockSide,
     tilesPerRow,
   }

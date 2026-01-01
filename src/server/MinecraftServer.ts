@@ -6,7 +6,7 @@ import type { WorldStorageAdapter } from './types.ts'
 import { asyncPipe } from '../shared/AsyncPipe.ts'
 import { Config } from '../shared/Config.ts'
 import { Chunk, type ChunkCoordinates } from '../shared/entities/Chunk.ts'
-import { Player } from '../shared/entities/Player.ts'
+import { ItemStack, Player } from '../shared/entities/Player.ts'
 import { RequestBlocksUpdate } from '../shared/events/client/RequestBlocksUpdate.ts'
 import { RequestChunksLoad } from '../shared/events/client/RequestChunksLoad.ts'
 import { RequestChunksUnload } from '../shared/events/client/RequestChunksUnload.ts'
@@ -14,6 +14,7 @@ import { RequestPlayerJoin } from '../shared/events/client/RequestPlayerJoin.ts'
 import { RequestPlayerUpdate } from '../shared/events/client/RequestPlayerUpdate.ts'
 import { ResponseChunksLoad } from '../shared/events/server/ResponseChunksLoad.ts'
 import { ResponsePlayerJoin } from '../shared/events/server/ResponsePlayerJoin.ts'
+import { Items } from '../shared/ItemRegistry.ts'
 import { pipe } from '../shared/Pipe.ts'
 import { range } from '../shared/util.ts'
 import { World } from '../shared/World.ts'
@@ -33,7 +34,7 @@ export const createMinecraftServer = async ({
   const terrainGenerator = createTerrainGenerator(seed)
 
   const players = await storage.readPlayers()
-  console.log(`Loaded ${players.length} players from storage.`, players)
+
   const spawnChunks = Chunk.coordsInRadius(0, 0, Config.RENDER_DISTANCE)
 
   const world = new World()
@@ -67,16 +68,21 @@ export const createMinecraftServer = async ({
     world.removeEntities(event.chunks.map(Chunk.getWorldID)),
   )
 
+  const createPlayer = (uuid: string): Player => {
+    const player = new Player(uuid, getPlayerSpawnPosition(), Euler.zero(), new Vector3())
+    const inventory = player.getInventory()
+
+    inventory.setItemAt(0, new ItemStack(Items.Grass.id, 64))
+    inventory.setItemAt(1, new ItemStack(Items.Dirt.id, 64))
+    inventory.setItemAt(2, new ItemStack(Items.Stone.id, 64))
+
+    return player
+  }
+
   eventBus.subscribe(RequestPlayerJoin, (event) => {
     pipe(event.playerUUID)
       .map((uuid) =>
-        world
-          .getEntity(uuid, Player)
-          .unwrapOr(() =>
-            world.addEntity(
-              new Player(uuid, getPlayerSpawnPosition(), Euler.zero(), new Vector3()),
-            ),
-          ),
+        world.getEntity(uuid, Player).unwrapOr(() => world.addEntity(createPlayer(uuid))),
       )
       .map(() => new ResponsePlayerJoin(world))
       .tap((response) => eventBus.reply(event, response))
