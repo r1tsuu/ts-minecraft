@@ -76,7 +76,7 @@ export const raycastingSystemFactory = createSystemFactory((ctx) => {
           if (ctx.world.getBlockAt(worldX, worldY, worldZ).isNone()) continue
 
           const position = new Vector3(worldX, worldY, worldZ)
-          matrix.setPosition(worldX, worldY, worldZ)
+          matrix.setPosition(worldX + 0.5, worldY + 0.5, worldZ + 0.5)
           raycastingMesh.setMatrixAt(index, matrix)
           blockPositionMap.set(index, position)
           index++
