@@ -140,7 +140,6 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   }
 
   // Check if a neighbor block exists and is solid
-  // Check if a neighbor block exists and is solid
   const hasNeighbor = (chunk: Chunk, x: number, y: number, z: number): boolean => {
     // Check height bounds
     if (y < 0 || y >= Config.WORLD_HEIGHT) {
@@ -163,6 +162,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
     // Get neighboring chunk
     const neighborChunk = ctx.world.getEntity(Chunk.getWorldID(neighborChunkCoord), Chunk)
 
+    // If neighboring chunk doesn't exist, assume no neighbor (render the face)
     if (neighborChunk.isNone()) return false
 
     // Convert to local coordinates in neighboring chunk
@@ -293,6 +293,27 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
   const unrenderBlockAt = (worldPos: RawVector3): void => {
     // For chunk meshing, unrendering a block means rebuilding the chunk mesh
     renderBlockAt(worldPos)
+
+    // Also update neighboring chunks if block is on chunk boundary
+    const localCoords = Chunk.mapToLocalCoordinates(worldPos.x, worldPos.z)
+
+    // Check if block is on chunk boundary and mark neighboring chunks for update
+    if (localCoords.x === 0) {
+      // On left boundary, update chunk to the left
+      renderBlockAt({ x: worldPos.x - 1, y: worldPos.y, z: worldPos.z })
+    }
+    if (localCoords.x === Config.CHUNK_SIZE - 1) {
+      // On right boundary, update chunk to the right
+      renderBlockAt({ x: worldPos.x + 1, y: worldPos.y, z: worldPos.z })
+    }
+    if (localCoords.z === 0) {
+      // On front boundary, update chunk in front
+      renderBlockAt({ x: worldPos.x, y: worldPos.y, z: worldPos.z - 1 })
+    }
+    if (localCoords.z === Config.CHUNK_SIZE - 1) {
+      // On back boundary, update chunk behind
+      renderBlockAt({ x: worldPos.x, y: worldPos.y, z: worldPos.z + 1 })
+    }
   }
 
   const unrenderChunks = (chunks: Chunk[]): void => {
