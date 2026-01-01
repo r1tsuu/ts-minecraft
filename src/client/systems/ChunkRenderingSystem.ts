@@ -260,7 +260,7 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
           // vertexColors: true,
         }),
       )
-      // mesh.frustumCulled = false
+
       ctx.scene.add(mesh)
 
       chunkMeshes.set(chunk, {

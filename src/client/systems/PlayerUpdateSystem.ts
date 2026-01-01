@@ -152,9 +152,10 @@ export const playerUpdateSystemFactory = createSystemFactory((ctx) => {
 
         if (ctx.world.boxIntersectsWorldBlocks(Player.boundingBox(attemptedPosition))) {
           if (player.velocity.y > 0) {
-            // Hitting ceiling
+            // Hitting ceiling - stop upward movement
             player.velocity.y = 0
-            player.position.y = Math.floor(player.position.y)
+            const headY = attemptedPosition.y
+            player.position.y = Math.floor(headY)
           } else {
             // Hitting ground
             setCanJump(player, true)
