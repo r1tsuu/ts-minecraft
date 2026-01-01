@@ -3,6 +3,14 @@ export const Blocks = {
     id: 4,
     name: 'bedrock',
   },
+  CoalOre: {
+    id: 10,
+    name: 'coal_ore',
+  },
+  DiamondOre: {
+    id: 12,
+    name: 'diamond_ore',
+  },
   Dirt: {
     id: 1,
     name: 'dirt',
@@ -11,6 +19,14 @@ export const Blocks = {
     id: 2,
     name: 'grass',
   },
+  Gravel: {
+    id: 9,
+    name: 'gravel',
+  },
+  IronOre: {
+    id: 11,
+    name: 'iron_ore',
+  },
   OakLeaves: {
     id: 6,
     name: 'oak_leaves',
@@ -18,6 +34,10 @@ export const Blocks = {
   OakLog: {
     id: 5,
     name: 'oak_log',
+  },
+  Sand: {
+    id: 8,
+    name: 'sand',
   },
   Stone: {
     id: 3,

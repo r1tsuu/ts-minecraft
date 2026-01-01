@@ -6,12 +6,19 @@ import { type BlockID, Blocks } from '../shared/BlocksRegistry.ts'
 import { HashMap } from '../shared/HashMap.ts'
 import { Maybe } from '../shared/Maybe.ts'
 import { deepMapToObj } from '../shared/util.ts'
+import bedrockTextureImg from '../static/bedrock.png?no-inline'
+import coalOreTextureImg from '../static/coal_ore.png?no-inline'
+import diamondOreTextureImg from '../static/diamond_ore.png?no-inline'
 import dirtTextureImg from '../static/dirt.png?no-inline'
 import grassBlockSideTextureImg from '../static/grass_block_side.png?no-inline'
 import grassBlockTopTextureImg from '../static/grass_block_top.png?no-inline'
+import gravelTextureImg from '../static/gravel.png?no-inline'
+import ironOreTextureImg from '../static/iron_ore.png?no-inline'
 import oakLeavesTextureImg from '../static/oak_leaves.png' // Using glass as placeholder for leaves
 import oakLogTopTextureImg from '../static/oak_log_top.png?no-inline'
 import oakLogTextureImg from '../static/oak_log.png?no-inline'
+import sandTextureImg from '../static/sand.png?no-inline'
+import stoneTextureImg from '../static/stone.png?no-inline'
 
 type BlockClientData = {
   [key in Side]: string
@@ -23,12 +30,28 @@ type Side = 'back' | 'bottom' | 'front' | 'left' | 'right' | 'top'
 
 const blocksTextureMap: Record<BlockID, Omit<BlockClientData, 'name'>> = {
   [Blocks.Bedrock.id]: {
-    back: dirtTextureImg,
-    bottom: dirtTextureImg,
-    front: dirtTextureImg,
-    left: dirtTextureImg,
-    right: dirtTextureImg,
-    top: dirtTextureImg,
+    back: bedrockTextureImg,
+    bottom: bedrockTextureImg,
+    front: bedrockTextureImg,
+    left: bedrockTextureImg,
+    right: bedrockTextureImg,
+    top: bedrockTextureImg,
+  },
+  [Blocks.CoalOre.id]: {
+    back: coalOreTextureImg,
+    bottom: coalOreTextureImg,
+    front: coalOreTextureImg,
+    left: coalOreTextureImg,
+    right: coalOreTextureImg,
+    top: coalOreTextureImg,
+  },
+  [Blocks.DiamondOre.id]: {
+    back: diamondOreTextureImg,
+    bottom: diamondOreTextureImg,
+    front: diamondOreTextureImg,
+    left: diamondOreTextureImg,
+    right: diamondOreTextureImg,
+    top: diamondOreTextureImg,
   },
   [Blocks.Dirt.id]: {
     back: dirtTextureImg,
@@ -46,6 +69,22 @@ const blocksTextureMap: Record<BlockID, Omit<BlockClientData, 'name'>> = {
     right: grassBlockSideTextureImg,
     top: grassBlockTopTextureImg,
   },
+  [Blocks.Gravel.id]: {
+    back: gravelTextureImg,
+    bottom: gravelTextureImg,
+    front: gravelTextureImg,
+    left: gravelTextureImg,
+    right: gravelTextureImg,
+    top: gravelTextureImg,
+  },
+  [Blocks.IronOre.id]: {
+    back: ironOreTextureImg,
+    bottom: ironOreTextureImg,
+    front: ironOreTextureImg,
+    left: ironOreTextureImg,
+    right: ironOreTextureImg,
+    top: ironOreTextureImg,
+  },
   [Blocks.OakLeaves.id]: {
     back: oakLeavesTextureImg,
     bottom: oakLeavesTextureImg,
@@ -62,13 +101,21 @@ const blocksTextureMap: Record<BlockID, Omit<BlockClientData, 'name'>> = {
     right: oakLogTextureImg,
     top: oakLogTopTextureImg,
   },
+  [Blocks.Sand.id]: {
+    back: sandTextureImg,
+    bottom: sandTextureImg,
+    front: sandTextureImg,
+    left: sandTextureImg,
+    right: sandTextureImg,
+    top: sandTextureImg,
+  },
   [Blocks.Stone.id]: {
-    back: dirtTextureImg,
-    bottom: dirtTextureImg,
-    front: dirtTextureImg,
-    left: dirtTextureImg,
-    right: dirtTextureImg,
-    top: dirtTextureImg,
+    back: stoneTextureImg,
+    bottom: stoneTextureImg,
+    front: stoneTextureImg,
+    left: stoneTextureImg,
+    right: stoneTextureImg,
+    top: stoneTextureImg,
   },
 }
 
