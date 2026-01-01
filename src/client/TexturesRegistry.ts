@@ -9,7 +9,7 @@ import { deepMapToObj } from '../shared/util.ts'
 import dirtTextureImg from '../static/dirt.png?no-inline'
 import grassBlockSideTextureImg from '../static/grass_block_side.png?no-inline'
 import grassBlockTopTextureImg from '../static/grass_block_top.png?no-inline'
-import oakLeavesTextureImg from '../static/oak_leaves.png?no-inline'
+import oakLeavesTextureImg from '../static/oak_leaves.png' // Using glass as placeholder for leaves
 import oakLogTopTextureImg from '../static/oak_log_top.png?no-inline'
 import oakLogTextureImg from '../static/oak_log.png?no-inline'
 
@@ -116,11 +116,12 @@ export const createTexturesRegistry = async (): Promise<TexturesRegistry> => {
   const canvas = document.createElement('canvas')
   canvas.width = atlasSize
   canvas.height = atlasSize
-  const ctx2d = Maybe.from(canvas.getContext('2d')).expect('2D context is not supported')
+  const ctx2d = Maybe.from(canvas.getContext('2d', { alpha: true })).expect(
+    '2D context is not supported',
+  )
 
-  // Fill entire canvas with white to ensure no transparent areas
-  ctx2d.fillStyle = '#FFFFFF'
-  ctx2d.fillRect(0, 0, atlasSize, atlasSize)
+  // Clear canvas (transparent by default when alpha: true)
+  ctx2d.clearRect(0, 0, atlasSize, atlasSize)
 
   let i = 0
 

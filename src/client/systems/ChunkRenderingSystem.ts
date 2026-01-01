@@ -255,8 +255,10 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
       const mesh = new Mesh(
         geometry,
         new MeshBasicMaterial({
+          alphaTest: 0.5,
           map: ctx.texturesRegistry.atlas,
           side: DoubleSide,
+          transparent: true,
           // vertexColors: true,
         }),
       )
