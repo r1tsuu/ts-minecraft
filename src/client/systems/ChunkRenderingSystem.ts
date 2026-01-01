@@ -4,7 +4,6 @@ import {
   Float32BufferAttribute,
   Mesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
   Uint16BufferAttribute,
 } from 'three'
 

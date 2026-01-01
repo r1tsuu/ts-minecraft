@@ -8,6 +8,7 @@ import type { LocalStorageManager } from '../LocalStorageManager.ts'
 import type { TexturesRegistry } from '../TexturesRegistry.ts'
 import type { GUIActions, GUIConditions, GUIState as GUIState } from './state.ts'
 
+import { Config } from '../../shared/Config.ts'
 import { ExitWorld } from '../../shared/events/client/ExitWorld.ts'
 import { JoinedWorld } from '../../shared/events/client/JoinedWorld.ts'
 import { JoinWorld } from '../../shared/events/client/JoinWorld.ts'
@@ -203,7 +204,7 @@ export const createGUI = ({
     Iterator.from(player.getInventory().listItems()).take(9)
 
     const hotbarSlots: HotbarSlot[] = Iterator.from(player.getInventory().listItems())
-      .take(9)
+      .take(Config.HOTBAR_SIZE)
       .map((stack, i) => ({
         isSelected: player.getActiveSlotIndex() === i,
         quantity: stack.map((s) => s.quantity).unwrapOrDefault(0),
