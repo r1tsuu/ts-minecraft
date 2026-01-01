@@ -64,8 +64,8 @@ export const createTerrainGenerator = (seed: string) => {
 
         // Use world coordinates for consistent tree placement across chunks
         const treeChance = seedrandom(`${seed}:tree:${worldX}:${worldZ}`)()
-        if (treeChance < 0.02) {
-          // 2% chance of tree
+        if (treeChance < 0.005) {
+          // 0.5% chance of tree
           // Find ground level
           let groundY = -1
           for (let y = Config.WORLD_HEIGHT - 1; y >= 0; y--) {
@@ -84,18 +84,18 @@ export const createTerrainGenerator = (seed: string) => {
               chunk.setBlock(x, y, z, Blocks.OakLog.id)
             }
 
-            // Place leaves (simple sphere-ish shape)
-            const leavesY = groundY + treeHeight - 1
+            // Place leaves (spherical shape with better coverage)
+            const leavesBaseY = groundY + treeHeight
             for (let dx = -2; dx <= 2; dx++) {
               for (let dy = -2; dy <= 2; dy++) {
                 for (let dz = -2; dz <= 2; dz++) {
-                  // Skip corners and center (trunk)
-                  if (
-                    Math.abs(dx) + Math.abs(dy) + Math.abs(dz) <= 3 &&
-                    !(dx === 0 && dz === 0 && dy <= 0)
-                  ) {
+                  // Calculate distance from center for spherical shape
+                  const distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
+
+                  // Create sphere with radius ~2.5, excluding the trunk
+                  if (distance <= 2.5 && !(dx === 0 && dz === 0 && dy <= 0)) {
                     const leafX = x + dx
-                    const leafY = leavesY + dy
+                    const leafY = leavesBaseY + dy
                     const leafZ = z + dz
 
                     // Only place leaves within chunk bounds
