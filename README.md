@@ -16,3 +16,14 @@
 
 - Much more stuff
 - Possibly support running the game straight up from Bun without a web browser using C/Rust FFI for OpenGL/GLFW
+
+## Core Utilities
+
+This project heavily relies on several functional programming utilities:
+
+- **[Maybe.ts](./src/shared/Maybe.ts)** - Optional value type for null safety, eliminating null/undefined checks.
+- **[Pipe.ts](./src/shared/Pipe.ts)** - Functional composition utility for chaining operations
+- **[AsyncPipe.ts](./src/shared/AsyncPipe.ts)** - Asynchronous version of Pipe for handling promises
+- **[HashMap.ts](./src/shared/HashMap.ts)** - Type-safe hash map implementation with functional methods
+
+Using normal `Map`, `undefined`, or `null` is discouraged in this project.
