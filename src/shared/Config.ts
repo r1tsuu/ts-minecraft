@@ -4,6 +4,7 @@ export class Config {
   static CHUNK_VOLUME = Config.CHUNK_SIZE * Config.CHUNK_SIZE * Config.WORLD_HEIGHT
   static readonly EULER_ORDER = 'YXZ'
   static readonly GRAVITY = 9.81
+  static readonly HOTBAR_SIZE = 9
   static readonly MAX_STACK_SIZE = 64
   static readonly MOUSE_SENSITIVITY = 0.002
   static readonly PLAYER_HEIGHT = 1.8

@@ -44,6 +44,26 @@ export const createClientPlayerControlSystemFactory = ({
   createSystemFactory((ctx) => {
     let queuedActionsToSend: BlockUpdateAction[] = []
 
+    const onScroll = throttle((event: WheelEvent) => {
+      const player = ctx.getClientPlayer()
+      const currentIndex = player.getActiveSlotIndex()
+      let newIndex = currentIndex
+
+      if (event.deltaY > 0) {
+        // Scrolling up
+        newIndex = (currentIndex + 1) % Config.HOTBAR_SIZE
+      } else if (event.deltaY < 0) {
+        // Scrolling down
+        newIndex = (currentIndex - 1 + Config.HOTBAR_SIZE) % Config.HOTBAR_SIZE
+      }
+
+      player.setActiveSlotIndex(newIndex)
+    }, 30)
+
+    window.addEventListener('wheel', onScroll)
+
+    ctx.onDispose(() => window.removeEventListener('wheel', onScroll))
+
     const handleBlockPlace = throttle(() => {
       const maybeLookingAtBlock = raycastingSystem.getLookingAtBlock()
       const maybeLookingAtNormal = raycastingSystem.getLookingAtNormal()
