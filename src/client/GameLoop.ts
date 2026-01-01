@@ -275,7 +275,7 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     disposed = true
   }
 
-  const vsync = false
+  const vsync = true
 
   const execute = () => {
     const frame = () => {

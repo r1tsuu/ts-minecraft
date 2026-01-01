@@ -1,19 +1,18 @@
 import seedrandom from 'seedrandom'
 import { SimplexNoise } from 'three/examples/jsm/Addons.js'
-import { match } from 'ts-pattern'
 
 import { type BlockID, Blocks } from '../shared/BlocksRegistry.ts'
 import { Config } from '../shared/Config.ts'
 import { Chunk, type ChunkCoordinates } from '../shared/entities/Chunk.ts'
-import { pipe } from '../shared/Pipe.ts'
 import { range } from '../shared/util.ts'
 
 export type TerrainGenerator = ReturnType<typeof createTerrainGenerator>
 // Terrain generation configuration
 const TERRAIN_CONFIG = {
   baseY: 32,
-  caveThreshold1: 0.6,
-  caveThreshold2: 0.5,
+  caveOpeningChance: 0.3, // 30% chance cave extends to surface
+  caveThreshold1: 0.1, //
+  caveThreshold2: 0.5, //
   detailScale: 0.02,
   gravelChance: 0.05, // 5% chance in stone layers
   heightScale: 0.005,
@@ -75,11 +74,15 @@ export const createTerrainGenerator = (seed: string) => {
           // Check for caves
           const cave1 = caveNoise.noise3d(worldX * 0.05, y * 0.05, worldZ * 0.05)
           const cave2 = caveNoise2.noise3d(worldX * 0.05, y * 0.05, worldZ * 0.05)
-          const isCave =
-            cave1 > TERRAIN_CONFIG.caveThreshold1 &&
-            cave2 > TERRAIN_CONFIG.caveThreshold2 &&
-            y > 1 &&
-            y < height - 3
+          const baseCave =
+            cave1 > TERRAIN_CONFIG.caveThreshold1 && cave2 > TERRAIN_CONFIG.caveThreshold2
+
+          // Allow caves to extend to surface occasionally
+          const surfaceOpeningNoise = caveNoise.noise(worldX * 0.1, worldZ * 0.1)
+          const hasSurfaceOpening = surfaceOpeningNoise > 0.7 && baseCave
+
+          const minCaveY = hasSurfaceOpening ? Math.max(1, height - 10) : 1
+          const isCave = baseCave && y > minCaveY && y < height - 3
 
           if (!isCave) {
             // Check for gravel pockets in stone
@@ -87,39 +90,33 @@ export const createTerrainGenerator = (seed: string) => {
             const isGravelPocket =
               gravelChance < TERRAIN_CONFIG.gravelChance && y < height - 4 && y > 5
 
-            pipe(
-              match<number, BlockID>(y)
-                .when(
-                  (y) => y === 0,
-                  () => Blocks.Bedrock.id,
-                )
-                .when(
-                  (y) =>
-                    y === height &&
-                    TERRAIN_CONFIG.sandBelowSeaLevel &&
-                    height < TERRAIN_CONFIG.baseY - 2,
-                  () => Blocks.Sand.id, // Sand below sea level
-                )
-                .when(
-                  (y) => y === height,
-                  () => Blocks.Grass.id,
-                )
-                .when(
-                  (y) => y > height - 4,
-                  () => Blocks.Dirt.id, // Top 4 blocks are dirt
-                )
-                .when(
-                  () => isGravelPocket,
-                  () => Blocks.Gravel.id, // Gravel pockets
-                )
-                .otherwise(() => Blocks.Stone.id), // Everything else is stone
-            ).tap((blockID) => chunk.setBlock(x, y, z, blockID))
+            let blockID: BlockID
+
+            if (y === 0) {
+              blockID = Blocks.Bedrock.id
+            } else if (
+              y === height &&
+              TERRAIN_CONFIG.sandBelowSeaLevel &&
+              height < TERRAIN_CONFIG.baseY - 2
+            ) {
+              blockID = Blocks.Sand.id // Sand below sea level
+            } else if (y === height) {
+              blockID = Blocks.Grass.id
+            } else if (y > height - 4) {
+              blockID = Blocks.Dirt.id // Top 4 blocks are dirt
+            } else if (isGravelPocket) {
+              blockID = Blocks.Gravel.id // Gravel pockets
+            } else {
+              blockID = Blocks.Stone.id // Everything else is stone
+            }
+
+            chunk.setBlock(x, y, z, blockID)
           }
         }
       }
     }
 
-    // Second pass: generate ores
+    // Second pass: generate ores in veins
     for (const oreConfig of ORE_CONFIGS) {
       for (const x of range(Config.CHUNK_SIZE)) {
         for (const z of range(Config.CHUNK_SIZE)) {
@@ -130,10 +127,41 @@ export const createTerrainGenerator = (seed: string) => {
               `${seed}:ore:${oreConfig.block}:${worldX}:${y}:${worldZ}`,
             )()
             if (oreChance < oreConfig.chance) {
-              // Check if current block is stone
-              const current = chunk.getBlock(x, y, z)
-              if (current.isSome() && current.value() === Blocks.Stone.id) {
-                chunk.setBlock(x, y, z, oreConfig.block)
+              // Generate ore vein
+              const veinCenterX = x
+              const veinCenterY = y
+              const veinCenterZ = z
+
+              // Place ore blocks in a cluster around the center
+              for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                  for (let dz = -1; dz <= 1; dz++) {
+                    const veinRandom = seedrandom(
+                      `${seed}:vein:${oreConfig.block}:${worldX + dx}:${y + dy}:${worldZ + dz}`,
+                    )()
+                    // Use distance to create irregular vein shapes
+                    if (veinRandom < 0.6) {
+                      const veinX = veinCenterX + dx
+                      const veinY = veinCenterY + dy
+                      const veinZ = veinCenterZ + dz
+
+                      // Check bounds
+                      if (
+                        veinX >= 0 &&
+                        veinX < Config.CHUNK_SIZE &&
+                        veinZ >= 0 &&
+                        veinZ < Config.CHUNK_SIZE &&
+                        veinY >= oreConfig.minY &&
+                        veinY <= oreConfig.maxY
+                      ) {
+                        const current = chunk.getBlock(veinX, veinY, veinZ)
+                        if (current.isSome() && current.value() === Blocks.Stone.id) {
+                          chunk.setBlock(veinX, veinY, veinZ, oreConfig.block)
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }
           }
