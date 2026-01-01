@@ -98,6 +98,11 @@ export const createTexturesRegistry = async (): Promise<TexturesRegistry> => {
   canvas.width = atlasSize
   canvas.height = atlasSize
   const ctx2d = Maybe.from(canvas.getContext('2d')).expect('2D context is not supported')
+
+  // Fill entire canvas with white to ensure no transparent areas
+  ctx2d.fillStyle = '#FFFFFF'
+  ctx2d.fillRect(0, 0, atlasSize, atlasSize)
+
   let i = 0
 
   const uvMap = new HashMap<number, HashMap<Side, RawVector2>>()
@@ -130,14 +135,23 @@ export const createTexturesRegistry = async (): Promise<TexturesRegistry> => {
   atlasTexture.needsUpdate = true
   atlasTexture.magFilter = NearestFilter
   atlasTexture.minFilter = NearestFilter
+  atlasTexture.flipY = false // Don't flip the texture
 
   console.log(`Created texture atlas with size ${atlasSize}x${atlasSize}`)
   const getUVForBlockSide = (blockID: number, side: Side): RawVector2 => {
-    return uvMap
-      .get(blockID)
-      .expect(`No UV mapping for block ID ${blockID}`)
-      .get(side)
-      .expect(`No UV mapping for block ID ${blockID} side ${side}`)
+    const blockMap = uvMap.get(blockID)
+    if (blockMap.isNone()) {
+      console.error(`No UV mapping for block ID ${blockID}`)
+      console.error('Available block IDs:', Array.from(uvMap.keys()))
+      throw new Error(`No UV mapping for block ID ${blockID}`)
+    }
+    const uv = blockMap.value().get(side)
+    if (uv.isNone()) {
+      console.error(`No UV mapping for block ID ${blockID} side ${side}`)
+      console.error(`Available sides for block ${blockID}:`, Array.from(blockMap.value().keys()))
+      throw new Error(`No UV mapping for block ID ${blockID} side ${side}`)
+    }
+    return uv.value()
   }
 
   return {

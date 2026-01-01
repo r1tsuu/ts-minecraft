@@ -42,19 +42,19 @@ const CUBE_FACES = {
   back: {
     normal: [0, 0, -1],
     vertices: [
-      [1, 0, 0],
-      [1, 1, 0],
-      [0, 1, 0],
       [0, 0, 0],
+      [0, 1, 0],
+      [1, 1, 0],
+      [1, 0, 0],
     ],
   },
   bottom: {
     normal: [0, -1, 0],
     vertices: [
-      [0, 0, 1],
-      [1, 0, 1],
-      [1, 0, 0],
       [0, 0, 0],
+      [1, 0, 0],
+      [1, 0, 1],
+      [0, 0, 1],
     ],
   },
   front: {
@@ -69,10 +69,10 @@ const CUBE_FACES = {
   left: {
     normal: [-1, 0, 0],
     vertices: [
-      [0, 0, 0],
-      [0, 1, 0],
-      [0, 1, 1],
       [0, 0, 1],
+      [0, 1, 1],
+      [0, 1, 0],
+      [0, 0, 0],
     ],
   },
   right: {
@@ -88,10 +88,10 @@ const CUBE_FACES = {
   top: {
     normal: [0, 1, 0],
     vertices: [
-      [0, 1, 0],
-      [1, 1, 0],
-      [1, 1, 1],
       [0, 1, 1],
+      [1, 1, 1],
+      [1, 1, 0],
+      [0, 1, 0],
     ],
   },
 }
@@ -102,18 +102,26 @@ const mapUVFromAtlas = (
   vertexIndex: number,
 ): RawVector2 => {
   const tileUV = 1 / tilesPerRow
+  const epsilon = 1 / 512 // Larger inset to avoid sampling at exact tile boundaries
+
   // Cube face vertices order: [0,1,2,3]
-  // We'll map vertex 0 = (0,0), 1 = (0,1), 2 = (1,1), 3 = (1,0)
+  // Map with flipped Y since we set flipY = false on texture
   const offsets = [
-    { x: 0, y: 0 }, // bottom-left
-    { x: 0, y: 1 }, // top-left
-    { x: 1, y: 1 }, // top-right
-    { x: 1, y: 0 }, // bottom-right
+    { x: 0, y: 1 }, // bottom-left -> top-left in texture (Y flipped)
+    { x: 0, y: 0 }, // top-left -> bottom-left in texture (Y flipped)
+    { x: 1, y: 0 }, // top-right -> bottom-right in texture (Y flipped)
+    { x: 1, y: 1 }, // bottom-right -> top-right in texture (Y flipped)
   ]
   const offset = offsets[vertexIndex]
+
+  const baseX = tile.x + offset.x * tileUV
+  const baseY = tile.y + offset.y * tileUV
+  const adjustX = offset.x === 0 ? epsilon : -epsilon
+  const adjustY = offset.y === 0 ? epsilon : -epsilon
+
   return {
-    x: tile.x + offset.x * tileUV,
-    y: tile.y + offset.y * tileUV,
+    x: baseX + adjustX,
+    y: baseY + adjustY,
   }
 }
 
@@ -164,7 +172,6 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
 
   // Build mesh geometry for a chunk
   const buildChunkMesh = (chunk: Chunk): BufferGeometry => {
-    const now = performance.now()
     const positions: number[] = []
     const normals: number[] = []
     const uvs: number[] = []
@@ -229,12 +236,6 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
       geometry.computeBoundingSphere()
     }
 
-    console.log(
-      `Built mesh for chunk at`,
-      chunk.getWorldCoordinates(),
-      `in ${(performance.now() - now).toFixed(2)} ms`,
-    )
-
     return geometry
   }
 
@@ -249,8 +250,6 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
       const data = existingData.value()
       data.mesh.geometry.dispose()
       data.mesh.geometry = geometry
-      data.needsRebuild = false
-      console.log(`Updated mesh for chunk at`, chunk.getWorldCoordinates())
     } else {
       // Create new mesh
       const mesh = new Mesh(
@@ -268,8 +267,6 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
         mesh,
         needsRebuild: false,
       })
-
-      console.log(`Created mesh for chunk at`, chunk.getWorldCoordinates())
     }
   }
 
@@ -312,8 +309,6 @@ export const chunkRenderingSystemFactory = createSystemFactory((ctx) => {
       chunksNeedingRender.delete(chunk)
       chunkBlocksNeedingUpdate.delete(chunk)
     }
-
-    console.log(`Unrendered ${chunks.length} chunks`)
   }
 
   ctx.onRenderBatch(Chunk, (chunks) => {
