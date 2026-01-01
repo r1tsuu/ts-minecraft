@@ -35,7 +35,11 @@ eventBus.subscribe(StartLocalServer, async (event) => {
   console.log(`Starting local server...`)
 
   const storage = await createPrivateFileSystemWorldStorage(event.worldName)
-  const createdServer = await createMinecraftServer({ eventBus, storage })
+  const createdServer = await createMinecraftServer({
+    eventBus,
+    seed: event.worldSeed,
+    storage,
+  })
   server = Some(createdServer)
 
   eventBus.publish(

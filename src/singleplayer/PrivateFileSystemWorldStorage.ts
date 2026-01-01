@@ -79,6 +79,9 @@ export const createPrivateFileSystemWorldStorage = async (
         .map(readBufferIntoString)
         .map((buffer) => JSON.parse(buffer))
         .mapArray(Player.deserialize)
+        .tapError((error) => {
+          console.warn('Error reading players file:', error)
+        })
         .catch(() => [])
         .execute()
     },

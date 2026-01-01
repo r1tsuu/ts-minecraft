@@ -76,7 +76,7 @@ export const raycastingSystemFactory = createSystemFactory((ctx) => {
           if (ctx.world.getBlockAt(worldX, worldY, worldZ).isNone()) continue
 
           const position = new Vector3(worldX, worldY, worldZ)
-          matrix.setPosition(worldX, worldY, worldZ)
+          matrix.setPosition(worldX + 0.5, worldY + 0.5, worldZ + 0.5)
           raycastingMesh.setMatrixAt(index, matrix)
           blockPositionMap.set(index, position)
           index++
@@ -105,7 +105,8 @@ export const raycastingSystemFactory = createSystemFactory((ctx) => {
 
       if (maybePosition.isSome()) {
         const position = maybePosition.value()
-        mesh.position.set(position.x, position.y, position.z)
+
+        mesh.position.set(position.x + 0.5, position.y + 0.5, position.z + 0.5) // Center the box
         ctx.scene.add(mesh)
 
         maybeLookingAtBlock = Some(position.clone())

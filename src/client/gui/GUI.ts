@@ -1,4 +1,4 @@
-import * as THREE from 'three'
+import { MathUtils } from 'three'
 
 import type { Maybe } from '../../shared/Maybe.ts'
 import type { MinecraftEventBus } from '../../shared/MinecraftEventBus.ts'
@@ -188,8 +188,8 @@ export const createGUI = ({
         positionX: player.position.x.toFixed(),
         positionY: player.position.y.toFixed(),
         positionZ: player.position.z.toFixed(),
-        rotationPitch: THREE.MathUtils.radToDeg(player.rotation.x).toFixed(),
-        rotationYaw: THREE.MathUtils.radToDeg(player.rotation.y).toFixed(),
+        rotationPitch: MathUtils.radToDeg(player.rotation.x).toFixed(),
+        rotationYaw: MathUtils.radToDeg(player.rotation.y).toFixed(),
       },
 
       ['#fps', '#position', '#rotation'],

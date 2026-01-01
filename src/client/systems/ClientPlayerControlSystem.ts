@@ -5,6 +5,7 @@ import type { ChunkRenderingSystem } from './ChunkRenderingSystem.ts'
 import type { PlayerUpdateSystem } from './PlayerUpdateSystem.ts'
 import type { RaycastingSystem } from './RaycastingSystem.ts'
 
+import { Blocks } from '../../shared/BlocksRegistry.ts'
 import { Config } from '../../shared/Config.ts'
 import { PauseToggle } from '../../shared/events/client/PauseToggle.ts'
 import {
@@ -35,7 +36,6 @@ export const createClientPlayerControlSystemFactory = ({
       if (maybeLookingAtBlock.isSome() && maybeLookingAtNormal.isSome()) {
         const lookingAtBlock = maybeLookingAtBlock.value()
         const lookingAtNormal = maybeLookingAtNormal.value()
-        const blockToPlace = ctx.blocksRegistry.getBlockIdByName('grass')
 
         const position: RawVector3 = {
           x: lookingAtBlock.x + lookingAtNormal.x,
@@ -43,6 +43,7 @@ export const createClientPlayerControlSystemFactory = ({
           z: lookingAtBlock.z + lookingAtNormal.z,
         }
 
+        const blockToPlace = Blocks.Grass.id
         ctx.world.addBlock(position.x, position.y, position.z, blockToPlace)
         chunkRenderingSystem.renderBlockAt(position)
         queuedActionsToSend.push({ blockID: blockToPlace, position, type: 'SET' })
@@ -53,6 +54,9 @@ export const createClientPlayerControlSystemFactory = ({
       const maybeLookingAtBlock = raycastingSystem.getLookingAtBlock()
       if (maybeLookingAtBlock.isSome()) {
         const lookingAtBlock = maybeLookingAtBlock.value()
+        const block = ctx.world.getBlockAt(lookingAtBlock.x, lookingAtBlock.y, lookingAtBlock.z)
+        if (block.isNone() || block.value() === Blocks.Bedrock.id) return
+
         chunkRenderingSystem.unrenderBlockAt(lookingAtBlock)
         ctx.world.removeBlockAt(lookingAtBlock.x, lookingAtBlock.y, lookingAtBlock.z)
         queuedActionsToSend.push({ position: lookingAtBlock, type: 'REMOVE' })

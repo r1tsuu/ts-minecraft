@@ -4,7 +4,6 @@ import type { MinecraftEventBus } from '../shared/MinecraftEventBus.ts'
 import type { WorldStorageAdapter } from './types.ts'
 
 import { asyncPipe } from '../shared/AsyncPipe.ts'
-import { BlocksRegistry } from '../shared/BlocksRegistry.ts'
 import { Config } from '../shared/Config.ts'
 import { Chunk, type ChunkCoordinates } from '../shared/entities/Chunk.ts'
 import { Player } from '../shared/entities/Player.ts'
@@ -24,15 +23,17 @@ export type MinecraftServer = Awaited<ReturnType<typeof createMinecraftServer>>
 
 export const createMinecraftServer = async ({
   eventBus,
+  seed,
   storage,
 }: {
   eventBus: MinecraftEventBus
+  seed: string
   storage: WorldStorageAdapter
 }) => {
-  const blocksRegistry = new BlocksRegistry()
-  const terrainGenerator = createTerrainGenerator(blocksRegistry)
+  const terrainGenerator = createTerrainGenerator(seed)
 
   const players = await storage.readPlayers()
+  console.log(`Loaded ${players.length} players from storage.`, players)
   const spawnChunks = Chunk.coordsInRadius(0, 0, Config.RENDER_DISTANCE)
 
   const world = new World()

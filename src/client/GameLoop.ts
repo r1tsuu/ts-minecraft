@@ -33,18 +33,18 @@ import { playerUpdateSystemFactory } from './systems/PlayerUpdateSystem.ts'
 import { raycastingSystemFactory } from './systems/RaycastingSystem.ts'
 
 export interface FrameCounter {
-  fps: number
-  lastFrames: number
-  lastTime: number
-  totalFrames: number
-  totalTime: number
+  readonly fps: number
+  readonly lastFrames: number
+  readonly lastTime: number
+  readonly totalFrames: number
+  readonly totalTime: number
 }
 
 export interface GameLoop {
   dispose(): void
   execute(): void
   getClientPlayer(): Player
-  getFrameCounter(): Readonly<FrameCounter>
+  getFrameCounter(): FrameCounter
   setRendererSize(width: number, height: number): void
 }
 
@@ -151,9 +151,6 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
       frameCounter.lastFrames = 0
       frameCounter.lastTime = 0
     }
-    // ---------------------------------
-    // FRAME COUNTER UPDATE ENDS HERE
-    // ---------------------------------
 
     const collectedEntities = new HashMap<EntityConstructor, Entity[]>()
 
@@ -240,9 +237,6 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     // FINAL RENDER CALL TO RENDER THE SCENE
     renderer.render(scene, camera)
   }
-  // ---------------------------------
-  // GAME LOOP FRAME HANDLER ENDS HERE
-  // ---------------------------------
 
   const subscriptions: Callback[] = []
   subscriptions.push(ctx.eventBus.subscribe(PauseToggle, () => (paused = !paused)))
@@ -281,7 +275,7 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     disposed = true
   }
 
-  const vsync = true
+  const vsync = false
 
   const execute = () => {
     const frame = () => {
@@ -316,9 +310,7 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     }
 
     const factoryCtx: SystemFactoryContext = {
-      blocksRegistry: ctx.blocksRegistry,
       camera,
-      clientBlocksRegistry: ctx.clientBlocksRegistry,
       eventBus: ctx.eventBus,
       getClientPlayer: () => clientPlayer,
       getDelta: () => delta,
@@ -363,6 +355,7 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
       },
       renderer,
       scene,
+      texturesRegistry: ctx.texturesRegistry,
       world,
     }
 
@@ -406,8 +399,6 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     }),
   )
   registerSystem(chunkLoadingSystemFactory({ chunkRenderingSystem, playerUpdateSystem }))
-  // ---------------------------------
-  // REGISTER SYSTEMS ENDS HERE
 
   // ---------------------------------
   // INITIALIZE SYSTEMS STARTS HERE
@@ -416,8 +407,6 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
   )) {
     init()
   }
-  // ---------------------------------
-  // INITIALIZE SYSTEMS ENDS HERE
 
   // ---------------------------------
   // SUBSCRIBE SYSTEM EVENT LISTENERS STARTS HERE
@@ -427,8 +416,6 @@ export const createGameLoop = (ctx: MinecraftClientContext, world: World): GameL
     const unsubscribe = ctx.eventBus.subscribe(EventConstructor, handler)
     systemsUnsubscriptions.push(unsubscribe)
   }
-  // ---------------------------------
-  // SUBSCRIBE SYSTEM EVENT LISTENERS ENDS HERE
 
   return {
     dispose,

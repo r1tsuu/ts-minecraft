@@ -9,13 +9,16 @@ export class Config {
   static readonly PLAYER_JUMP_STRENGTH = 8
   static readonly PLAYER_WALK_SPEED = 5
   static readonly PLAYER_WIDTH = 0.6
-  static readonly RENDER_DISTANCE = 2
+
+  static readonly RENDER_DISTANCE = 4
   /**
    * Server autosave interval in milliseconds
    */
   static readonly SERVER_AUTOSAVE_INTERVAL_MS = 5_000
+
   static readonly SPAWN_CHUNK_RADIUS = 3
   static readonly TICK_RATE = 20
+  static readonly TILE_SIZE = 16
 
   static getTickDuration(): number {
     return 1000 / Config.TICK_RATE

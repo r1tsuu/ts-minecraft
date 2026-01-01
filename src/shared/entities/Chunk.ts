@@ -82,6 +82,13 @@ export class Chunk extends Entity {
     }
   }
 
+  static mapToWorldCoordinates(chunk: ChunkCoordinates, local: ChunkCoordinates): ChunkCoordinates {
+    return {
+      x: chunk.x * Config.CHUNK_SIZE + local.x,
+      z: chunk.z * Config.CHUNK_SIZE + local.z,
+    }
+  }
+
   static serialize(chunk: Chunk): any {
     return chunk.serialize()
   }
@@ -111,6 +118,13 @@ export class Chunk extends Entity {
       x: this.x * Config.CHUNK_SIZE + localX,
       y: localY,
       z: this.z * Config.CHUNK_SIZE + localZ,
+    }
+  }
+
+  getWorldCoordinates(): ChunkCoordinates {
+    return {
+      x: this.x * Config.CHUNK_SIZE,
+      z: this.z * Config.CHUNK_SIZE,
     }
   }
 
