@@ -4,7 +4,7 @@
 
 ## Implemented:
 
-- Partial [ECS pattern](./src/shared/World.ts) without "components" - they are stored inside [entities](./src/shared/entities/Entity.ts). New game logic can easily be added with `createServiceFactory`, example - [chunk rendering](./src/client/systems/ChunkRenderingSystem.ts)
+- Partial [ECS pattern](./src/shared/World.ts) without "components" - they are stored inside [entities](./src/shared/entities/Entity.ts). New game logic can easily be added with `createSystemFactory`, example - [chunk rendering](./src/client/systems/ChunkRenderingSystem.ts)
 - Client - Server architecture through [Event Bus](./src/shared//MinecraftEventBus.ts), currently the "server" is executed via a [web worker](./src/singleplayer/SinglePlayerWorker.ts).
 - Infinite world generation with terrain, trees, caves, ores
 - Chunk rendering via chunk mesh generation - very fast.
